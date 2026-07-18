@@ -1,0 +1,5 @@
+classroom_db2.sql
+*.sql
+config/db.php
+config/secrets.php
+.env
