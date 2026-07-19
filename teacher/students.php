@@ -388,11 +388,11 @@ $active_nav = "students";
             <label>Password <span style="color:var(--red);">*</span></label>
             <div class="input-wrap" style="position:relative;">
               <i class="ti ti-lock"></i>
-              <input type="password" name="password" id="pw_input" class="form-control"
+              <input type="password" name="password" id="pw-input" class="form-control"
                 placeholder="Set initial password" required>
-              <button type="button" onclick="togglePw()"
-                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;">
-                <i class="ti ti-eye" id="pw_icon"></i>
+              <button type="button" class="show-pw" onclick="togglePw()"
+                style="position:absolute;right:15px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;">
+                 &ensp;<i class="ti ti-eye"></i> &nbsp;&emsp;<i id="pw-icon"></i>
               </button>
             </div>
           </div>
@@ -569,8 +569,8 @@ $active_nav = "students";
 
 <script>
 function togglePw(){
-  const pw=document.getElementById('pw_input');
-  const ic=document.getElementById('pw_icon');
+  const pw=document.getElementById('pw-input');
+  const ic=document.getElementById('pw-icon');
   if(!pw||!ic)return;
   if(pw.type==='password'){pw.type='text';ic.className='ti ti-eye-off';}
   else{pw.type='password';ic.className='ti ti-eye';}

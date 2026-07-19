@@ -75,13 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label>Password</label>
         <div class="input-wrap">
           <i class="ti ti-lock"></i>
-          <input type="password" name="password" id="pw" placeholder="Enter your password" required>
+          <input type="password" name="password" id="pw-input" placeholder="Enter your password" required>
             <button type="button" class="show-pw" onclick="togglePw()">
-             &ensp;&emsp;<i class="ti ti-eye"></i> &nbsp;<i class=id="pw-icon"></i>
+             &ensp;&emsp;<i class="ti ti-eye"></i> &nbsp;<i id="pw-icon"></i>
           </button>
         </div>
       </div>
-      <button type="submit" class="btn-login" style="color:var(--text2);">
+      <button type="submit" class="btn-login">
         <i class="ti ti-login"></i> Sign In
       </button>
     </form>
