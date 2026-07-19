@@ -3,3 +3,4 @@ classroom_db2.sql
 config/db.php
 config/secrets.php
 .env
+!database/schema.sql
