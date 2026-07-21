@@ -1,18 +1,23 @@
 // ============================================================
 //  classroom_biometric.ino
-//  ESP32 + AS608  —  Host-Driven Fingerprint Attendance
+//  ESP32 + AS608  —  Server-Side Fingerprint Attendance
 //
-//  Architecture: ZERO templates stored on the AS608 sensor.
-//  All templates live in MySQL. The ESP32 is a thin client:
-//    1. Capture image → extract feature
-//    2. Fetch all templates from server (bio_match.php)
-//    3. Loop: DownChar each template → Match vs probe
+//  Architecture: ZERO matching happens on the ESP32 or AS608.
+//  The ESP32 is a thin client that only captures and uploads
+//  raw images — all minutiae extraction and matching happens
+//  server-side (NBIS mindtct + bozorth3):
+//    1. Capture raw fingerprint image (UpImage)
+//    2. POST image to server (bio_match.php)
+//    3. Server extracts minutiae + matches against enrolled
+//       students for the active session, returns result
 //    4. On match → POST student_id to bio_record.php
 //
-//  Enrollment flow:
+//  Enrollment flow (UNCHANGED FOR NOW — still on-device):
 //    Teacher selects a student on the LCD menu →
 //    ESP32 captures 2 images → merges → UpChar 512-byte template →
 //    POSTs base64 template to bio_enroll.php
+//    NOTE: this still uses the old AS608-template approach and is
+//    a candidate for the same UpImage-based rewrite as a follow-up.
 //
 //  Subject/Teacher binding:
 //    Each device has a unique DEVICE_KEY flashed in.
@@ -51,13 +56,13 @@
 //  CONFIG — edit before flashing
 // ============================================================
 
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* WIFI_SSID     = "GlobeAtHome_b60e8_2.4";
+const char* WIFI_PASSWORD = "twPwBph6";
 
-const char* SERVER_BASE   = "http://YOUR_SERVER_IP";
+const char* SERVER_BASE   = "http://192.168.254.110";
 
 // This device's unique key — must match the device_key column in bio_devices
-const char* DEVICE_KEY    = "YOUR_DEVICE_KEY_HERE";
+const char* DEVICE_KEY    = "esp32-room1-abc123";
 
 // ── Pins ──────────────────────────────────────────────────────
 #define I2C_SDA    21
@@ -66,17 +71,22 @@ const char* DEVICE_KEY    = "YOUR_DEVICE_KEY_HERE";
 #define FP_TX      33
 #define LED_GREEN  25
 #define LED_RED    26
-#define BUZZER     27   // set to -1 if no buzzer
+#define BUZZER     -1   // set to -1 if no buzzer
 
 // ── Timing ────────────────────────────────────────────────────
 #define SCAN_COOLDOWN_MS    3000
 #define LCD_HOLD_MS         2800
 #define WIFI_RETRY_MS       30000
-#define HTTP_TIMEOUT_MS     8000    // match + record calls can take ~3s for 40 students
+#define HTTP_TIMEOUT_MS     15000   // image upload (~48KB base64) + server-side minutiae match
 #define ENROLL_POLL_MS      4000    // how often to check for queued enrollments
 
 // ── SD log ────────────────────────────────────────────────────
 #define SD_LOG_FILE  "/bio_offline.csv"
+
+//----------------------------------------------------------
+#define IMG_WIDTH 256
+#define IMG_HEIGHT 288
+#define IMG_SIZE (IMG_WIDTH * IMG_HEIGHT / 2)  // AS608 packs 2 pixels/byte, 4-bit grayscale
 
 // ============================================================
 //  Globals
@@ -116,7 +126,9 @@ void     attendanceMode();
 void     enrollmentMode();
 bool     captureFeature(uint8_t slot);
 bool     captureAndUploadTemplate();
-String   fetchTemplatesAndMatch(const String& dateStr, const String& timeStr);
+String   uploadImageAndMatch(const String& dateStr, const String& timeStr);
+bool     uploadImage(uint8_t* dst, int dstLen);
+int      readDataStream(uint8_t* dst, int dstLen, uint32_t timeoutMs);
 bool     recordAttendance(const String& studentId, const String& dateStr,
                           const String& timeStr, const String& status);
 void     logToSD(const String& studentId, const String& dateStr,
@@ -265,8 +277,15 @@ attendanceMode();
 //  runs 1:N match on-device, records attendance.
 // ============================================================
 void attendanceMode() {
-    // Step 1: Capture image and extract feature into CharBuffer1
-    if (!captureFeature(1)) return;   // no finger or bad image
+    // Step 1: Capture a raw fingerprint image (no on-device feature
+    // extraction needed anymore — matching happens server-side)
+    uint8_t p = finger.getImage();
+    if (p == FINGERPRINT_NOFINGER) return;
+    if (p != FINGERPRINT_OK) {
+        if (p != FINGERPRINT_IMAGEMESS)   // suppress idle noise
+            Serial.printf("[FP] getImage error %d\n", p);
+        return;
+    }
 
     // Cooldown guard — don't re-process the same scan immediately
     // (AS608 getImage can fire multiple times per finger press)
@@ -292,8 +311,8 @@ void attendanceMode() {
         return;
     }
 
-    // Step 2: Fetch all enrolled templates + run match on-sensor
-    String matchResult = fetchTemplatesAndMatch(dateStr, timeStr);
+    // Step 2: Upload the raw image — server extracts minutiae and matches
+    String matchResult = uploadImageAndMatch(dateStr, timeStr);
     // matchResult is either:
     //   "MATCH:2024-001:Ana Reyes:Present"
     //   "MATCH:2024-001:Ana Reyes:Late"
@@ -354,46 +373,36 @@ void attendanceMode() {
 }
 
 // ============================================================
-//  FETCH TEMPLATES + 1:N MATCH ON-SENSOR
+//  UPLOAD RAW IMAGE + SERVER-SIDE MATCH
 //
 //  Protocol:
-//    1. POST probe feature (CharBuffer1, 256 bytes) to bio_match.php
-//    2. Server returns JSON: { templates: [{student_id, name, template_b64}, ...] }
-//    3. For each template:
-//         a. base64 decode to 512-byte raw template
-//         b. DownChar: write template into AS608 CharBuffer2
-//            (we match probe in CB1 against each stored template in CB2)
-//         c. Call finger.fingerFastSearch() — WAIT, that's 1:N on sensor.
-//            AS608 Match command (0x03) compares CB1 vs CB2 only (1:1).
-//            We use that for each iteration.
-//    4. Return result string on first match
-//
-//  AS608 Match Command (0x03):
-//    Adafruit library: finger.fingerFastSearch() does 1:N against stored templates.
-//    For host-driven 1:1, we use the raw Match packet directly since the
-//    Adafruit library doesn't expose it. We send the packet manually.
+//    1. UpImage: pull the raw fingerprint image off the AS608
+//       (IMG_SIZE bytes, 4-bit packed grayscale, 256x288)
+//    2. POST it (base64) to bio_match.php
+//    3. Server runs mindtct (minutiae extraction) on the image,
+//       then bozorth3 against every enrolled student's stored
+//       minutiae for the active session, and returns a "result"
+//       field already formatted as:
+//         "MATCH:2024-001:Ana Reyes:Present"
+//         "MATCH:2024-001:Ana Reyes:Late"
+//         "NO_MATCH"
+//    4. This function just forwards that string (or an ERROR:)
+//       back to attendanceMode(), which parses it exactly as before.
 // ============================================================
-String fetchTemplatesAndMatch(const String& dateStr, const String& timeStr) {
-    // ── Upload probe feature (CharBuffer1) to ESP32 memory ────
-    // We use UpChar to read the 256-byte feature from the sensor
-    // so we can re-load it as CharBuffer1 for each comparison.
-    uint8_t probeTemplate[512];   // AS608 UpChar returns 512 bytes even for features
-    memset(probeTemplate, 0, sizeof(probeTemplate));
+String uploadImageAndMatch(const String& dateStr, const String& timeStr) {
+    static uint8_t imgBuf[IMG_SIZE];   // static: allocate once, not on the stack
 
-    // UpChar(1): upload CharBuffer1 from sensor → ESP32
-    // We'll call it via direct packet since Adafruit library
-    // doesn't expose UpChar. See uploadCharBuffer() helper below.
-    if (!uploadCharBuffer(1, probeTemplate, 512)) {
-        Serial.println("[MATCH] Failed to upload probe from sensor");
-        return "ERROR:Probe upload failed";
+    if (!uploadImage(imgBuf, IMG_SIZE)) {
+        Serial.println("[MATCH] Failed to upload image from sensor");
+        return "ERROR:Image upload failed";
     }
 
     // ── POST to bio_match.php ─────────────────────────────────
-    String probe_b64 = base64Encode(probeTemplate, 512);
+    String img_b64 = base64Encode(imgBuf, IMG_SIZE);
 
     String url  = String(SERVER_BASE) + "/classroom/api/bio_match.php";
     String body = "device_key=" + urlencode(String(DEVICE_KEY))
-                + "&probe_b64=" + urlencode(probe_b64)
+                + "&image_b64=" + urlencode(img_b64)
                 + "&date="      + dateStr
                 + "&time="      + timeStr;
 
@@ -408,83 +417,14 @@ String fetchTemplatesAndMatch(const String& dateStr, const String& timeStr) {
         return "ERROR:HTTP " + String(httpCode);
     }
 
-    // Quick check
     if (response.indexOf("\"status\":\"error\"") >= 0) {
         String msg = jsonExtract(response, "message");
         return "ERROR:" + msg;
     }
 
-    // ── Extract late_cutoff ───────────────────────────────────
-    String cutoff = jsonExtract(response, "late_cutoff");
-    if (cutoff == "") cutoff = "08:15:00";
-
-    // ── Parse templates array ─────────────────────────────────
-    // JSON format: "templates":[{"student_id":"...","name":"...","template_b64":"..."},...]
-    // We parse manually since no ArduinoJson.
-    int arrStart = response.indexOf("\"templates\":[");
-    if (arrStart < 0) return "ERROR:No templates key";
-
-    arrStart += 13;   // skip past  "templates":[
-    int arrEnd = response.lastIndexOf(']');
-    if (arrEnd < 0) return "ERROR:Bad JSON";
-
-    String arrStr = response.substring(arrStart, arrEnd);
-
-    // ── Reload probe into CharBuffer1 before matching loop ────
-    if (!downloadCharBuffer(1, probeTemplate, 512)) {
-        return "ERROR:Probe reload failed";
-    }
-
-    // ── Iterate templates: DownChar → Match ───────────────────
-    int pos = 0;
-    while (pos < (int)arrStr.length()) {
-        int objStart = arrStr.indexOf('{', pos);
-        if (objStart < 0) break;
-        int objEnd = arrStr.indexOf('}', objStart);
-        if (objEnd < 0) break;
-
-        String obj = arrStr.substring(objStart + 1, objEnd);
-        pos = objEnd + 1;
-
-        String student_id   = jsonExtract("{" + obj + "}", "student_id");
-        String name         = jsonExtract("{" + obj + "}", "name");
-        String template_b64 = jsonExtract("{" + obj + "}", "template_b64");
-
-        if (student_id == "" || template_b64 == "") continue;
-
-        // Decode base64 template (512 bytes)
-        uint8_t tplBuf[512];
-        int tplLen = base64Decode(template_b64, tplBuf, 512);
-        if (tplLen != 512) {
-            Serial.printf("[MATCH] Bad template size %d for %s\n", tplLen, student_id.c_str());
-            continue;
-        }
-
-        // DownChar(2): load stored template into CharBuffer2
-        if (!downloadCharBuffer(2, tplBuf, 512)) {
-            Serial.println("[MATCH] DownChar failed, skipping");
-            continue;
-        }
-
-        // Match CharBuffer1 (probe) vs CharBuffer2 (stored) — 1:1
-        uint16_t score = 0;
-        if (matchBuffers(score)) {
-            Serial.printf("[MATCH] Match! student=%s score=%d\n",
-                          student_id.c_str(), score);
-
-            // Determine status based on RTC time vs late cutoff
-            String att_status = "Present";
-            if (timeStr >= cutoff) att_status = "Late";
-
-            return "MATCH:" + student_id + ":" + name + ":" + att_status;
-        }
-
-        // No match — reload probe into CB1 (DownChar overwrites CB2 but
-        // some AS608 variants corrupt CB1 too on failed match, so reload)
-        downloadCharBuffer(1, probeTemplate, 512);
-    }
-
-    return "NO_MATCH";
+    String result = jsonExtract(response, "result");
+    if (result == "") return "ERROR:No result in response";
+    return result;
 }
 
 // ============================================================
@@ -816,37 +756,24 @@ bool sendCmd(uint8_t* payload, int payLen, uint8_t* ackBuf, int ackLen) {
     return (rIdx >= ackLen);
 }
 
-// UpChar: sensor → ESP32  (upload CharBuffer bufId into dst, dstLen bytes)
-// The sensor sends the template in multiple data packets (PID=0x02) followed
-// by one end-of-data packet (PID=0x08).
-bool uploadCharBuffer(uint8_t bufId, uint8_t* dst, int dstLen) {
-    // Send UpChar command (0x08) with buffer ID
-    uint8_t cmd[] = { 0x08, bufId };
-    uint8_t ack[12];
-    if (!sendCmd(cmd, 2, ack, 12)) {
-        Serial.println("[UPCHAR] sendCmd timeout");
-        return false;
-    }
-    if (ack[9] != 0x00) {
-        Serial.printf("[UPCHAR] Sensor error code: 0x%02X\n", ack[9]);
-        return false;
-    }
-
-    // Read data packets. Each packet:
-    //   0xEF 0x01  (header)
-    //   0xFF 0xFF 0xFF 0xFF  (address)
-    //   PID  (0x02=data, 0x08=end-of-data)
-    //   LEN_HIGH LEN_LOW  (payload + 2 checksum bytes)
-    //   [payload bytes]
-    //   CS_HIGH CS_LOW
+// Shared packet-reading loop used by both UpChar and UpImage.
+// Reads data packets (PID=0x02) until an end-of-data packet (PID=0x08),
+// writing payload bytes into dst. Each packet:
+//   0xEF 0x01  (header)
+//   0xFF 0xFF 0xFF 0xFF  (address)
+//   PID  (0x02=data, 0x08=end-of-data)
+//   LEN_HIGH LEN_LOW  (payload + 2 checksum bytes)
+//   [payload bytes]
+//   CS_HIGH CS_LOW
+int readDataStream(uint8_t* dst, int dstLen, uint32_t timeoutMs) {
     int received = 0;
     uint32_t timeout = millis();
 
-    while (millis() - timeout < 6000) {
+    while (millis() - timeout < timeoutMs) {
         // Wait for 0xEF 0x01 sync
         uint8_t b;
         bool synced = false;
-        while (millis() - timeout < 6000) {
+        while (millis() - timeout < timeoutMs) {
             if (fpSerial.available()) {
                 b = fpSerial.read();
                 if (b == 0xEF) {
@@ -886,7 +813,7 @@ bool uploadCharBuffer(uint8_t bufId, uint8_t* dst, int dstLen) {
         uint16_t pktLen = ((uint16_t)lh << 8) | ll;
         int dataLen = (int)pktLen - 2;  // exclude 2-byte checksum
         if (dataLen <= 0 || dataLen > 256) {
-            Serial.printf("[UPCHAR] Unexpected dataLen=%d pid=0x%02X\n", dataLen, pid);
+            Serial.printf("[STREAM] Unexpected dataLen=%d pid=0x%02X\n", dataLen, pid);
             break;
         }
 
@@ -905,14 +832,60 @@ bool uploadCharBuffer(uint8_t bufId, uint8_t* dst, int dstLen) {
             if (fpSerial.available()) fpSerial.read();
         }
 
-        Serial.printf("[UPCHAR] pid=0x%02X dataLen=%d received=%d\n", pid, dataLen, received);
+        Serial.printf("[STREAM] pid=0x%02X dataLen=%d received=%d\n", pid, dataLen, received);
 
         if (pid == 0x08) break;  // end-of-data packet
     }
 
+    return received;
+}
+
+// UpChar: sensor → ESP32  (upload CharBuffer bufId into dst, dstLen bytes)
+// Still used by enrollmentMode() for now.
+bool uploadCharBuffer(uint8_t bufId, uint8_t* dst, int dstLen) {
+    // Send UpChar command (0x08) with buffer ID
+    uint8_t cmd[] = { 0x08, bufId };
+    uint8_t ack[12];
+    if (!sendCmd(cmd, 2, ack, 12)) {
+        Serial.println("[UPCHAR] sendCmd timeout");
+        return false;
+    }
+    if (ack[9] != 0x00) {
+        Serial.printf("[UPCHAR] Sensor error code: 0x%02X\n", ack[9]);
+        return false;
+    }
+
+    int received = readDataStream(dst, dstLen, 6000);
     Serial.printf("[UPCHAR] Total received: %d bytes\n", received);
     return (received >= 256);
 }
+
+// UpImage: sensor → ESP32  (upload the raw captured fingerprint image)
+// Command 0x0A — same packet protocol as UpChar, but no buffer-ID byte
+// and a much larger payload (IMG_SIZE bytes vs 512 for a template).
+bool uploadImage(uint8_t* dst, int dstLen) {
+    uint8_t cmd[] = { 0x0A };
+    uint8_t ack[12];
+    if (!sendCmd(cmd, 1, ack, 12)) {
+        Serial.println("[UPIMAGE] sendCmd timeout");
+        return false;
+    }
+    if (ack[9] != 0x00) {
+        Serial.printf("[UPIMAGE] Sensor error code: 0x%02X\n", ack[9]);
+        return false;
+    }
+
+    // Images are much bigger than templates, so allow more time
+    int received = readDataStream(dst, dstLen, 15000);
+    Serial.printf("[UPIMAGE] Total received: %d / %d bytes\n", received, dstLen);
+    // Allow a little slack — the final packet may be padded
+    return (received >= dstLen - 1024);
+}
+
+// NOTE: downloadCharBuffer() and matchBuffers() below are no longer called
+// from attendanceMode() — matching now happens server-side on the raw
+// image. Left in place (unused for now) in case enrollmentMode() gets the
+// same UpImage-based rewrite later, or in case of rollback.
 
 // DownChar: ESP32 → sensor  (download src into CharBuffer bufId)
 // Sends 512 bytes in 4 data packets + 1 end packet.
