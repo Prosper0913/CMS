@@ -107,7 +107,7 @@ $conn->query("UPDATE bio_sessions SET status='ended', ended_at=NOW()
               WHERE status='active' AND auto_expire_at IS NOT NULL AND auto_expire_at < NOW()");
 
 $sq = $conn->prepare(
-    "SELECT id, subject_id, late_threshold FROM bio_sessions
+    "SELECT id, subject_id, started_at, late_after_minutes FROM bio_sessions
      WHERE device_id=? AND status='active'
      ORDER BY started_at DESC LIMIT 1"
 );
@@ -119,10 +119,10 @@ if (!$session) {
     exit;
 }
 
-$subject_id  = (int)$session['subject_id'];
-$session_id  = (int)$session['id'];
-// Real session threshold — fixes the old hardcoded 08:15:00 bug
-$late_cutoff = $session['late_threshold'] ?? '08:15:00';
+$subject_id         = (int)$session['subject_id'];
+$session_id         = (int)$session['id'];
+$session_started_at = $session['started_at'];
+$late_after_minutes = (int)$session['late_after_minutes'];
 
 // ── Load candidate .xyt templates for this subject ─────────────
 $tq = $conn->prepare(
@@ -277,7 +277,18 @@ if ($bestScore < MATCH_THRESHOLD || $bestStudent === null) {
     exit;
 }
 
-$att_status = ($scan_time >= $late_cutoff) ? 'Late' : 'Present';
+// Let MySQL decide Late vs Present — comparing the scan's full
+// datetime against (session start + late_after_minutes) entirely on
+// the DB side avoids any PHP/MySQL clock disagreement (see the
+// auto_expire_at timezone bug from earlier — same class of issue).
+$scan_datetime = $scan_date . ' ' . $scan_time;
+$lateq = $conn->prepare(
+    "SELECT (? >= DATE_ADD(?, INTERVAL ? MINUTE)) AS is_late"
+);
+$lateq->bind_param('ssi', $scan_datetime, $session_started_at, $late_after_minutes);
+$lateq->execute();
+$is_late = (bool)$lateq->get_result()->fetch_assoc()['is_late'];
+$att_status = $is_late ? 'Late' : 'Present';
 
 logAttempt($conn, $device, $session_id, $subject_id, $scan_date, $scan_time, $ip,
            strtolower($att_status), "Matched score={$bestScore}", $bestStudent);

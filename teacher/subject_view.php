@@ -401,10 +401,14 @@ if (isset($_POST['delete_attendance_day'])) {
 if (isset($_POST['start_bio_session'])) {
     $dev_id = (int)$_POST['bio_device_id'];
     $hours  = (int)($_POST['bio_expire_hours'] ?? 2);
-    $late_t = preg_match('/^\d{2}:\d{2}:\d{2}$/', $_POST['late_threshold'] ?? '')
-              ? $_POST['late_threshold'] : '08:15:00';
+
+    $late_raw = trim($_POST['late_after_minutes'] ?? '');
+    $late_minutes = (ctype_digit($late_raw) && (int)$late_raw > 0) ? (int)$late_raw : null;
+
     if ($dev_id <= 0) {
         $error_msg = "Please select a device.";
+    } elseif ($late_minutes === null) {
+        $error_msg = "Please enter how many minutes after the session starts a scan counts as Late (a whole number greater than 0).";
     } else {
         // End any active session on this device first
         $es = $conn->prepare(
@@ -414,17 +418,18 @@ if (isset($_POST['start_bio_session'])) {
         $es->bind_param('i', $dev_id); $es->execute();
 
         $expire = $hours > 0 ? date('Y-m-d H:i:s', strtotime("+{$hours} hours")) : null;
+
         $ins = $conn->prepare(
             "INSERT INTO bio_sessions
-             (device_id, subject_id, started_by, auto_expire_at, late_threshold, status)
+                (device_id, subject_id, started_by, auto_expire_at, late_after_minutes, status)
              VALUES (?,?,?,?,?,'active')"
         );
-        $ins->bind_param('iiiss', $dev_id, $subject_id, $teacher_id, $expire, $late_t);
+        $ins->bind_param('iiisi', $dev_id, $subject_id, $teacher_id, $expire, $late_minutes);
         $ins->execute();
+
         $success_msg = "Biometric session started. Device is now live for this subject.";
     }
 }
-
 // ── STOP biometric session ────────────────────────────────────
 if (isset($_POST['stop_bio_session'])) {
     $sess_id = (int)$_POST['session_id'];
@@ -682,11 +687,11 @@ $conn->query(
 );
 
 $bsq = $conn->prepare(
-    "SELECT bs.id, bs.device_id, bs.started_at, bs.auto_expire_at, bs.late_threshold,
-            d.label AS device_label
+    "SELECT bs.id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at,
+            bd.label AS device_label
      FROM bio_sessions bs
-     JOIN bio_devices d ON d.id = bs.device_id
-     WHERE bs.subject_id=? AND bs.status='active'
+     JOIN bio_devices bd ON bd.id = bs.device_id
+     WHERE bs.subject_id = ? AND bs.status = 'active'
      ORDER BY bs.started_at DESC LIMIT 1"
 );
 $bsq->bind_param('i', $subject_id);
@@ -1692,7 +1697,7 @@ elseif ($active_tab === 'biometric'):
           </div>
           <div style="display:flex;justify-content:space-between;">
             <span>Late after</span>
-            <span style="font-family:var(--font-mono);"><?php echo date('g:i A', strtotime($active_bio_session['late_threshold'])); ?></span>
+            <span style="font-family:var(--font-mono);"><?php echo (int)$active_bio_session['late_after_minutes']; ?> min</span>
           </div>
           <?php if ($active_bio_session['auto_expire_at']): ?>
           <div style="display:flex;justify-content:space-between;">
@@ -1744,9 +1749,9 @@ elseif ($active_tab === 'biometric'):
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="form-group">
-              <label>Late After</label>
-              <input type="time" name="late_threshold" class="form-control"
-                value="08:15" step="60" required>
+              <label>Late After (minutes)</label>
+              <input type="number" name="late_after_minutes" class="form-control"
+                value="15" min="1" step="1" required>
             </div>
             <div class="form-group">
               <label>Auto-Stop</label>

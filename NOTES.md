@@ -9,7 +9,10 @@ ONGOING JAVDSCHOOL- SYSTEM DATABASE : add a feature that a teacher can request a
 DONE - teacher/subject_view.php : adjust written works, major exams, performance and attendance so that each entry ex., Pre-midterm exam is just a small container which can be expanded to see student scores and other features.
 DONE - teacher/dashboard.php : add more features together with the at risk students and recent entries.
 - allow students to message instructors if they have questions or issues regarding their grades.
-
+- enlarge overall font  size
+- add admin role - to create student/teacher account, remove student if wala na sa school
+-get biometric working (try integrate the google sheets into db)
+- 
 
 
 ---FILES WHICH USE INTERNAL CSS
