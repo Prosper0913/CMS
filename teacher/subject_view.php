@@ -115,7 +115,7 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
     $ajax_rows = $aq->get_result()->fetch_all(MYSQLI_ASSOC);
 
     $asq = $conn->prepare(
-        "SELECT bs.id, bs.late_threshold, bs.auto_expire_at, bs.started_at,
+        "SELECT bs.id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at,
                 bd.label AS device_label
          FROM bio_sessions bs
          JOIN bio_devices bd ON bd.id = bs.device_id
@@ -1323,10 +1323,10 @@ elseif ($active_tab === 'attendance'):
 <!-- Stat chips -->
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
   <?php foreach ([
-    ['Present', $att_summary['Present'],    'var(--green)',  'var(--green-dim)',  'rgba(52,211,153,.25)'],
-    ['Late',    $att_summary['Late'],        'var(--yellow)', 'var(--yellow-dim)','rgba(251,191,36,.25)'],
-    ['Absent',  $att_summary['Absent'],      'var(--red)',    'var(--red-dim)',   'rgba(248,113,113,.25)'],
-    ['Total',   $enrollee_count,             'var(--accent)', 'var(--accent-dim)','var(--accent-glow)'],
+    ['Present', $att_summary['Present'],    'var(--green)',  'var(--bg4)',  'rgba(52,211,153,.25)'],
+    ['Late',    $att_summary['Late'],        'var(--yellow)', 'var(--bg4)','rgba(251,191,36,.25)'],
+    ['Absent',  $att_summary['Absent'],      'var(--red)',    'var(--bg4)',   'rgba(248,113,113,.25)'],
+    ['Total',   $enrollee_count,             'var(--accent)', 'var(--bg4)','var(--accent-glow)'],
   ] as [$lbl, $val, $col, $bg, $bdr]): ?>
   <div style="background:<?php echo $bg; ?>;border:1px solid <?php echo $bdr; ?>;
               border-radius:var(--radius-lg);padding:16px;text-align:center;">
@@ -1647,10 +1647,10 @@ elseif ($active_tab === 'biometric'):
 <!-- Bio stat chips -->
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
   <?php foreach ([
-    ['Present', $bio_present, 'var(--green)',  'var(--green-dim)',  'rgba(52,211,153,.25)',  'bioStatPresent'],
-    ['Late',    $bio_late,    'var(--yellow)', 'var(--yellow-dim)', 'rgba(251,191,36,.25)',  'bioStatLate'],
-    ['Not Yet', $bio_absent,  'var(--red)',    'var(--red-dim)',    'rgba(248,113,113,.25)', 'bioStatAbsent'],
-    ['Total',   $bio_total,   'var(--accent)', 'var(--accent-dim)','var(--accent-glow)',    'bioStatTotal'],
+    ['Present', $bio_present, 'var(--green)',  'var(--bg4)',  'rgba(52,211,153,.25)',  'bioStatPresent'],
+    ['Late',    $bio_late,    'var(--yellow)', 'var(--bg4)', 'rgba(251,191,36,.25)',  'bioStatLate'],
+    ['Not Yet', $bio_absent,  'var(--red)',    'var(--bg4)',    'rgba(248,113,113,.25)', 'bioStatAbsent'],
+    ['Total',   $bio_total,   'var(--accent)', 'var(--bg4)','var(--accent-glow)',    'bioStatTotal'],
   ] as [$lbl, $val, $col, $bg, $bdr, $elid]): ?>
   <div style="background:<?php echo $bg; ?>;border:1px solid <?php echo $bdr; ?>;
               border-radius:var(--radius-lg);padding:16px;text-align:center;">
@@ -2105,7 +2105,7 @@ elseif ($active_tab === 'settings'):
 <div class="settings-wrap">
 
   <!-- 1. Subject Details -->
-  <div class="card" style="max-width:700px;margin-bottom:20px; transform: translate(-150px, 0px);">
+  <div class="card" style="max-width:600px;margin-bottom:20px; transform: translate(-50px, 0px);">
     <p class="card-title"><i class="ti ti-pencil"></i> Edit Subject Details</p>
     <form method="POST">
       <input type="hidden" name="update_subject_meta">
@@ -2160,7 +2160,7 @@ elseif ($active_tab === 'settings'):
   </div>
 
   <!-- 2. Grade Weights -->
-  <div class="card" style="max-width:700px;margin-bottom:20px; transform: translate(600px, -430px);">
+  <div class="card" style="max-width:600px;margin-bottom:20px; transform: translate(600px, -430px);">
     <p class="card-title"><i class="ti ti-percentage"></i> Edit Grade Weights</p>
     <p style="font-size:12px;color:var(--text2);margin-bottom:16px;">
       Changing weights will immediately recompute all student grades for this subject.

@@ -195,7 +195,10 @@ if (strlen($imgRaw) < $expectedBytes) {
 
 if (!extension_loaded('gd')) fail('Server misconfigured: GD extension not available', 500);
 
-$im = imagecreatetruecolor(IMG_WIDTH, IMG_HEIGHT);
+// Palette-based (8-bit) image, NOT imagecreatetruecolor() — mindtct
+// requires true 8-bit grayscale PNGs, and truecolor() produces 24-bit
+// PNGs even when every pixel happens to be gray.
+$im = imagecreate(IMG_WIDTH, IMG_HEIGHT);
 $palette = [];
 for ($v = 0; $v < 256; $v++) $palette[$v] = imagecolorallocate($im, $v, $v, $v);
 
@@ -232,7 +235,7 @@ $pngWsl   = winToWsl(realpath($pngPath));
 $orootWsl = winToWsl($orootWin);
 
 // ── Run mindtct on the probe image ───────────────────────────────
-$cmd = 'wsl.exe ' . MINDTCT_BIN . ' ' . escapeshellarg($pngWsl) . ' ' . escapeshellarg($orootWsl) . ' 2>&1';
+$cmd = 'wsl.exe -d Ubuntu ' . MINDTCT_BIN . ' ' . escapeshellarg($pngWsl) . ' ' . escapeshellarg($orootWsl) . ' 2>&1';
 $mindtctOut = shell_exec($cmd);
 
 if (!file_exists($xytPath)) {
@@ -256,7 +259,7 @@ foreach ($candidates as $cand) {
     $candWsl = winToWsl(realpath($candXytPath));
     $probeXytWsl = winToWsl(realpath($xytPath));
 
-    $cmd = 'wsl.exe ' . BOZORTH3_BIN . ' ' . escapeshellarg($probeXytWsl) . ' ' . escapeshellarg($candWsl) . ' 2>&1';
+    $cmd = 'wsl.exe -d Ubuntu ' . BOZORTH3_BIN . ' ' . escapeshellarg($probeXytWsl) . ' ' . escapeshellarg($candWsl) . ' 2>&1';
     $out = trim((string)shell_exec($cmd));
     $score = is_numeric($out) ? (int)$out : -1;
 

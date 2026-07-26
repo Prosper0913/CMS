@@ -184,12 +184,18 @@ if (isset($_GET['ajax_section_students'])) {
 
 // ── Start a session ───────────────────────────────────────────
 if (isset($_POST['start_session'])) {
-    $dev_id         = (int)$_POST['dev_id'];
-    $subj_id        = (int)$_POST['session_subject'];
-    $late_threshold = trim($_POST['late_threshold'] ?? '08:15:00');
-    $duration_min   = (int)($_POST['duration_min'] ?? 90);
+    $dev_id  = (int)$_POST['dev_id'];
+    $subj_id = (int)$_POST['session_subject'];
+
+    $late_raw     = trim($_POST['late_after_minutes'] ?? '');
+    $late_minutes = (ctype_digit($late_raw) && (int)$late_raw > 0) ? (int)$late_raw : null;
+
+    $duration_min = (int)($_POST['duration_min'] ?? 90);
+
     if ($dev_id === 0 || $subj_id === 0) {
         $error_msg = "Select both a device and a subject.";
+    } elseif ($late_minutes === null) {
+        $error_msg = "Please enter how many minutes after the session starts a scan counts as Late (a whole number greater than 0).";
     } else {
         $ov = $conn->prepare("SELECT id FROM subjects WHERE id=? AND teacher_id=? LIMIT 1");
         $ov->bind_param('ii', $subj_id, $teacher_id);
@@ -197,21 +203,19 @@ if (isset($_POST['start_session'])) {
         if ($ov->num_rows === 0) {
             $error_msg = "You don't own that subject.";
         } else {
-            // End any currently active session for this device first
             $end = $conn->prepare("UPDATE bio_sessions SET status='ended', ended_at=NOW() WHERE device_id=? AND status='active'");
             $end->bind_param('i', $dev_id); $end->execute();
-            // Insert new session
+
             $ins = $conn->prepare(
-                "INSERT INTO bio_sessions (device_id, subject_id, started_by, status, late_threshold, auto_expire_at, started_at)
+                "INSERT INTO bio_sessions (device_id, subject_id, started_by, status, late_after_minutes, auto_expire_at, started_at)
                  VALUES (?, ?, ?, 'active', ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NOW())"
             );
-            $ins->bind_param('iiisi', $dev_id, $subj_id, $teacher_id, $late_threshold, $duration_min);
+            $ins->bind_param('iiiii', $dev_id, $subj_id, $teacher_id, $late_minutes, $duration_min);
             $ins->execute();
             $success_msg = "Session started. Device will pick it up within seconds.";
         }
     }
 }
-
 // ── Stop a session ─────────────────────────────────────────────
 if (isset($_POST['stop_session'])) {
     $dev_id = (int)$_POST['dev_id'];
@@ -319,14 +323,14 @@ $queue_rows = $queue_res ? $queue_res->fetch_all(MYSQLI_ASSOC) : [];
 $active_sessions = [];
 if (!empty($devices)) {
     foreach ($devices as $dev) {
-        $sq = $conn->prepare(
-            "SELECT bs.id, bs.subject_id, bs.late_threshold, bs.auto_expire_at, bs.started_at,
-                    s.subject_code, s.subject_name, s.section
-             FROM bio_sessions bs
-             JOIN subjects s ON s.id = bs.subject_id
-             WHERE bs.device_id=? AND bs.status='active'
-             ORDER BY bs.started_at DESC LIMIT 1"
-        );
+$sq = $conn->prepare(
+    "SELECT bs.id, bs.subject_id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at,
+            s.subject_code, s.subject_name, s.section
+     FROM bio_sessions bs
+     JOIN subjects s ON s.id = bs.subject_id
+     WHERE bs.device_id=? AND bs.status='active'
+     ORDER BY bs.started_at DESC LIMIT 1"
+);
         $sq->bind_param('i', $dev['id']); $sq->execute();
         $row = $sq->get_result()->fetch_assoc();
         $active_sessions[$dev['id']] = $row ?: null;
@@ -744,7 +748,7 @@ $type_cfg  = [
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
               <span style="color:var(--text2);">Late after</span>
-              <span style="font-family:var(--font-mono);"><?php echo $sess['late_threshold']; ?></span>
+              <span style="font-family:var(--font-mono);"><?php echo (int)$sess['late_after_minutes']; ?> min</span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
               <span style="color:var(--text2);">Started</span>
@@ -782,7 +786,7 @@ $type_cfg  = [
             <div class="form-row" style="margin-bottom:8px;">
               <div class="form-group" style="margin-bottom:0;">
                 <label>Late After</label>
-                <input type="time" name="late_threshold" class="form-control" value="08:15" step="60" required>
+                <input type="number" name="late_after_minutes" class="form-control" value="15" min="1" step="1" required>
               </div>
               <div class="form-group" style="margin-bottom:0;">
                 <label>Duration (min)</label>

@@ -63,7 +63,8 @@ if (!$row) {
 // Only update database to 'enrolling' if it wasn't already marked as such
 if ($row['current_status'] === 'pending') {
     $upd2 = $conn->prepare("UPDATE bio_enroll_queue SET status='enrolling' WHERE id=?");
-    $upd2->bind_param('i', (int)$row['id']); 
+    $qid = (int)$row['id'];
+    $upd2->bind_param('i', $qid);
     $upd2->execute();
 }
 

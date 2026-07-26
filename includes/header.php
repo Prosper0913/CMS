@@ -118,6 +118,12 @@ $teacher_id        = $_SESSION['user_id']  ?? 0;
         <i class="ti ti-users"></i> Students
       </a>
 
+      <!-- Separate device enrollment/management workspace -->
+      <a href="/classroom/teacher/biometric.php"
+         class="<?php echo $active_nav==='biometric'?'active':''; ?>">
+        <i class="ti ti-fingerprint"></i> Biometrics
+      </a>
+
     <?php else: ?>
       <!-- Student nav links -->
       <a href="/classroom/student/dashboard.php"   class="<?php echo $active_nav==='dashboard'  ?'active':''; ?>"><i class="ti ti-home"></i> Home</a>

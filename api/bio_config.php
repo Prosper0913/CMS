@@ -58,7 +58,7 @@ $conn->query(
 );
 
 $sq = $conn->prepare(
-    "SELECT bs.id AS session_id, bs.subject_id, bs.late_threshold,
+    "SELECT bs.id AS session_id, bs.subject_id, bs.late_after_minutes,
             s.subject_code, s.subject_name, s.section,
             u.username AS teacher_name
      FROM bio_sessions bs
@@ -81,12 +81,12 @@ if (!$session) {
 }
 
 echo json_encode([
-    'status'         => 'ok',
-    'session_id'     => (int)$session['session_id'],
-    'subject_id'     => (int)$session['subject_id'],
-    'subject_code'   => $session['subject_code'],
-    'subject_name'   => $session['subject_name'],
-    'section'        => $session['section'],
-    'teacher'        => $session['teacher_name'],
-    'late_threshold' => $session['late_threshold'],
+    'status'             => 'ok',
+    'session_id'         => (int)$session['session_id'],
+    'subject_id'         => (int)$session['subject_id'],
+    'subject_code'       => $session['subject_code'],
+    'subject_name'       => $session['subject_name'],
+    'section'            => $session['section'],
+    'teacher'            => $session['teacher_name'],
+    'late_after_minutes' => (int)$session['late_after_minutes'],
 ]);

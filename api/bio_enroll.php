@@ -18,9 +18,8 @@
 //   { "status":"ok", "student":"Ana Reyes" }
 //   { "status":"error", "message":"..." }
 //
-// NOTE: requires an ACTIVE session on this device (same as bio_match.php)
-// so we know which subject to log this enrollment under. Start a
-// biometric session for the target subject before enrolling students.
+// Enrollment is independent of attendance sessions. The device assignment is
+// used only for audit metadata, so enrollment cannot create attendance scans.
 // ============================================================
 
 header('Content-Type: application/json');
@@ -44,6 +43,8 @@ $data = array_merge($_POST, $data);
 
 $device_key = trim($data['device_key'] ?? '');
 $student_id = trim($data['student_id'] ?? '');
+$slot_raw   = trim($data['slot'] ?? '1');
+$slot       = ctype_digit($slot_raw) ? (int)$slot_raw : 0;
 $image_b64  = trim($data['image_b64'] ?? '');
 $ip         = $_SERVER['REMOTE_ADDR'] ?? '';
 
@@ -56,14 +57,16 @@ function fail($msg, $httpCode = 400) {
 if ($device_key === '') fail('Missing device_key');
 if ($student_id === '') fail('Missing student_id');
 if ($image_b64 === '')  fail('Missing image_b64');
+if ($slot < 1 || $slot > 10) fail('Invalid slot number');
 
 // ── Authenticate device ───────────────────────────────────────
-$dq = $conn->prepare("SELECT id FROM bio_devices WHERE device_key=? LIMIT 1");
+$dq = $conn->prepare("SELECT id, subject_id FROM bio_devices WHERE device_key=? LIMIT 1");
 $dq->bind_param('s', $device_key);
 $dq->execute();
 $device = $dq->get_result()->fetch_assoc();
 if (!$device) fail('Unknown device', 403);
 $device_id = (int)$device['id'];
+$subject_id = $device['subject_id'] !== null ? (int)$device['subject_id'] : null;
 
 $upd = $conn->prepare("UPDATE bio_devices SET last_seen=NOW() WHERE id=?");
 $upd->bind_param('i', $device_id);
@@ -73,20 +76,6 @@ $upd->execute();
 //    is logged under — fingerprint_templates itself is a global pool
 //    matched via subject_enrollments, not scoped by this field, but we
 //    still want it recorded for the biometric_log / audit trail) ─────
-$conn->query("UPDATE bio_sessions SET status='ended', ended_at=NOW()
-              WHERE status='active' AND auto_expire_at IS NOT NULL AND auto_expire_at < NOW()");
-
-$sq = $conn->prepare(
-    "SELECT subject_id FROM bio_sessions
-     WHERE device_id=? AND status='active'
-     ORDER BY started_at DESC LIMIT 1"
-);
-$sq->bind_param('i', $device_id);
-$sq->execute();
-$session = $sq->get_result()->fetch_assoc();
-if (!$session) fail('No active session on this device. Start a session before enrolling.');
-$subject_id = (int)$session['subject_id'];
-
 // ── Verify student exists ─────────────────────────────────────
 $stq = $conn->prepare("SELECT student_id, first_name, last_name FROM students WHERE student_id=? LIMIT 1");
 $stq->bind_param('s', $student_id);
@@ -120,7 +109,10 @@ $pngPath = TMP_DIR . "/{$reqId}.png";
 $orootWin = TMP_DIR . "/{$reqId}";
 $xytPath  = TMP_DIR . "/{$reqId}.xyt";
 
-$im = imagecreatetruecolor(IMG_WIDTH, IMG_HEIGHT);
+// Palette-based (8-bit) image, NOT imagecreatetruecolor() — mindtct
+// requires true 8-bit grayscale PNGs, and truecolor() produces 24-bit
+// PNGs even when every pixel happens to be gray.
+$im = imagecreate(IMG_WIDTH, IMG_HEIGHT);
 $palette = [];
 for ($v = 0; $v < 256; $v++) $palette[$v] = imagecolorallocate($im, $v, $v, $v);
 
@@ -149,7 +141,7 @@ function winToWsl($winPath) {
 $pngWsl   = winToWsl(realpath($pngPath));
 $orootWsl = winToWsl($orootWin);
 
-$cmd = 'wsl.exe ' . MINDTCT_BIN . ' ' . escapeshellarg($pngWsl) . ' ' . escapeshellarg($orootWsl) . ' 2>&1';
+$cmd = 'wsl.exe -d Ubuntu ' . MINDTCT_BIN . ' ' . escapeshellarg($pngWsl) . ' ' . escapeshellarg($orootWsl) . ' 2>&1';
 $mindtctOut = shell_exec($cmd);
 
 if (!file_exists($xytPath)) {
@@ -166,16 +158,17 @@ if ($xytData === false || trim($xytData) === '') {
     fail('No minutiae detected in capture — try enrolling again with a cleaner scan', 500);
 }
 
-// ── Upsert template (INSERT or UPDATE if already enrolled) ────
+// ── Upsert template for this (student, slot) — one row per finger
+//    position captured (see NUM_ENROLL_CAPTURES in the firmware) ──
 $ins = $conn->prepare(
-    "INSERT INTO fingerprint_templates (student_id, template_b64, subject_id)
-     VALUES (?, ?, ?)
+    "INSERT INTO fingerprint_templates (student_id, slot, template_b64, subject_id)
+     VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
         template_b64 = VALUES(template_b64),
         subject_id   = VALUES(subject_id),
         updated_at   = NOW()"
 );
-$ins->bind_param('ssi', $student_id, $xytData, $subject_id);
+$ins->bind_param('sisi', $student_id, $slot, $xytData, $subject_id);
 if (!$ins->execute()) {
     fail('Database error: ' . $conn->error, 500);
 }
