@@ -167,7 +167,7 @@ $pass = $fg >= 75;
         </div>
         <div class="grade-letter" style="color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>">
           <?php echo $grade['letter_grade'] ?? '—'; ?>
-          <span style="font-size:11px;color:var(--text3);font-weight:400;"> · <?php echo $pass ? 'PASSED' : 'FAILED'; ?></span>
+          <span style="font-size:11px;color:var(--text7);font-weight:400;"> · <?php echo $pass ? 'PASSED' : 'FAILED'; ?></span>
         </div>
         <div class="grade-label">Final Grade</div>
         <?php else: ?>
