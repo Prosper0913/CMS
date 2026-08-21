@@ -26,9 +26,8 @@ header('Content-Type: application/json');
 require_once '../config/db.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-// ── Config — keep in sync with bio_match.php ───────────────────
-define('WSL_USER',    'dances');
-define('MINDTCT_BIN', '/home/' . WSL_USER . '/nbis/mindtct/bin/mindtct');
+// ── Config ────────────────────────────────────────────────────
+require_once '../includes/nbis_config.php';   // mindtct/bozorth3 runner — auto-detects Windows+WSL dev vs Linux production
 define('IMG_WIDTH',   256);
 define('IMG_HEIGHT',  288);
 define('TMP_DIR', __DIR__ . '/../tmp/bio');
@@ -130,19 +129,9 @@ $pngOk = imagepng($im, $pngPath);
 imagedestroy($im);
 if (!$pngOk) fail('Failed to write enrollment PNG', 500);
 
-function winToWsl($winPath) {
-    $p = str_replace('\\', '/', $winPath);
-    if (preg_match('#^([A-Za-z]):/(.*)$#', $p, $m)) {
-        return '/mnt/' . strtolower($m[1]) . '/' . $m[2];
-    }
-    return $p;
-}
-
-$pngWsl   = winToWsl(realpath($pngPath));
-$orootWsl = winToWsl($orootWin);
-
-$cmd = 'wsl.exe -d Ubuntu ' . MINDTCT_BIN . ' ' . escapeshellarg($pngWsl) . ' ' . escapeshellarg($orootWsl) . ' 2>&1';
-$mindtctOut = shell_exec($cmd);
+$pngReal = realpath($pngPath);
+$nbis = runNbis(MINDTCT_BIN_WSL, MINDTCT_BIN_LINUX, [$pngReal, $orootWin]);
+$mindtctOut = $nbis['output'];
 
 if (!file_exists($xytPath)) {
     @unlink($pngPath);

@@ -3,5 +3,5 @@
 session_start();
 session_unset();
 session_destroy();
-header("Location: /classroom/login.php");
+header("Location: /classroomv2/login.php");
 exit;

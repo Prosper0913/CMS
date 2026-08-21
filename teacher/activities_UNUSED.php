@@ -3,7 +3,7 @@ session_start();
 require '../config/db.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'teacher') {
-    header("Location: /classroom/login.php"); exit;
+    header("Location: /classroomv2/login.php"); exit;
 }
 
 $success_msg = '';

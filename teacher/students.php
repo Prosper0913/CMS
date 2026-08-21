@@ -221,18 +221,18 @@ $active_nav = "students";
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
 
 </head>
 <body class="page-teacher-students">
 
 <!-- NAVBAR -->
 <nav class="navbar">
-  <a class="brand" href="/classroom/teacher/dashboard.php">
-    <img src="/classroom/assets/images/TCM logo (2).png" alt="TCM Logo " width="32" height="32">Classroom Management System
+  <a class="brand" href="/classroomv2/teacher/dashboard.php">
+    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="TCM Logo " width="32" height="32">Classroom Management System
   </a>
   <div class="nav-sep"></div>
-  <a href="/classroom/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
+  <a href="/classroomv2/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
   <!-- Subject dropdown (only if subjects exist) -->
   <?php if ($all_subs->num_rows > 0): ?>
   <div class="nav-dropdown">
@@ -246,14 +246,14 @@ $active_nav = "students";
       while ($ns = $all_subs->fetch_assoc()):
         $dc = $type_cfg[$ns['subject_type']]['color'] ?? '#7aa3ff';
       ?>
-      <a href="/classroom/teacher/subject_view.php?id=<?php echo $ns['id']; ?>" class="dd-item">
+      <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $ns['id']; ?>" class="dd-item">
         <span class="dd-dot" style="background:<?php echo $dc; ?>;"></span>
         <span class="dd-main"><?php echo htmlspecialchars($ns['subject_code'].' — '.$ns['subject_name']); ?></span>
         <span class="dd-sub"><?php echo htmlspecialchars($ns['section']); ?></span>
       </a>
       <?php endwhile; ?>
       <div class="dd-divider"></div>
-      <a href="/classroom/teacher/add_subject.php" class="dd-item">
+      <a href="/classroomv2/teacher/add_subject.php" class="dd-item">
         <i class="ti ti-plus" style="color:var(--accent);font-size:13px;"></i>
         <span class="dd-main" style="color:var(--accent);">Add New Subject</span>
       </a>
@@ -261,25 +261,17 @@ $active_nav = "students";
   </div>
   <?php endif; ?>
 
-  <a href="/classroom/teacher/add_subject.php" class="nav-link"><i class="ti ti-book-plus"></i> Add Subject</a>
-    <a href="/classroom/teacher/manage_sections.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Sections</a>
-  <a href="/classroom/teacher/students.php" class="nav-link active"><i class="ti ti-users"></i> Students</a>
+  <a href="/classroomv2/teacher/add_subject.php" class="nav-link"><i class="ti ti-book-plus"></i> Add Subject</a>
+    <a href="/classroomv2/teacher/manage_sections.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Sections</a>
+  <a href="/classroomv2/teacher/students.php" class="nav-link active"><i class="ti ti-users"></i> Students</a>
   <div class="nav-right">
     <span class="nav-role">Teacher</span>
     <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
 <div class="page-wrap">
-
-  <!-- Page header -->
-  <div class="page-header">
-    <h1><i class="ti ti-users" style="color:var(--bg4)"></i> Student Management</h1>
-    <p>Add and manage student accounts. Enroll them into subjects from the Add Subject page.</p>
-  </div>
-
-<hr class="thin-line" style="margin-bottom: 25px;">
 
   <?php if ($success_msg): ?>
     <div class="alert alert-success"><i class="ti ti-circle-check"></i> <?php echo $success_msg; ?></div>
@@ -289,13 +281,14 @@ $active_nav = "students";
   <?php endif; ?>
 
   <!-- Stats -->
-  <div class="stats-row">
+  <!-- <div class="stats-row"> 
     <div class="stat-card stat-accent">
       <div class="stat-label">Total Students</div>
       <div class="stat-value"><?php echo $total_students; ?></div>
       <div class="stat-sub">in the system</div>
     </div>
-    <div class="stat-card stat-green">
+
+    <div class="stat-card">
       <div class="stat-label">Enrolled in Subjects</div>
       <?php
       $enrolled_count = $conn->query(
@@ -305,9 +298,9 @@ $active_nav = "students";
       <div class="stat-value"><?php echo $enrolled_count; ?></div>
       <div class="stat-sub">across all subjects</div>
     </div>
-  </div>
+  </div>-->
 
-  <div class="two-col">
+  <div class="two-col" style="justify-content: center;">
 
     <!-- ── FORM PANEL ── -->
     <div>
@@ -328,7 +321,7 @@ $active_nav = "students";
             </div>
           <?php else: ?>
             <div class="form-group">
-              <label>Student ID <span style="color:var(--red);">*</span></label>
+              <label>Student ID</label>
               <div class="input-wrap">
                 <i class="ti ti-id-badge"></i>
                 <input type="text" name="student_id" class="form-control"
@@ -338,15 +331,16 @@ $active_nav = "students";
             </div>
           <?php endif; ?>
 
+
           <div class="form-row">
             <div class="form-group">
-              <label>Last Name <span style="color:var(--red);">*</span></label>
+              <label>Last Name</label>
               <input type="text" name="last_name" class="form-control"
                 placeholder="Dances"
                 value="<?php echo htmlspecialchars($edit_mode?$edit_data['last_name']:($_POST['last_name']??'')); ?>" required>
             </div>
             <div class="form-group">
-              <label>First Name <span style="color:var(--red);">*</span></label>
+              <label>First Name</label>
               <input type="text" name="first_name" class="form-control"
                 placeholder="Anthony"
                 value="<?php echo htmlspecialchars($edit_mode?$edit_data['first_name']:($_POST['first_name']??'')); ?>" required>
@@ -363,7 +357,7 @@ $active_nav = "students";
           <div class="form-group">
             <label>Email Address</label>
             <div class="input-wrap">
-              <i class="ti ti-mail"></i>
+              <i class="ti ti-mail green-font"></i>
               <input type="email" name="email" class="form-control"
                 placeholder="anthonydances@school.edu.ph"
                 value="<?php echo htmlspecialchars($edit_mode?($edit_data['email']??''):($_POST['email']??'')); ?>">
@@ -371,10 +365,10 @@ $active_nav = "students";
           </div>
 
           <div class="divider"></div>
-          <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:12px;">Login Credentials</p>
+          <p class="bottom-margin">Login Credentials</p>
 
           <div class="form-group">
-            <label>Username <span style="color:var(--red);">*</span></label>
+            <label>Username</label>
             <div class="input-wrap">
               <i class="ti ti-at"></i>
               <input type="text" name="username" class="form-control"
@@ -385,7 +379,7 @@ $active_nav = "students";
 
           <?php if (!$edit_mode): ?>
           <div class="form-group">
-            <label>Password <span style="color:var(--red);">*</span></label>
+            <label>Password</label>
             <div class="input-wrap" style="position:relative;">
               <i class="ti ti-lock"></i>
               <input type="password" name="password" id="pw-input" class="form-control"
@@ -421,24 +415,24 @@ $active_nav = "students";
       </div>
 
       <!-- Info box -->
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px; margin-top: 25px;">
-        <p style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-          <i class="ti ti-info-circle" style="color:var(--bg5);"></i> Note on Sections
+      <!-- <div class="card"> 
+        <p>
+          <i class="ti ti-info-circle red-font"></i> Note on Sections
         </p>
-        <p style="font-size:12px;color:var(--text3);line-height:1.7;">
+        <p>
           Students are no longer assigned a fixed section here.
           Instead, enroll them into specific subjects when you
           <a href="/classroom/teacher/add_subject.php" style="color:var(--yellow);">create a subject</a>.
           A student can be enrolled in multiple subjects across different sections.
         </p>
-      </div>
+      </div>-->
     </div>
 
     <!-- ── STUDENT LIST PANEL ── -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <p class="card-title" style="margin:0;"><i class="ti ti-list"></i> All Students</p>
-        <span style="font-size:12px;color:var(--text2);"><?php echo $total_students; ?> total</span>
+        <span class="black-font"><?php echo $total_students; ?> total</span>
       </div>
 
       <!-- Search -->
@@ -489,10 +483,10 @@ $active_nav = "students";
                     <div style="font-weight:500;">
                       <?php echo htmlspecialchars($s['last_name'].', '.$s['first_name']); ?>
                       <?php if ($s['middle_initial']): ?>
-                        <span style="color:var(--text2)"><?php echo htmlspecialchars($s['middle_initial']); ?></span>
+                        <span><?php echo htmlspecialchars($s['middle_initial']); ?></span>
                       <?php endif; ?>
                     </div>
-                    <div style="font-size:11px;color:var(--text3);">
+                    <div>
                       <?php echo htmlspecialchars($s['email'] ?: '—'); ?>
                     </div>
                   </div>
@@ -500,7 +494,7 @@ $active_nav = "students";
               </td>
               <td class="td-mono"><?php echo htmlspecialchars($s['student_id']); ?></td>
               <td>
-                <span style="font-family:var(--font-mono);font-size:12px;background:var(--bg3);padding:2px 8px;border-radius:5px;color:var(--text2);">
+                <span>
                   <?php echo htmlspecialchars($s['username']); ?>
                 </span>
               </td>
@@ -508,7 +502,7 @@ $active_nav = "students";
                 <?php if ($s['subject_count'] > 0): ?>
                   <span class="badge badge-green"><?php echo $s['subject_count']; ?> subject<?php echo $s['subject_count']>1?'s':''; ?></span>
                 <?php else: ?>
-                  <span style="font-size:11px;color:var(--text3);">Not enrolled</span>
+                  <span style="font-size:11px;color:var(--text7);">Not enrolled</span>
                 <?php endif; ?>
               </td>
               <td>
@@ -520,7 +514,7 @@ $active_nav = "students";
                   <button type="button"
                     class="btn btn-sm btn-yellow"
                     onclick="openResetModal('<?php echo htmlspecialchars($s['student_id'],ENT_QUOTES); ?>','<?php echo htmlspecialchars($s['last_name'].', '.$s['first_name'],ENT_QUOTES); ?>')">
-                    <i class="ti ti-key"></i>
+                    <i class="ti ti-key" style="color: var(--yellow2);"></i>
                   </button>
                   <a href="students.php?delete=<?php echo urlencode($s['student_id']); ?>"
                      class="btn btn-sm btn-delete"

@@ -32,9 +32,9 @@ $res->execute();
 $subs = $res->get_result();
 
 $type_colors = [
-    'General Education'      => '#7aa3ff',
-    'Professional Education' => '#34d399',
-    'Major Subject'          => '#fbbf24',
+    'General Education'      => '#6c8dda',
+    'Professional Education' => '#ff2407',
+    'Major Subject'          => '#00ff1a',
 ];
 ?>
 <!DOCTYPE html>
@@ -47,20 +47,20 @@ $type_colors = [
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
 
 </head>
 <body class="page-student-subjects">
 
 <nav class="navbar">
-  <a class="brand" href="/classroom/student/dashboard.php"><img src="/classroom/assets/images/TCM logo (2).png" alt="Classroom Management System" width="32" height="32"></span>Classroom Management System</a>
+  <a class="brand" href="/classroomv2/student/dashboard.php"><img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom Management System" width="32" height="32"></span>Classroom Management System</a>
   <div class="nav-sep"></div>
-  <a href="/classroom/student/dashboard.php" class="nav-link"><i class="ti ti-home"></i> Home</a>
-  <a href="/classroom/student/subjects.php"  class="nav-link active"><i class="ti ti-books"></i> My Subjects</a>
+  <a href="/classroomv2/student/dashboard.php" class="nav-link"><i class="ti ti-home"></i> Home</a>
+  <a href="/classroomv2/student/subjects.php"  class="nav-link active"><i class="ti ti-books"></i> My Subjects</a>
   <div class="nav-right">
     <span class="nav-role">Student</span>
     <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
@@ -135,14 +135,14 @@ $type_colors = [
                 <div class="score-bar-track">
                   <div class="score-bar-fill" style="width:<?php echo min($v,100);?>%;background:<?php echo $color;?>;opacity:.8;"></div>
                 </div>
-                <span style="font-size:12px;min-width:36px;text-align:right;color:<?php echo $v>=75?'var(--green)':($v>0?'var(--red)':'var(--text3)');?>;">
+                <span style="font-size:12px;min-width:36px;text-align:right;color:<?php echo $v>=75?'var(--green)':($v>0?'var(--red)':'var(--text7)');?>;">
                   <?php echo $v>0?number_format($v,1).'%':'—'; ?>
                 </span>
               </div>
             </td>
             <?php endforeach; ?>
             <td>
-              <span style="font-family:var(--font-head);font-size:17px;font-weight:700;color:<?php echo $fg>=75?'var(--green)':($fg>0?'var(--red)':'var(--text3)');?>;">
+              <span style="font-family:var(--font-head);font-size:17px;font-weight:700;color:<?php echo $fg>=75?'var(--green)':($fg>0?'var(--red)':'var(--text7)');?>;">
                 <?php echo $fg>0?number_format($fg,2).'%':'—'; ?>
               </span>
             </td>
@@ -152,11 +152,11 @@ $type_colors = [
                 <?php echo $sub['letter_grade']; ?>
               </span>
               <?php else: ?>
-              <span style="font-size:11px;color:var(--text3);">—</span>
+              <span style="font-size:11px;color:var(--text7);">—</span>
               <?php endif; ?>
             </td>
             <td>
-              <a href="/classroom/student/subject_detail.php?id=<?php echo $sub['id']; ?>" class="btn-view">
+              <a href="/classroomv2/student/subject_detail.php?id=<?php echo $sub['id']; ?>" class="btn-view">
                 <i class="ti ti-eye"></i> View
               </a>
             </td>

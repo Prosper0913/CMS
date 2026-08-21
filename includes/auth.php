@@ -12,7 +12,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 function requireLogin() {
     if (!isset($_SESSION['user_id'])) {
-        header("Location: /classroom/login.php");
+        header("Location: /classroomv2/login.php");
         exit;
     }
 }
@@ -20,9 +20,13 @@ function requireLogin() {
 function requireRole(string $role) {
     requireLogin();
     if ($_SESSION['role'] !== $role) {
-        header($_SESSION['role'] === 'teacher'
-            ? "Location: /classroom/teacher/dashboard.php"
-            : "Location: /classroom/student/dashboard.php");
+        $redirect = match ($_SESSION['role']) {
+            'teacher' => "/classroomv2/teacher/dashboard.php",
+            'student' => "/classroomv2/student/dashboard.php",
+            'admin'   => "/classroomv2/admin/dashboard.php",
+            default   => "/classroomv2/login.php",
+        };
+        header("Location: $redirect");
         exit;
     }
 }

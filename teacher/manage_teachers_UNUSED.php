@@ -110,8 +110,8 @@ $nav_subs = getTeacherSubjects($conn, $me);
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-  <link rel="stylesheet" href="/classroom/assets/style.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+  <link rel="stylesheet" href="/classroomv2/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
 
 </head>
 <body class="page-teacher-manage_teachers">
@@ -124,7 +124,7 @@ while ($ns = $nav_subs->fetch_assoc()) $nav_subs_arr[] = $ns;
 ?>
 <nav class="navbar" style="height:56px;background:var(--bg2);border-bottom:1px solid var(--border);
   display:flex;align-items:center;padding:0 28px;gap:4px;position:sticky;top:0;z-index:100;">
-  <a class="brand" href="/classroom/teacher/dashboard.php"
+  <a class="brand" href="/classroomv2/teacher/dashboard.php"
     style="font-family:var(--font-head);font-size:15px;font-weight:700;color:var(--text);
     text-decoration:none;display:flex;align-items:center;gap:8px;flex-shrink:0;margin-right:8px;">
     <span style="width:7px;height:7px;border-radius:50%;background:var(--accent);
@@ -132,28 +132,28 @@ while ($ns = $nav_subs->fetch_assoc()) $nav_subs_arr[] = $ns;
     Classroom CMS
   </a>
   <div style="width:1px;height:20px;background:var(--border2);margin:0 6px;"></div>
-  <a href="/classroom/teacher/dashboard.php"
+  <a href="/classroomv2/teacher/dashboard.php"
     style="font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;
     padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;"
     class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
-  <a href="/classroom/teacher/manage_sections.php"
+  <a href="/classroomv2/teacher/manage_sections.php"
     style="font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;
     padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;"
     class="nav-link"><i class="ti ti-building-community"></i> Sections</a>
-  <a href="/classroom/teacher/manage_teachers.php"
+  <a href="/classroomv2/teacher/manage_teachers.php"
     style="font-size:13px;font-weight:500;background:var(--bg3);color:var(--text);text-decoration:none;
     padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;"
     class="nav-link active"><i class="ti ti-user-star"></i> Teachers</a>
-  <a href="/classroom/teacher/students.php"
+  <!-- <a href="/classroomv2/teacher/students.php"
     style="font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;
     padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;"
-    class="nav-link"><i class="ti ti-users"></i> Students</a>
+    class="nav-link"><i class="ti ti-users"></i> Students</a> -->
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
     <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
       padding:3px 9px;border-radius:99px;background:rgba(91,141,238,.12);color:var(--accent);
       border:1px solid rgba(91,141,238,.25);">Teacher</span>
     <span style="font-size:13px;color:var(--text2);"><?= htmlspecialchars($_SESSION['username']) ?></span>
-    <a href="/classroom/logout.php"
+    <a href="/classroomv2/logout.php"
       style="font-size:12px;padding:5px 12px;border-radius:8px;background:transparent;
       border:1px solid var(--border2);color:var(--text2);cursor:pointer;text-decoration:none;
       display:inline-flex;align-items:center;gap:5px;">

@@ -143,7 +143,7 @@ if (isset($_POST['save_subject'])) {
         }
     }
 }
-
+https://github.com/addyosmani/critical/blob/master/README.md
 // ── Load data ─────────────────────────────────────────────────
 $all_students = $conn->query(
     "SELECT student_id,last_name,first_name,middle_initial
@@ -199,17 +199,17 @@ $type_cfg = [
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
 
 </head>
 <body class="page-teacher-add_subject">
 
 <nav class="navbar">
-  <a class="brand" href="/classroom/teacher/dashboard.php">
-    <img src="/classroom/assets/images/TCM logo (2).png" alt="Classroom CMS" width="32" height="32"></span>Classroom Management System
+  <a class="brand" href="/classroomv2/teacher/dashboard.php">
+    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom CMS" width="32" height="32"></span>Classroom Management System
   </a>
   <div class="nav-sep"></div>
-  <a href="/classroom/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
+  <a href="/classroomv2/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
   <?php if ($nav_subs->num_rows > 0): ?>
   <div style="position:relative;" id="ddWrap">
     <button style="display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:var(--radius);
@@ -221,7 +221,7 @@ $type_cfg = [
       background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:5px;
       box-shadow:var(--shadow);z-index:200;max-height:380px;overflow-y:auto;">
       <?php while ($ns=$nav_subs->fetch_assoc()): $dc=$type_cfg[$ns['subject_type']]['color']??'#00ff1a'; ?>
-      <a href="/classroom/teacher/subject_view.php?id=<?= $ns['id'] ?>"
+      <a href="/classroomv2/teacher/subject_view.php?id=<?= $ns['id'] ?>"
         style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:var(--radius);text-decoration:none;">
         <span style="width:6px;height:6px;border-radius:50%;background:<?= $dc ?>;flex-shrink:0;"></span>
         <span style="font-size:13px;font-weight:500;color:var(--text);flex:1;"><?= htmlspecialchars($ns['subject_code'].' — '.$ns['subject_name']) ?></span>
@@ -231,23 +231,17 @@ $type_cfg = [
     </div>
   </div>
   <?php endif; ?>
-  <a href="/classroom/teacher/add_subject.php" class="nav-link active"><i class="ti ti-book-plus"></i> Add Subject</a>
-  <a href="/classroom/teacher/manage_sections.php" class="nav-link"><i class="ti ti-building-community"></i> Sections</a>
-  <a href="/classroom/teacher/students.php" class="nav-link"><i class="ti ti-users"></i> Students</a>
+  <a href="/classroomv2/teacher/add_subject.php" class="nav-link active"><i class="ti ti-book-plus"></i> Add Subject</a>
+  <a href="/classroomv2/teacher/manage_sections.php" class="nav-link"><i class="ti ti-building-community"></i> Sections</a>
+  <!-- <a href="/classroomv2/teacher/students.php" class="nav-link"><i class="ti ti-users"></i> Students</a> -->
   <div class="nav-right">
     <span class="nav-role">Teacher</span>
     <span style="font-size:13px;color:var(--text2);"><?= htmlspecialchars($_SESSION['username']) ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
 <div class="page-wrap">
-  <div class="page-header">
-    <h1 style="font-family: var(--font-head); font-size: 35px;"> Add New Subject</h1>
-    <p style="font-size: 15px; color: var(--text); padding-top: 15px;">Set up a subject-section with its grade composition, then enroll students by section or individually.</p>
-  </div>
-
-<hr class="thin-line" style="margin-bottom: 25px;">
 
   <?php if ($success_msg && $new_subject_id): ?>
   <div class="alert alert-success">
@@ -255,7 +249,7 @@ $type_cfg = [
     <div>
       <?= $success_msg ?>
       <br>
-      <a href="/classroom/teacher/subject_view.php?id=<?= $new_subject_id ?>" class="btn-goto">
+      <a href="/classroomv2/teacher/subject_view.php?id=<?= $new_subject_id ?>" class="btn-goto">
         <i class="ti ti-arrow-right"></i> Open Subject
       </a>
     </div>
@@ -322,7 +316,7 @@ $type_cfg = [
       <!-- Subject type -->
       <div class="card" style="margin-bottom:20px;">
         <p class="card-title"><i class="ti ti-category"></i> Subject Type</p>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">
+        <p>
           Selecting a type auto-fills the grade weights below.
         </p>
         <input type="hidden" name="subject_type" id="subject_type_hidden"
@@ -356,8 +350,8 @@ $type_cfg = [
       <!-- Grade weights -->
       <div class="card" style="margin-bottom:20px;">
         <p class="card-title"><i class="ti ti-percentage"></i> Grade Composition</p>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">
-          Must total exactly <strong style="color:var(--text)">100%</strong>.
+        <p>
+          Must total exactly <strong>100%</strong>.
           Attendance is a sub-component inside Performance Tasks.
         </p>
         <div class="weight-grid">
@@ -431,11 +425,11 @@ $type_cfg = [
         <div class="empty-state" style="padding:24px;">
           <i class="ti ti-building-community"></i>
           <p>No sections yet.<br>
-            <a href="/classroom/teacher/manage_sections.php" style="color:var(--accent)">Create sections first →</a>
+            <a href="/classroomv2/teacher/manage_sections.php" style="color:var(--accent)">Create sections first →</a>
           </p>
         </div>
         <?php else: ?>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">
+        <p >
           Select a section to enroll all its students at once.
         </p>
         <input type="hidden" name="enroll_section_id" id="enroll_section_id" value="<?= $prefill_section ?>">
@@ -454,10 +448,10 @@ $type_cfg = [
           </div>
           <?php endforeach; ?>
         </div>
-        <div style="margin-top:10px;font-size:12px;color:var(--text2);">
+        <div>
           <i class="ti ti-info-circle"></i>
           Can't find your section?
-          <a href="/classroom/teacher/manage_sections.php" style="color:var(--yellow);">Manage sections →</a>
+          <a href="/classroomv2/teacher/manage_sections.php" style="color:var(--text7);">Manage sections →</a>
         </div>
         <?php endif; ?>
       </div>
@@ -469,13 +463,13 @@ $type_cfg = [
         <div class="empty-state">
           <i class="ti ti-users-off"></i>
           <p>No students yet.<br>
-            <a href="/classroom/teacher/students.php" style="color:var(--accent)">Add students first →</a>
+            <!-- <a href="/classroomv2/teacher/students.php" style="color:var(--accent)">Add students first →</a> -->
           </p>
         </div>
         <?php else: ?>
         <div class="checklist-header">
           <div class="search-input-wrap">
-            <i class="ti ti-search"></i>
+            <i class="ti ti-search" style="color: var(--bg);"></i>
             <input type="text" id="srch" placeholder="Search students…" oninput="filterStudents()">
           </div>
           <div class="checklist-actions">
@@ -488,30 +482,29 @@ $type_cfg = [
           </div>
         </div>
         <div class="selected-counter">
-          <i class="ti ti-users" style="font-size:13px;color:var(--text2);"></i>
-          <span id="sel_count" style="color:var(--text2);">0</span> of <?= $student_count ?> selected
+          <i class="ti ti-users"></i>
+          <span id="sel_count">0</span> of <?= $student_count ?> selected
         </div>
-        <div class="student-list" id="studentList">
-          <?php while ($s = $all_students->fetch_assoc()):
-            $checked  = in_array($s['student_id'], $_POST['enrollees']??[]);
-            $initials = strtoupper(substr($s['last_name'],0,1).substr($s['first_name'],0,1));
-          ?>
-          <label class="enrollee-row <?= $checked?'selected':'' ?>"
-            data-name="<?= strtolower($s['last_name'].' '.$s['first_name'].' '.$s['student_id']) ?>"
-            onclick="toggleRow(this)">
-            <input type="checkbox" name="enrollees[]"
-              value="<?= htmlspecialchars($s['student_id']) ?>"
-              class="enr-check"
-              <?= $checked?'checked':'' ?>
-              onchange="countSelected()" onclick="event.stopPropagation()">
-            <div class="enr-avatar"><?= $initials ?></div>
-            <div style="flex:1;">
-              <div class="enr-name"><?= htmlspecialchars($s['last_name'].', '.$s['first_name']) ?></div>
-              <div class="enr-id"><?= htmlspecialchars($s['student_id']) ?></div>
-            </div>
-          </label>
-          <?php endwhile; ?>
-        </div>
+<div class="student-list" id="studentList">
+  <?php while ($s = $all_students->fetch_assoc()):
+    $checked  = in_array($s['student_id'], $_POST['enrollees'] ?? []);
+    $initials = strtoupper(substr($s['last_name'], 0, 1) . substr($s['first_name'], 0, 1));
+  ?>
+  <label class="enrollee-row"
+    data-name="<?= strtolower($s['last_name'].' '.$s['first_name'].' '.$s['student_id']) ?>">
+    <input type="checkbox" name="enrollees[]"
+      value="<?= htmlspecialchars($s['student_id']) ?>"
+      class="enr-check"
+      <?= $checked ? 'checked' : '' ?>
+      onchange="countSelected()">
+    <div class="enr-avatar"><?= $initials ?></div>
+    <div style="flex:1;">
+      <div class="enr-name"><?= htmlspecialchars($s['last_name'].', '.$s['first_name']) ?></div>
+      <div class="enr-id"><?= htmlspecialchars($s['student_id']) ?></div>
+    </div>
+  </label>
+  <?php endwhile; ?>
+</div>
         <?php endif; ?>
       </div><!-- end panel-individual -->
 

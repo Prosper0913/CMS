@@ -4,7 +4,7 @@ require '../config/db.php';
 
 // ── Auth guard ──────────────────────────────────────────
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'teacher') {
-    header("Location: /classroom/login.php"); exit;
+    header("Location: /classroomv2/login.php"); exit;
 }
 
 $success_msg = '';

@@ -12,12 +12,16 @@
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
+// Push-based sync to tooltrack (no-op for non-FPST subjects, never throws).
+// See includes/sync_to_tooltrack.php for the full design.
+require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
+require_once __DIR__ . '/../includes/sync_to_guidance.php';
 
 $teacher_id = $_SESSION['user_id'];
 
 // ── Load subject (must belong to this teacher) ──────────────
 $subject_id = (int)($_GET['id'] ?? 0);
-if (!$subject_id) { header("Location: /classroom/teacher/dashboard.php"); exit; }
+if (!$subject_id) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
 $sub_stmt = $conn->prepare(
     "SELECT * FROM subjects WHERE id = ? AND teacher_id = ? AND is_active = 1"
@@ -25,7 +29,7 @@ $sub_stmt = $conn->prepare(
 $sub_stmt->bind_param("ii", $subject_id, $teacher_id);
 $sub_stmt->execute();
 $subject = $sub_stmt->get_result()->fetch_assoc();
-if (!$subject) { header("Location: /classroom/teacher/dashboard.php"); exit; }
+if (!$subject) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
 $active_tab = $_GET['tab'] ?? 'overview';
 $valid_tabs = ['overview','written','exams','performance','attendance','biometric','grades','settings'];
@@ -60,7 +64,7 @@ function getEnrollees($conn, $subject_id) {
 // ── CSV export (must run before any HTML output) ─────────────
 if (isset($_GET['export']) && $_GET['export'] === 'csv' && ($active_tab === 'grades' || ($_GET['tab'] ?? '') === 'grades')) {
     $csv = $conn->prepare(
-        "SELECT s.student_id, s.last_name, s.first_name, ses
+        "SELECT s.student_id, s.last_name, s.first_name,
                 COALESCE(g.exam_avg,0)         AS ea,
                 COALESCE(g.written_avg,0)       AS wa,
                 COALESCE(g.performance_avg,0)   AS pa,
@@ -521,6 +525,19 @@ if (isset($_POST['enroll_section'])) {
         $added++;
     }
     $success_msg = "Enrolled <strong>{$added}</strong> student(s) from section.";
+    // ── Push to tooltrack: we have sec_id directly, so push this
+    // specific section+subject pair. Non-FPST sections are a no-op
+    // inside push_section_subject_to_tooltrack. Failures never break
+    // the enrollment.
+    push_section_subject_to_tooltrack($conn, $sec_id, $subject_id);
+    // Push to Guidance: every student just enrolled
+    $sq3 = $conn->prepare("SELECT student_id FROM section_students WHERE section_id = ?");
+    $sq3->bind_param('i', $sec_id);
+    $sq3->execute();
+    $srows3 = $sq3->get_result();
+    while ($sr3 = $srows3->fetch_assoc()) {
+        push_student_to_guidance($conn, $sr3['student_id']);
+    }
 }
 
 // ── ENROLL single student ────────────────────────────────────
@@ -549,6 +566,18 @@ if (isset($_POST['enroll_single'])) {
             $e2->bind_param('is', $subject_id, $sid);
             $e2->execute();
             $success_msg = "Student enrolled.";
+            // ── Push to tooltrack: we don't have a section_id here (the
+            // enrollment row was created without one), but the subject
+            // has a `section` text field we can resolve to a section_id.
+            // push_subject_to_tooltrack() handles that lookup and filters
+            // to FPST. Note: students enrolled via enroll_single won't
+            // appear in the pushed roster unless they ALSO have a
+            // section_id on their subject_enrollments row — but pushing
+            // is still useful so any OTHER students in this section+subject
+            // get re-synced. Failures never break the enrollment.
+            push_subject_to_tooltrack($conn, $subject_id);
+            // Push to Guidance: push student's full state
+            push_student_to_guidance($conn, $sid);
         }
     }
 }
@@ -562,6 +591,15 @@ if (isset($_POST['unenroll_student'])) {
     $del->bind_param('is', $subject_id, $sid);
     $del->execute();
     $success_msg = "Student removed from subject. Their scores and grades are preserved.";
+    // ── Push to tooltrack: re-push the (now smaller) roster for this
+    // subject. The removed student won't be in the payload, so tooltrack's
+    // receive endpoint will soft-deactivate their borrower_enrollments row
+    // for this section+subject. The borrower row itself is preserved (the
+    // student may still be in other subjects, or may still have tools out).
+    // Non-FPST subjects are a no-op. Failures never break the unenroll.
+    push_subject_to_tooltrack($conn, $subject_id);
+    // Push to Guidance: re-push student state (enrollment removed)
+    push_student_to_guidance($conn, $sid);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -724,7 +762,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
   <style>body.page-teacher-subject_view{--subject-color:<?php echo htmlspecialchars($type_color, ENT_QUOTES, 'UTF-8'); ?>;}</style>
 
 </head>
@@ -732,12 +770,12 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
 
 <?php $teacher_subjects = getTeacherSubjects($conn, $teacher_id); ?>
 <nav class="navbar">
-  <a class="brand" href="/classroom/teacher/dashboard.php">
-    <img src="/classroom/assets/images/TCM logo (2).png" alt="TCM logo" width="32" height="32">
+  <a class="brand" href="/classroomv2/teacher/dashboard.php">
+    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="TCM logo" width="32" height="32">
     Classroom Management System
   </a>
   <div class="nav-sep"></div>
-  <a href="/classroom/teacher/dashboard.php" class="nav-link">
+  <a href="/classroomv2/teacher/dashboard.php" class="nav-link">
     <i class="ti ti-layout-dashboard"></i> Dashboard
   </a>
 
@@ -745,7 +783,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
     <button class="nav-dd-btn" id="ddBtn" onclick="toggleDD()">
       <i class="ti ti-books"></i>
       <?php echo htmlspecialchars($subject['subject_code'] . ' — ' . $subject['section']); ?>
-      <i class="ti ti-chevron-down"></i>
+      <i class="ti ti-chevron-down" class="black-font"></i>
     </button>
     <div class="nav-dd-menu" id="ddMenu">
       <?php
@@ -758,7 +796,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
             default                  => '#7aa3ff',
         };
       ?>
-      <a href="/classroom/teacher/subject_view.php?id=<?php echo $ns['id']; ?>"
+      <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $ns['id']; ?>"
          class="dd-item <?php echo $ns['id'] == $subject_id ? 'active' : ''; ?>">
         <span class="dd-dot" style="background:<?php echo $dot_color; ?>"></span>
         <span class="dd-main"><?php echo htmlspecialchars($ns['subject_code'] . ' ' . $ns['subject_name']); ?></span>
@@ -766,27 +804,27 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
       </a>
       <?php endwhile; ?>
       <div class="dd-divider"></div>
-      <a href="/classroom/teacher/add_subject.php" class="dd-item">
+      <a href="/classroomv2/teacher/add_subject.php" class="dd-item">
         <i class="ti ti-plus" style="color:var(--accent);font-size:13px;"></i>
         <span class="dd-main" style="color:var(--accent);">Add New Subject</span>
       </a>
     </div>
   </div>
 
-  <a href="/classroom/teacher/add_subject.php" class="nav-link">
+  <a href="/classroomv2/teacher/add_subject.php" class="nav-link">
     <i class="ti ti-book-plus"></i> Add Subject
   </a>
-  <a href="/classroom/teacher/manage_sections.php" class="nav-link">
+  <a href="/classroomv2/teacher/manage_sections.php" class="nav-link">
     <i class="ti ti-building-community"></i> Sections
   </a>
-  <a href="/classroom/teacher/students.php" class="nav-link">
+  <!-- <a href="/classroomv2/teacher/students.php" class="nav-link">
     <i class="ti ti-users"></i> Students
-  </a>
+  </a> -->
 
   <div class="nav-right">
     <span class="nav-role">Teacher</span>
     <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
@@ -928,58 +966,222 @@ if ($active_tab === 'overview'):
         $chart_values[] = round((float)$r['final_grade'], 1);
         $chart_colors[] = (float)$r['final_grade'] >= 75 ? 'rgba(52,211,153,.7)' : 'rgba(248,113,113,.7)';
     }
+
+    // ── At-risk students (this subject only) ─────────────────────
+$sv_risk_stmt = $conn->prepare(
+    "SELECT st.student_id, st.last_name, st.first_name,
+            g.final_grade, g.letter_grade
+     FROM subject_grades g
+     JOIN students st ON st.student_id = g.student_id
+     WHERE g.subject_id = ? AND g.final_grade > 0 AND g.final_grade < 75
+     ORDER BY g.final_grade ASC
+     LIMIT 8"
+);
+$sv_risk_stmt->bind_param("i", $subject_id);
+$sv_risk_stmt->execute();
+$sv_risk = $sv_risk_stmt->get_result();
+
+// ── Recent score entries (this subject only) ──────────────────
+$sv_recent_stmt = $conn->prepare(
+    "SELECT se.entry_name, se.component, se.score, se.total_items, se.date_given,
+            st.last_name, st.first_name
+     FROM score_entries se
+     JOIN students st ON st.student_id = se.student_id
+     WHERE se.subject_id = ?
+     ORDER BY se.created_at DESC
+     LIMIT 6"
+);
+$sv_recent_stmt->bind_param("i", $subject_id);
+$sv_recent_stmt->execute();
+$sv_recent = $sv_recent_stmt->get_result();
+
+// ── Top & Lowest performers — based on this subject's single
+//    most recent activity (exam / written work / performance task) ──
+$sv_la_stmt = $conn->prepare(
+    "SELECT component, entry_name, total_items, date_given, MAX(created_at) AS latest_created
+     FROM score_entries
+     WHERE subject_id = ?
+     GROUP BY component, entry_name, total_items, date_given
+     ORDER BY latest_created DESC
+     LIMIT 1"
+);
+$sv_la_stmt->bind_param("i", $subject_id);
+$sv_la_stmt->execute();
+$sv_latest_activity = $sv_la_stmt->get_result()->fetch_assoc();
+
+$sv_perf_top    = [];
+$sv_perf_bottom = [];
+if ($sv_latest_activity) {
+    $sv_pf_stmt = $conn->prepare(
+        "SELECT st.student_id, st.last_name, st.first_name, se.score, se.total_items
+         FROM score_entries se
+         JOIN students st ON st.student_id = se.student_id
+         WHERE se.subject_id = ? AND se.component = ? AND se.entry_name = ?
+         ORDER BY se.score DESC, st.last_name ASC"
+    );
+    $sv_pf_stmt->bind_param(
+        "iss", $subject_id,
+        $sv_latest_activity['component'],
+        $sv_latest_activity['entry_name']
+    );
+    $sv_pf_stmt->execute();
+    $sv_pf_rows  = $sv_pf_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $sv_pf_count = count($sv_pf_rows);
+
+    $sv_top_n    = min(3, $sv_pf_count);
+    $sv_bottom_n = min(3, max(0, $sv_pf_count - $sv_top_n));
+
+    $sv_perf_top    = array_slice($sv_pf_rows, 0, $sv_top_n);
+    $sv_perf_bottom = $sv_bottom_n > 0
+        ? array_reverse(array_slice($sv_pf_rows, $sv_pf_count - $sv_bottom_n, $sv_bottom_n))
+        : [];
+}
+
+$sv_comp_colors = [
+    'Major Exam'       => ['color'=>'#7aa3ff','icon'=>'ti-file-certificate'],
+    'Written Work'     => ['color'=>'#34d399','icon'=>'ti-pencil'],
+    'Performance Task' => ['color'=>'#fbbf24','icon'=>'ti-star'],
+];
 ?>
-<div class="two-col">
+
+<div class="bottom-grid" style="margin-top:28px;">
+
+  <!-- At-risk students -->
   <div class="card">
-    <p class="card-title"><i class="ti ti-users"></i> Enrollees</p>
-    <?php if ($enrollee_count === 0): ?>
-      <div class="empty-state">
-        <i class="ti ti-users-off"></i>
-        <p>No students enrolled.<br>
-          <a href="/classroom/teacher/subject_view.php?id=<?php echo $subject_id; ?>&tab=settings" style="color:var(--subject-color)">Add students to this subject →</a>
-        </p>
+    <p class="card-title">
+      <i class="ti ti-alert-triangle" style="color:var(--red);"></i>
+      At-Risk Students
+      <?php if ($sv_risk->num_rows > 0): ?>
+        <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--red);">
+          <?php echo $sv_risk->num_rows; ?> flagged
+        </span>
+      <?php endif; ?>
+    </p>
+    <?php if ($sv_risk->num_rows === 0): ?>
+      <div class="empty-state" style="padding:24px;">
+        <i class="ti ti-circle-check" style="color:var(--green);font-size:28px;"></i>
+        <p style="color:var(--text6);margin-top:8px;">No failing students — great job!</p>
       </div>
     <?php else: ?>
-    <div style="display:flex;flex-direction:column;gap:2px;">
-      <?php
-      $enrollees->data_seek(0);
-      while ($s = $enrollees->fetch_assoc()):
-        $g        = $grade_map[$s['student_id']] ?? null;
-        $initials = strtoupper(substr($s['last_name'],0,1) . substr($s['first_name'],0,1));
-        $fg       = $g ? (float)$g['final_grade'] : 0;
-        $pass     = $fg >= 75;
+      <?php while ($r = $sv_risk->fetch_assoc()):
+        $sv_initials = strtoupper(substr($r['last_name'],0,1).substr($r['first_name'],0,1));
       ?>
-      <div class="enrollee-row">
-        <div class="enrollee-avatar"><?php echo $initials; ?></div>
-        <div style="flex:1;">
-          <div class="enrollee-name"><?php echo htmlspecialchars($s['last_name'] . ', ' . $s['first_name']); ?></div>
-          <div class="enrollee-id"><?php echo htmlspecialchars($s['student_id']); ?></div>
+      <div class="risk-item">
+        <div class="risk-avatar"><?php echo $sv_initials; ?></div>
+        <div>
+          <div class="risk-name"><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></div>
+          <div class="risk-sub"><?php echo htmlspecialchars($r['letter_grade'] ?? ''); ?></div>
         </div>
-        <?php if ($g && $fg > 0): ?>
-          <span style="font-family:var(--font-head);font-size:15px;font-weight:700;color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>">
-            <?php echo number_format($fg, 1); ?>%
-          </span>
-          <span class="badge <?php echo $pass ? 'badge-green' : 'badge-red'; ?>" style="font-size:10px;">
-            <?php echo $g['letter_grade']; ?>
-          </span>
-        <?php else: ?>
-          <span style="font-size:11px;color:var(--text3);">No data</span>
-        <?php endif; ?>
+        <div class="risk-grade"><?php echo number_format($r['final_grade'],1); ?>%</div>
       </div>
       <?php endwhile; ?>
-    </div>
     <?php endif; ?>
   </div>
 
-  <div>
-    <div class="card" style="margin-bottom:20px;">
-      <p class="card-title"><i class="ti ti-chart-bar"></i> Grade Distribution</p>
-      <?php if (empty($chart_labels)): ?>
-        <div class="empty-state"><i class="ti ti-chart-off"></i><p>No grades computed yet.</p></div>
+  <!-- Top & Lowest performers (latest activity in this subject) -->
+  <div class="card">
+    <p class="card-title">
+      <i class="ti ti-trophy" style="color:var(--text7);"></i>
+      Top &amp; Lowest Performers
+    </p>
+    <?php if (!$sv_latest_activity): ?>
+      <div class="empty-state" style="padding:24px;">
+        <i class="ti ti-pencil-off" style="color:var(--text6);"></i>
+        <p class="black-font">No score entries yet.</p>
+      </div>
+    <?php else: ?>
+      <div style="font-size:11px;color:var(--text7);margin-bottom:10px;">
+        Based on: <strong style="color:var(--text7);"><?php echo htmlspecialchars($sv_latest_activity['entry_name']); ?></strong>
+        &nbsp;·&nbsp; <?php echo date('M d', strtotime($sv_latest_activity['date_given'])); ?>
+      </div>
+
+      <div class="perf-subhead" style="color:var(--green);">
+        <i class="ti ti-arrow-up"></i> Top Performers
+      </div>
+      <?php if (empty($sv_perf_top)): ?>
+        <p style="font-size:12px;color:var(--text3);">No scores recorded for this activity yet.</p>
       <?php else: ?>
-        <canvas id="gradeChart" height="160"></canvas>
+        <?php foreach ($sv_perf_top as $r):
+          $sv_pct      = $r['total_items'] > 0 ? round($r['score'] / $r['total_items'] * 100, 1) : 0;
+          $sv_initials = strtoupper(substr($r['last_name'],0,1).substr($r['first_name'],0,1));
+        ?>
+        <div class="perf-item" style="background:rgba(0,255,81,.1);border:1px solid rgba(52,211,153,.1);">
+          <div class="perf-avatar">
+            <?php echo $sv_initials; ?>
+          </div>
+          <div>
+            <div class="perf-name"><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></div>
+            <div class="perf-sub"><?php echo (int)$r['score'].'/'.(int)$r['total_items']; ?></div>
+          </div>
+          <div class="perf-score" style="color:var(--green);"><?php echo $sv_pct; ?>%</div>
+        </div>
+        <?php endforeach; ?>
       <?php endif; ?>
-    </div>
+
+      <div class="perf-subhead" style="color:var(--red);margin-top:14px;">
+        <i class="ti ti-arrow-down"></i> Lowest Performers
+      </div>
+      <?php if (empty($sv_perf_bottom)): ?>
+        <p style="font-size:12px;color:var(--text3);">Not enough separate scores yet to list lowest performers.</p>
+      <?php else: ?>
+        <?php foreach ($sv_perf_bottom as $r):
+          $sv_pct      = $r['total_items'] > 0 ? round($r['score'] / $r['total_items'] * 100, 1) : 0;
+          $sv_initials = strtoupper(substr($r['last_name'],0,1).substr($r['first_name'],0,1));
+        ?>
+        <div class="perf-item" style="background:rgba(251,0,0,.1);border:1px solid rgba(248,113,113,.1);">
+          <div class="perf-avatar">
+            <?php echo $sv_initials; ?>
+          </div>
+          <div>
+            <div class="perf-name"><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></div>
+            <div class="perf-sub"><?php echo (int)$r['score'].'/'.(int)$r['total_items']; ?></div>
+          </div>
+          <div class="perf-score" style="color:var(--red);"><?php echo $sv_pct; ?>%</div>
+        </div>
+        <?php endforeach; ?>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+
+  <!-- Recent score entries -->
+  <div class="card">
+    <p class="card-title">
+      <i class="ti ti-activity" style="color:var(--green);"></i>
+      Recent Entries
+    </p>
+    <?php if ($sv_recent->num_rows === 0): ?>
+      <div class="empty-state" style="padding:24px;">
+        <i class="ti ti-pencil-off" style="color:var(--text6);"></i>
+        <p class="black-font">No score entries yet.</p>
+      </div>
+    <?php else: ?>
+      <?php while ($r = $sv_recent->fetch_assoc()):
+        $sv_cc  = $sv_comp_colors[$r['component']] ?? ['color'=>'#7aa3ff','icon'=>'ti-pencil'];
+        $sv_pct = $r['total_items'] > 0 ? round($r['score']/$r['total_items']*100,1) : 0;
+      ?>
+      <div class="recent-item">
+        <div class="recent-icon" style="background:<?php echo $sv_cc['color']; ?>18;color:<?php echo $sv_cc['color']; ?>;">
+          <i class="ti <?php echo $sv_cc['icon']; ?>"></i>
+        </div>
+        <div class="recent-main">
+          <div class="recent-title"><?php echo htmlspecialchars($r['entry_name']); ?></div>
+          <div class="recent-sub">
+            <?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?>
+            &nbsp;·&nbsp;<?php echo date('M d', strtotime($r['date_given'])); ?>
+          </div>
+        </div>
+        <div class="recent-score">
+          <?php echo $r['score'].'/'.$r['total_items']; ?>
+          <span style="color:<?php echo $sv_pct>=75?'var(--green)':'var(--red)'; ?>;">
+            (<?php echo $sv_pct; ?>%)
+          </span>
+        </div>
+      </div>
+      <?php endwhile; ?>
+    <?php endif; ?>
+  </div>
+
+</div>
 
     <div class="card">
       <p class="card-title"><i class="ti ti-percentage"></i> Grade Composition</p>
@@ -1005,8 +1207,6 @@ if ($active_tab === 'overview'):
         <div class="weight-bar-seg" style="width:<?php echo $subject['performance_pct']; ?>%;background:#fbbf24;"></div>
       </div>
     </div>
-  </div>
-</div>
 
 <?php
 // ══════════════════════════════════════════════════════
@@ -1110,7 +1310,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
               placeholder="0" min="0" step="1"
               oninput="calcPct(this, '<?php echo htmlspecialchars($s['student_id']); ?>')"
               onblur="calcPct(this, '<?php echo htmlspecialchars($s['student_id']); ?>')">
-            <span style="font-size:12px;color:var(--text2);text-align:right;padding-right:4px;"
+            <span style="font-size:12px;color:var(--text6);text-align:right;padding-right:4px;"
               id="tot_<?php echo htmlspecialchars($s['student_id']); ?>">/ —</span>
             <span style="font-size:12px;font-weight:600;text-align:right;color:var(--text2);"
               id="pct_<?php echo htmlspecialchars($s['student_id']); ?>">—</span>
@@ -1133,8 +1333,8 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
     <div class="card">
       <div class="empty-state">
         <i class="ti <?php echo $comp_icon; ?>" style="color:<?php echo $comp_color; ?>"></i>
-        <p style="color:var(--text2);">No <?php echo $comp_label; ?> entries yet.</p>
-        <p style="font-size:12px;margin-top:6px;">Use the form on the left to add scores.</p>
+        <p style="color:var(--text7);">No <?php echo $comp_label; ?> entries yet.</p>
+        <p style="font-size:12px;margin-top:6px;color:var(--text7);">Use the form on the left to add scores.</p>
       </div>
     </div>
     <?php else: ?>
@@ -1150,16 +1350,16 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
         <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;"
              onclick="toggleGroup('<?php echo $gkey; ?>')">
           <i class="ti ti-chevron-down" id="gp_chev_<?php echo $gkey; ?>"
-             style="transition:transform .2s;color:var(--text3);"></i>
+             style="transition:transform .2s;color:var(--text6);"></i>
           <div>
             <p class="card-title" style="margin-bottom:4px;">
               <i class="ti <?php echo $comp_icon; ?>" style="color:<?php echo $comp_color; ?>"></i>
               <?php echo htmlspecialchars($ename); ?>
             </p>
-            <div style="display:flex;gap:10px;font-size:12px;color:var(--text2);flex-wrap:wrap;">
+            <div style="display:flex;gap:10px;font-size:12px;color:var(--text7);flex-wrap:wrap;">
               <span><i class="ti ti-calendar" style="font-size:12px;"></i> <?php echo $date; ?></span>
-              <span>Total items: <strong style="color:var(--text)"><?php echo $total; ?></strong></span>
-              <span>Students: <strong style="color:var(--text)"><?php echo count($rows); ?></strong></span>
+              <span>Total items: <strong style="color:var(--text7)"><?php echo $total; ?></strong></span>
+              <span>Students: <strong style="color:var(--text7)"><?php echo count($rows); ?></strong></span>
               <span>Class avg:
                 <strong style="color:<?php echo $avg_pct >= 75 ? 'var(--green)' : 'var(--red)'; ?>">
                   <?php echo number_format($avg_pct, 1); ?>%
@@ -1173,12 +1373,12 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
         <div id="gp_actions_default_<?php echo $gkey; ?>" style="display:flex;gap:6px;">
           <button type="button" class="btn btn-sm btn-outline" title="Edit all scores in this activity"
             onclick="startGroupEdit('<?php echo $gkey; ?>')">
-            <i class="ti ti-edit"></i> Edit All
+            <i class="ti ti-edit"></i> Edit
           </button>
           <button type="button" class="btn btn-sm btn-outline" style="color:var(--red);border-color:rgba(248,113,113,.3);"
             title="Delete this entire activity for all students"
             onclick="confirmDeleteQuiz('<?php echo $gkey; ?>', '<?php echo htmlspecialchars(addslashes($ename)); ?>')">
-            <i class="ti ti-trash"></i> Delete Quiz
+            <i class="ti ti-trash"></i> Delete
           </button>
         </div>
 
@@ -1238,7 +1438,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
                       value="<?php echo $r['score']; ?>" data-original="<?php echo $r['score']; ?>"
                       min="0" max="<?php echo $r['total_items']; ?>" step="1"
                       oninput="clampEditInput(this)" onblur="clampEditInput(this)">
-                    <span style="font-size:12px;color:var(--text2);">/ <?php echo $r['total_items']; ?></span>
+                    <span style="font-size:12px;color:var(--text7);">/ <?php echo $r['total_items']; ?></span>
                   </td>
                   <td>
                     <div class="score-bar-wrap">
@@ -1250,7 +1450,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
                       </span>
                     </div>
                   </td>
-                  <td class="row-actions-default">
+                  <!-- <td class="row-actions-default"> 
                     <button type="button" class="btn btn-sm btn-ghost" title="Edit"
                       onclick="focusRowEdit('<?php echo $gkey; ?>', '<?php echo $r['id']; ?>')">
                       <i class="ti ti-edit"></i>
@@ -1260,7 +1460,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
                        onclick="return confirm('Delete this score? The grade will be recalculated.')">
                       <i class="ti ti-trash"></i>
                     </a>
-                  </td>
+                  </td>-->
                 </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -1320,7 +1520,7 @@ elseif ($active_tab === 'attendance'):
     }
 ?>
 
-<!-- Stat chips -->
+<!-- Stat chips 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
   <?php foreach ([
     ['Present', $att_summary['Present'],    'var(--green)',  'var(--bg4)',  'rgba(52,211,153,.25)'],
@@ -1338,7 +1538,7 @@ elseif ($active_tab === 'attendance'):
   </div>
   <?php endforeach; ?>
 </div>
-
+-->
 <div class="two-col">
 
   <!-- LEFT: Date picker + quick mark + form -->
@@ -1347,7 +1547,7 @@ elseif ($active_tab === 'attendance'):
       <p class="card-title">
         <i class="ti ti-calendar-check" style="color:var(--purple);"></i>
         Manual Attendance
-        <span style="font-size:11px;font-weight:400;color:var(--text2);margin-left:4px;">
+        <span style="font-size:11px;font-weight:400;color:var(--text7);margin-left:4px;">
           (<?php echo (int)$subject['attendance_pct']; ?>% of final grade)
         </span>
       </p>
@@ -1392,7 +1592,7 @@ elseif ($active_tab === 'attendance'):
             $initials = strtoupper(substr($s['last_name'],0,1) . substr($s['first_name'],0,1));
           ?>
           <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
-                      background:var(--bg3);border-radius:var(--radius);">
+                      background:var(--bg6);border-radius:var(--radius);border:1px solid var(--bg4);">
             <div class="enrollee-avatar"
               style="width:30px;height:30px;font-size:11px;flex-shrink:0;"><?php echo $initials; ?></div>
             <span style="font-size:13px;font-weight:500;flex:1;">
@@ -1410,12 +1610,12 @@ elseif ($active_tab === 'attendance'):
               <label for="att_<?php echo htmlspecialchars($sid) . '_' . $opt; ?>"><?php echo $opt; ?></label>
               <?php endforeach; ?>
             </div>
-            <input type="time"
+            <!-- <input type="time" 
               name="time_in[<?php echo htmlspecialchars($sid); ?>]"
               id="timein_<?php echo htmlspecialchars($sid); ?>"
               class="form-control" style="width:110px;padding:5px 8px;font-size:12px;"
               value="<?php echo htmlspecialchars($timein); ?>"
-              <?php echo $status === 'Absent' ? 'disabled' : ''; ?>>
+              <?php echo $status === 'Absent' ? 'disabled' : ''; ?>>-->
           </div>
           <?php endwhile; ?>
         </div>
@@ -1436,8 +1636,8 @@ elseif ($active_tab === 'attendance'):
 
       <?php if (empty($att_dates)): ?>
       <div class="empty-state">
-        <i class="ti ti-calendar-off"></i>
-        <p>No attendance records yet.</p>
+        <i class="ti ti-calendar-off" style="color:var(--text7)"></i>
+        <p style="color:var(--text7)">No attendance records yet.</p>
       </div>
       <?php else: ?>
 
@@ -1450,12 +1650,12 @@ elseif ($active_tab === 'attendance'):
           $dkey = md5('att|' . $d);
           $is_today = $d === date('Y-m-d');
       ?>
-      <div class="card" style="background:var(--bg3);padding-bottom:10px;margin-bottom:10px;">
+      <div class="card" style="background:var(--bg6);padding-bottom:10px;margin-bottom:10px;border:1px solid var(--bg4);">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:180px;"
                onclick="toggleAttDay('<?php echo $dkey; ?>')">
             <i class="ti ti-chevron-down" id="att_chev_<?php echo $dkey; ?>"
-               style="transition:transform .2s;color:var(--text3);"></i>
+               style="transition:transform .2s;color:var(--text6);"></i>
             <div>
               <p style="font-weight:600;font-size:13px;">
                 <?php echo date('M d, Y', strtotime($d)); ?>
@@ -1465,7 +1665,7 @@ elseif ($active_tab === 'attendance'):
               </p>
               <div style="display:flex;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap;">
                 <span style="color:var(--green);"><?php echo $day_counts['Present']; ?> Present</span>
-                <span style="color:var(--yellow);"><?php echo $day_counts['Late']; ?> Late</span>
+                <span style="color:var(--text7);"><?php echo $day_counts['Late']; ?> Late</span>
                 <span style="color:var(--red);"><?php echo $day_counts['Absent']; ?> Absent</span>
               </div>
             </div>
@@ -1474,16 +1674,16 @@ elseif ($active_tab === 'attendance'):
           <div id="att_actions_default_<?php echo $dkey; ?>" style="display:flex;gap:6px;">
             <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=attendance&att_date=<?php echo $d; ?>"
                class="btn btn-sm btn-ghost" title="Load this date into the Manual Attendance form">
-              <i class="ti ti-edit-circle"></i>
+              <!-- <i class="ti ti-edit-circle" style="color:var(--text6);"></i> -->
             </a>
             <button type="button" class="btn btn-sm btn-outline" title="Edit all records for this day"
               onclick="startAttDayEdit('<?php echo $dkey; ?>')">
-              <i class="ti ti-edit"></i> Edit All
+              <i class="ti ti-edit"></i> Edit
             </button>
             <button type="button" class="btn btn-sm btn-outline" style="color:var(--red);border-color:rgba(248,113,113,.3);"
               title="Delete this entire day's attendance"
               onclick="confirmDeleteAttDay('<?php echo $dkey; ?>', '<?php echo date('M d, Y', strtotime($d)); ?>')">
-              <i class="ti ti-trash"></i> Delete Day
+              <i class="ti ti-trash"></i> Delete
             </button>
           </div>
 
@@ -1515,7 +1715,7 @@ elseif ($active_tab === 'attendance'):
                   <tr>
                     <th>Student</th>
                     <th>Status</th>
-                    <th>Time In</th>
+                    <!-- <th>Time In</th> --><th></th>
                     <th>Source</th>
                     <th></th>
                   </tr>
@@ -1552,7 +1752,7 @@ elseif ($active_tab === 'attendance'):
                       </span>
                       <span class="att-edit-input" style="display:none;" id="att_radios_<?php echo $rk; ?>">
                         <?php foreach (['Present','Late','Absent'] as $opt): ?>
-                        <label style="font-size:11px;margin-right:6px;">
+                        <label style="font-size:12px;margin-right:25px;">
                           <input type="radio"
                             name="bea_status[<?php echo htmlspecialchars($ar['student_id']); ?>]"
                             value="<?php echo $opt; ?>"
@@ -1564,7 +1764,8 @@ elseif ($active_tab === 'attendance'):
                         <?php endforeach; ?>
                       </span>
                     </td>
-                    <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">
+                    <td></td>
+                    <!-- <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);"> 
                       <span class="att-view" id="att_time_view_<?php echo $rk; ?>">
                         <?php echo $ar['time_in'] ? substr($ar['time_in'], 0, 5) : '—'; ?>
                       </span>
@@ -1574,8 +1775,8 @@ elseif ($active_tab === 'attendance'):
                         style="display:none;width:100px;padding:4px 6px;font-size:11px;"
                         value="<?php echo htmlspecialchars(substr($ar['time_in'] ?? '', 0, 5)); ?>"
                         <?php echo $ar['status'] === 'Absent' ? 'disabled' : ''; ?>>
-                    </td>
-                    <td style="font-size:11px;color:var(--text2);">
+                    </td>-->
+                    <td style="font-size:11px;color:var(--text7);">
                       <?php if ($ar['source'] === 'Biometric'): ?>
                         <span style="color:var(--accent);"><i class="ti ti-fingerprint" style="font-size:12px;"></i> Bio</span>
                       <?php elseif ($ar['source']): ?>
@@ -1584,7 +1785,7 @@ elseif ($active_tab === 'attendance'):
                         —
                       <?php endif; ?>
                     </td>
-                    <td class="row-actions-default">
+                    <!-- <td class="row-actions-default"> 
                       <button type="button" class="btn btn-sm btn-ghost" title="Edit"
                         onclick="focusAttRowEdit('<?php echo $dkey; ?>', '<?php echo $rk; ?>')">
                         <i class="ti ti-edit"></i>
@@ -1594,7 +1795,7 @@ elseif ($active_tab === 'attendance'):
                          onclick="return confirm('Delete this attendance record? The grade will be recalculated.')">
                         <i class="ti ti-trash"></i>
                       </a>
-                    </td>
+                    </td>-->
                   </tr>
                   <?php endforeach; ?>
                   <?php if (empty($day_rows)): ?>
@@ -1644,7 +1845,7 @@ elseif ($active_tab === 'biometric'):
     $bio_absent  = $bio_total - $bio_present - $bio_late;
 ?>
 
-<!-- Bio stat chips -->
+<!-- Bio stat chips 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
   <?php foreach ([
     ['Present', $bio_present, 'var(--green)',  'var(--bg4)',  'rgba(52,211,153,.25)',  'bioStatPresent'],
@@ -1663,6 +1864,7 @@ elseif ($active_tab === 'biometric'):
   </div>
   <?php endforeach; ?>
 </div>
+-->
 
 <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start;">
 
@@ -1672,7 +1874,7 @@ elseif ($active_tab === 'biometric'):
         ? 'border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03);' : ''; ?>">
       <p class="card-title">
         <i class="ti ti-player-play"
-          style="color:<?php echo $active_bio_session ? 'var(--green)' : 'var(--text2)'; ?>;"></i>
+          style="color:<?php echo $active_bio_session ? 'var(--green)' : 'var(--text6)'; ?>;"></i>
         Session Control
         <?php if ($active_bio_session): ?>
         <span style="display:inline-flex;align-items:center;gap:5px;margin-left:6px;">
@@ -1718,18 +1920,18 @@ elseif ($active_tab === 'biometric'):
 
       <?php elseif (empty($bio_devices)): ?>
       <div class="empty-state" style="padding:20px;">
-        <i class="ti ti-cpu-off"></i>
-        <p>No devices assigned to this subject.<br>
-          <a href="/classroom/teacher/biometric.php" style="color:var(--accent);">
+        <i class="ti ti-cpu-off" style="color: var(--text7);"></i>
+        <p style="color: var(--text7);">No devices assigned to this subject.<br>
+          <a href="/classroomv2/teacher/biometric.php" style="color:var(--accent);">
             Biometric Setup →
           </a>
         </p>
       </div>
 
       <?php else: ?>
-      <div style="background:var(--bg3);border:1px solid var(--border2);
+      <div style="background:var(--bg6);border:1px solid var(--border2);
                   border-radius:var(--radius);padding:14px;">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;
+        <p style="font-size:12px;color:var(--text6);margin-bottom:12px;
                   display:flex;align-items:center;gap:5px;">
           <i class="ti ti-clock"></i> No active session
         </p>
@@ -1776,6 +1978,7 @@ elseif ($active_tab === 'biometric'):
     <?php if (!empty($bio_devices)): ?>
     <div class="card">
       <p class="card-title"><i class="ti ti-cpu"></i> Devices</p>
+            <hr class="thin-line">
       <?php foreach ($bio_devices as $bd):
         $online = $bd['last_seen'] && (time() - strtotime($bd['last_seen']) < 120);
         $ls     = !$bd['last_seen'] ? 'Never'
@@ -1785,7 +1988,7 @@ elseif ($active_tab === 'biometric'):
       <div style="display:flex;align-items:center;gap:10px;padding:9px 0;
                   border-bottom:1px solid var(--border);">
         <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;
-          background:<?php echo $online ? 'var(--green)' : 'var(--text3)'; ?>;
+          background:<?php echo $online ? 'var(--green)' : 'var(--text7)'; ?>;
           <?php echo $online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:500;"><?php echo htmlspecialchars($bd['label']); ?></div>
@@ -1796,7 +1999,7 @@ elseif ($active_tab === 'biometric'):
       </div>
       <?php endforeach; ?>
       <div style="margin-top:12px;text-align:center;">
-        <a href="/classroom/teacher/biometric.php" class="btn btn-outline btn-sm" style="font-size:11px;">
+        <a href="/classroomv2/teacher/biometric.php" class="btn btn-outline btn-sm" style="font-size:11px;">
           <i class="ti ti-settings"></i> Manage Devices &amp; Enrollment
         </a>
       </div>
@@ -1825,20 +2028,20 @@ elseif ($active_tab === 'biometric'):
         style="background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.2);"
         onclick="setBioFilter('all')">All</button>
       <button class="btn btn-sm" id="bioFilterPresent"
-        style="background:transparent;color:var(--text2);border:1px solid var(--border2);"
+        style="background:var(--bg);color:var(--text);border:1px solid var(--border2);"
         onclick="setBioFilter('present')">Present</button>
       <button class="btn btn-sm" id="bioFilterLate"
-        style="background:transparent;color:var(--text2);border:1px solid var(--border2);"
+        style="background:var(--bg);color:var(--text2);border:1px solid var(--border2);"
         onclick="setBioFilter('late')">Late</button>
       <button class="btn btn-sm" id="bioFilterAbsent"
-        style="background:transparent;color:var(--text2);border:1px solid var(--border2);"
+        style="background:var(--bg);color:var(--text2);border:1px solid var(--border2);"
         onclick="setBioFilter('not yet')">Not Yet</button>
     </div>
 
     <!-- Search -->
     <div style="position:relative;margin-bottom:12px;">
       <i class="ti ti-search" style="position:absolute;left:10px;top:50%;
-         transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none;"></i>
+         transform:translateY(-50%);color:var(--text6);font-size:13px;pointer-events:none;"></i>
       <input type="text" id="bioRosterSearch" class="form-control"
         style="padding-left:32px;" placeholder="Search student…"
         oninput="filterBioRoster()">
@@ -1849,7 +2052,9 @@ elseif ($active_tab === 'biometric'):
         <thead>
           <tr>
             <th>#</th><th>Student</th><th>Fingerprint</th>
-            <th>Status</th><th>Time In</th><th>Source</th>
+            <th>Status</th>
+            <!-- <th>Time In</th> -->
+            <th>Source</th>
           </tr>
         </thead>
         <tbody id="bioRosterBody"></tbody>
@@ -1886,12 +2091,12 @@ elseif ($active_tab === 'biometric'):
     if (!src) return '';
     return src === 'Biometric'
       ? badge('<i class="ti ti-fingerprint" style="font-size:9px;"></i> Bio','#5b8dee','rgba(91,141,238,.12)')
-      : badge('Manual','#3d4560','#1a1e2b');
+      : badge('Manual','#dcd6d6','#eb14348e');
   }
   function fpBadge(has) {
     return has
       ? badge('✓ Enrolled','#34d399','rgba(52,211,153,.12)')
-      : badge('✗ None','#3d4560','#1a1e2b');
+      : badge('✗ None','#dcd6d6','#eb14348e');
   }
 
   function renderRoster(students) {
@@ -1905,16 +2110,18 @@ elseif ($active_tab === 'biometric'):
                   && (q === '' || name.includes(q));
       if (!show) return `<tr style="display:none;" data-status="${dispSt}" data-name="${name}"></tr>`;
       return `<tr data-status="${dispSt}" data-name="${name}">
-        <td style="color:var(--text3);font-size:11px;">${i+1}</td>
+        <td style="color:var(--text7);font-size:11px;">${i+1}</td>
         <td>
           <div style="font-weight:500;">${s.last_name}, ${s.first_name}</div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">${s.student_id}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text7);">${s.student_id}</div>
         </td>
         <td>${fpBadge(s.has_template)}</td>
         <td>${statusBadge(s.att_status)}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">
+
+        <!-- <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">
           ${s.time_in ? s.time_in.substring(0,5) : '—'}
-        </td>
+        </td> -->
+
         <td>${sourceBadge(s.source)}</td>
       </tr>`;
     }).join('');
@@ -1959,7 +2166,7 @@ elseif ($active_tab === 'biometric'):
       if (!el) return;
       const on = val === f;
       el.style.background  = on ? 'rgba(52,211,153,.12)' : 'transparent';
-      el.style.color       = on ? '#34d399'              : 'var(--text2)';
+      el.style.color       = on ? '#34d399'              : 'var(--text6)';
       el.style.borderColor = on ? 'rgba(52,211,153,.2)'  : 'var(--border2)';
     });
     renderRoster(lastData ? lastData.students : initStudents);
@@ -1993,8 +2200,8 @@ elseif ($active_tab === 'grades'):
 ?>
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
   <div>
-    <h2 style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text);">Grade Summary</h2>
-    <p style="font-size:12px;color:var(--text2);">
+    <h2 style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text6);">Grade Summary</h2>
+    <p style="font-size:12px;color:var(--text7);">
       Auto-computed from scores and attendance. Formula: Exam×<?php echo (int)$subject['exam_pct']; ?>% + Written×<?php echo (int)$subject['written_pct']; ?>% + Performance×<?php echo (int)$subject['performance_pct']; ?>%
     </p>
   </div>
@@ -2044,7 +2251,7 @@ elseif ($active_tab === 'grades'):
             };
         ?>
         <tr>
-          <td style="color:var(--text3);font-size:12px;"><?php echo $rank++; ?></td>
+          <td style="color:var(--text7);font-size:12px;"><?php echo $rank++; ?></td>
           <td>
             <div style="font-weight:500;font-size:13px;"><?php echo htmlspecialchars($r['last_name'] . ', ' . $r['first_name']); ?></div>
             <div class="td-mono"><?php echo htmlspecialchars($r['student_id']); ?></div>
@@ -2090,7 +2297,7 @@ elseif ($active_tab === 'grades'):
       </tbody>
     </table>
   </div>
-  <p style="font-size:11px;color:var(--text3);margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+  <p style="font-size:11px;color:var(--text7);margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
     Performance component = (Perf. Task Avg × <?php echo (int)($subject['performance_pct'] - $subject['attendance_pct']); ?>% + Attendance × <?php echo (int)$subject['attendance_pct']; ?>%) / <?php echo (int)$subject['performance_pct']; ?>%
     &nbsp;·&nbsp; Last computed: <?php echo date('M d, Y g:i A'); ?>
   </p>
@@ -2162,7 +2369,7 @@ elseif ($active_tab === 'settings'):
   <!-- 2. Grade Weights -->
   <div class="card" style="max-width:600px;margin-bottom:20px; transform: translate(600px, -430px);">
     <p class="card-title"><i class="ti ti-percentage"></i> Edit Grade Weights</p>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:16px;">
+    <p style="font-size:12px;color:var(--text7);margin-bottom:16px;">
       Changing weights will immediately recompute all student grades for this subject.
     </p>
     <form method="POST">
@@ -2189,7 +2396,7 @@ elseif ($active_tab === 'settings'):
           <label style="color:#a78bfa;">Attendance % <span style="font-weight:400;font-size:10px;">(inside Perf)</span></label>
           <input type="number" name="attendance_pct" id="s_att" class="form-control"
             value="<?php echo (int)$subject['attendance_pct']; ?>"
-            min="0" max="50" step="1" required>
+            min="0" max="10" step="1" required>
         </div>
       </div>
       <div id="s_total" style="font-size:12px;color:var(--green);margin-bottom:14px;">Total: 100% ✓</div>
@@ -2209,6 +2416,7 @@ elseif ($active_tab === 'settings'):
   <div class="card" style="margin-bottom:20px; transform: translate(0px, -300px);">
     <p class="card-title"><i class="ti ti-users"></i>
       Enrollee Management
+      <hr class="thin-line">
       <span style="font-weight:400;font-size:11px;color:var(--text3);margin-left:4px;">
         (<?php echo $enrolled_list ? $enrolled_list->num_rows : 0; ?> enrolled)
       </span>
@@ -2216,8 +2424,8 @@ elseif ($active_tab === 'settings'):
 
     <?php if ($sections_list): ?>
     <div class="enroll-block">
-      <p style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">
-        <i class="ti ti-building-community" style="color:var(--accent);"></i> Enroll Entire Section
+      <p style="font-size:12px;font-weight:600;color:var(--text6);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">
+        <i class="ti ti-building-community" style="color:var(--text6);"></i> Enroll Entire Section
       </p>
       <form method="POST" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input type="hidden" name="enroll_section">
@@ -2235,12 +2443,13 @@ elseif ($active_tab === 'settings'):
         </a>
       </form>
     </div>
+     <hr class="thin-line">
     <div class="divider" style="margin:16px 0;"></div>
     <?php endif; ?>
 
     <?php if ($not_enrolled_list): ?>
     <div class="enroll-block" style="margin-bottom:16px;">
-      <p style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">
+      <p style="font-size:12px;font-weight:600;color:var(--text6);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">
         <i class="ti ti-user-plus" style="color:var(--accent);"></i> Add Individual Student
       </p>
       <form method="POST" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -2259,7 +2468,7 @@ elseif ($active_tab === 'settings'):
       </form>
     </div>
     <?php else: ?>
-    <p style="font-size:12px;color:var(--text3);margin-bottom:14px;">All registered students are already enrolled.</p>
+    <p style="font-size:12px;color:var(--text6);margin-bottom:14px;">All registered students are already enrolled.</p>
     <?php endif; ?>
 
     <?php if (!$enrolled_list || $enrolled_list->num_rows === 0): ?>
@@ -2269,10 +2478,10 @@ elseif ($active_tab === 'settings'):
     </div>
     <?php else: ?>
     <div style="position:relative;margin-bottom:10px;">
-      <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none;"></i>
+      <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text6);font-size:13px;pointer-events:none;"></i>
       <input type="text" id="enrolleeSearch" placeholder="Search enrolled students…"
         oninput="filterEnrollees()"
-        style="width:100%;padding:7px 10px 7px 32px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:12px;outline:none;">
+        style="width:100%;padding:7px 10px 7px 32px;background:var(--bg6);border:1px solid var(--border2);border-radius:8px;color:var(--text6);font-family:var(--font-body);font-size:12px;outline:none;">
     </div>
 
     <div id="enrolleeList" style="max-height:380px;overflow-y:auto;">
@@ -2281,13 +2490,13 @@ elseif ($active_tab === 'settings'):
     ?>
     <div class="enrollee-row"
       data-name="<?php echo strtolower($en['last_name'] . ' ' . $en['first_name'] . ' ' . $en['student_id']); ?>"
-      style="border:1px solid var(--border);background:var(--bg3);margin-bottom:6px;">
+      style="border:1px solid var(--border);background:var(--bg6);margin-bottom:6px;">
       <div class="enrollee-avatar" style="border-radius:8px;width:32px;height:32px;font-size:11px;"><?php echo $initials; ?></div>
       <div style="flex:1;">
         <div class="enrollee-name">
           <?php echo htmlspecialchars($en['last_name'] . ', ' . $en['first_name']); ?>
           <?php if ($en['middle_initial']): ?>
-          <span style="color:var(--text3);"><?php echo htmlspecialchars($en['middle_initial']); ?></span>
+          <span style="color:var(--text7);"><?php echo htmlspecialchars($en['middle_initial']); ?></span>
           <?php endif; ?>
         </div>
         <div class="enrollee-id">

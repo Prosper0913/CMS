@@ -3,9 +3,9 @@
 session_start();
 if (isset($_SESSION['role'])) {
     header("Location: " . ($_SESSION['role']==='teacher'
-        ? '/classroom/teacher/dashboard.php'
-        : '/classroom/student/dashboard.php'));
+        ? '/classroomv2/teacher/dashboard.php'
+        : '/classroomv2/student/dashboard.php'));
 } else {
-    header("Location: /classroom/login.php");
+    header("Location: /classroomv2/login.php");
 }
 exit;

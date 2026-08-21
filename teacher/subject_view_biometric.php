@@ -195,7 +195,7 @@ if ($standalone):
   <title>Biometric Session — <?php echo htmlspecialchars($subject['subject_code']); ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-  <link rel="stylesheet" href="/classroom/assets/style.css">
+  <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <?php if ($standalone): ?>
 <body style="background:#0c0e14;min-height:100vh;padding:32px 28px;">

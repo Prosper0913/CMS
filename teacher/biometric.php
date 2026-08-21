@@ -386,18 +386,18 @@ $type_cfg  = [
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
 
 </head>
 <body class="page-teacher-biometric">
 
 <!-- NAVBAR -->
 <nav class="navbar">
-  <a class="brand" href="/classroom/teacher/dashboard.php">
+  <a class="brand" href="/classroomv2/teacher/dashboard.php">
     <span class="brand-dot"></span>Classroom CMS
   </a>
   <div class="nav-sep"></div>
-  <a href="/classroom/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
+  <a href="/classroomv2/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
 
   <?php if ($all_subs->num_rows > 0): ?>
   <div class="nav-dropdown">
@@ -407,14 +407,14 @@ $type_cfg  = [
     <div class="nav-dd-menu" id="ddMenu">
       <?php $all_subs->data_seek(0); while ($ns = $all_subs->fetch_assoc()):
         $dc = $type_cfg[$ns['subject_type']]['color'] ?? '#00ff1a'; ?>
-      <a href="/classroom/teacher/subject_view.php?id=<?php echo $ns['id']; ?>" class="dd-item">
+      <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $ns['id']; ?>" class="dd-item">
         <span class="dd-dot" style="background:<?php echo $dc; ?>;"></span> 
         <span class="dd-main"><?php echo htmlspecialchars($ns['subject_code'].' — '.$ns['subject_name']); ?></span>
         <span class="dd-sub"><?php echo htmlspecialchars($ns['section']); ?></span>
       </a>
       <?php endwhile; ?>
       <div class="dd-divider"></div>
-      <a href="/classroom/teacher/add_subject.php" class="dd-item">
+      <a href="/classroomv2/teacher/add_subject.php" class="dd-item">
         <i class="ti ti-plus" style="color:var(--accent);font-size:13px;"></i>
         <span class="dd-main" style="color:var(--accent);">Add New Subject</span>
       </a>
@@ -422,21 +422,20 @@ $type_cfg  = [
   </div>
   <?php endif; ?>
 
-  <a href="/classroom/teacher/add_subject.php" class="nav-link"><i class="ti ti-book-plus"></i> Add Subject</a>
-  <a href="/classroom/teacher/manage_sections.php" class="nav-link"><i class="ti ti-building-community"></i> Sections</a>
-  <a href="/classroom/teacher/biometric.php" class="nav-link active"><i class="ti ti-fingerprint"></i> Biometric</a>
-  <a href="/classroom/teacher/students.php" class="nav-link"><i class="ti ti-users"></i> Students</a>
+  <a href="/classroomv2/teacher/add_subject.php" class="nav-link"><i class="ti ti-book-plus"></i> Add Subject</a>
+  <a href="/classroomv2/teacher/biometric.php" class="nav-link active"><i class="ti ti-fingerprint"></i> Biometric</a>
+  <!-- <a href="/classroomv2/teacher/students.php" class="nav-link"><i class="ti ti-users"></i> Students</a> -->
   <div class="nav-right">
     <span class="nav-role">Teacher</span>
     <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
 <div class="page-wrap">
 
   <!-- PAGE HEADER -->
-  <div class="page-header">
+  <div class="page-header with-actions">
     <div>
       <h1><i class="ti ti-fingerprint" style="color:var(--accent);"></i> Biometric Attendance</h1>
       <p>Register devices, enroll student fingerprints, and monitor live attendance.</p>
@@ -478,7 +477,7 @@ $type_cfg  = [
   </div>
 
   <!-- ── STEP-BY-STEP GUIDE ── -->
-  <div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,rgba(91,141,238,.05) 0%,transparent 100%);border-color:rgba(91,141,238,.2);">
+  <div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,rgba(19, 95, 63, 0.24) 0%,transparent 100%);border-color:rgba(36, 90, 31, 0.2);">
     <p class="card-title"><i class="ti ti-route"></i> Setup Guide</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
       <?php
@@ -513,8 +512,8 @@ $type_cfg  = [
         <p class="card-title"><i class="ti ti-cpu"></i> Registered Devices</p>
         <?php if (empty($devices)): ?>
         <div class="empty-state" style="padding:24px;">
-          <i class="ti ti-cpu-off"></i>
-          <p>No devices registered yet.<br>Click "Register Device" to add one.</p>
+          <i class="ti ti-cpu-off" style="color: var(--text7);"></i>
+          <p style="color: var(--text7);">No devices registered yet.<br>Click "Register Device" to add one.</p>
         </div>
         <?php else: ?>
         <?php foreach ($devices as $dev):
@@ -620,7 +619,7 @@ $type_cfg  = [
                 </option>
                 <?php endforeach; ?>
               </select>
-              <small>✓ = already has a template (will be overwritten)</small>
+              <small style="color:var(--text7);">✓ = already has a template (will be overwritten)</small>
             </div>
             <button type="submit" name="queue_enroll" class="btn btn-primary btn-full">
               <i class="ti ti-fingerprint"></i> Queue Enrollment
@@ -696,7 +695,7 @@ $type_cfg  = [
         <div class="divider"></div>
         <p class="section-label"><i class="ti ti-clock"></i> Pending Queue</p>
         <?php foreach ($queue_rows as $qr): ?>
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:var(--radius);margin-bottom:6px;">
           <i class="ti ti-loader" style="color:var(--yellow);font-size:16px;animation:spin 1.5s linear infinite;"></i>
           <div style="flex:1;">
             <div style="font-size:13px;font-weight:500;">
@@ -727,7 +726,7 @@ $type_cfg  = [
           $sess = $active_sessions[$dev['id']] ?? null;
           $is_online = $dev['last_seen'] && (time() - strtotime($dev['last_seen']) < 120);
         ?>
-        <div style="background:var(--bg3);border:1px solid <?php echo $sess ? 'rgba(52,211,153,.25)' : 'var(--border2)'; ?>;border-radius:var(--radius);padding:14px;margin-bottom:12px;">
+        <div style="background:var(--bg);border:1px solid <?php echo $sess ? 'rgba(52,211,153,.25)' : 'var(--border2)'; ?>;border-radius:var(--radius);padding:14px;margin-bottom:12px;">
           <!-- Device header -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
@@ -846,7 +845,7 @@ $type_cfg  = [
                   <div style="font-weight:500;"><?php echo htmlspecialchars($st['last_name'].', '.$st['first_name']); ?></div>
                   <div class="td-mono"><?php echo htmlspecialchars($st['student_id']); ?></div>
                 </td>
-                <td style="font-size:12px;color:var(--text2);">
+                <td style="font-size:12px;color:var(--text7);">
                   <?php echo htmlspecialchars($st['subject_code'].' '.$st['section']); ?>
                 </td>
                 <td>
@@ -856,7 +855,7 @@ $type_cfg  = [
                   <span class="badge badge-gray">Not enrolled</span>
                   <?php endif; ?>
                 </td>
-                <td style="font-size:11px;color:var(--text3);">
+                <td style="font-size:11px;color:var(--text7);">
                   <?php echo $st['enrolled_at'] ? date('M d, Y', strtotime($st['enrolled_at'])) : '—'; ?>
                 </td>
                 <td style="text-align:right;">
@@ -917,19 +916,19 @@ $type_cfg  = [
             $sc = 'st-' . $lg['status'];
             $student_name = $lg['last_name']
                 ? htmlspecialchars($lg['last_name'].', '.$lg['first_name'])
-                : '<span style="color:var(--text3);">Unknown</span>';
+                : '<span style="color:var(--text7);">Unknown</span>';
           ?>
           <tr>
             <td class="td-mono"><?php echo date('M d H:i:s', strtotime($lg['scanned_at'])); ?></td>
-            <td style="font-size:12px;color:var(--text2);"><?php echo htmlspecialchars($lg['device_label'] ?? '—'); ?></td>
+            <td style="font-size:12px;color:var(--text7);"><?php echo htmlspecialchars($lg['device_label'] ?? '—'); ?></td>
             <td><?php echo $student_name; ?></td>
-            <td style="font-size:12px;color:var(--text2);"><?php echo htmlspecialchars($lg['subject_code'] ?? '—'); ?></td>
+            <td style="font-size:12px;color:var(--text7);"><?php echo htmlspecialchars($lg['subject_code'] ?? '—'); ?></td>
             <td>
               <span class="<?php echo $sc; ?>" style="font-size:11px;font-weight:700;text-transform:uppercase;">
                 <?php echo $lg['status']; ?>
               </span>
             </td>
-            <td style="font-size:12px;color:var(--text2);"><?php echo htmlspecialchars($lg['message'] ?? ''); ?></td>
+            <td style="font-size:12px;color:var(--text7);"><?php echo htmlspecialchars($lg['message'] ?? ''); ?></td>
           </tr>
           <?php endforeach; ?>
         </tbody>

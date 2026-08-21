@@ -16,7 +16,7 @@ $sid        = $_SESSION['student_id'];
 $subject_id = (int)($_GET['id'] ?? 0);
 
 if (!$subject_id) {
-    header("Location: /classroom/student/dashboard.php");
+    header("Location: /classroomv2/student/dashboard.php");
     exit;
 }
 
@@ -29,7 +29,7 @@ $chk->bind_param("is", $subject_id, $sid);
 $chk->execute();
 $chk->store_result();
 if ($chk->num_rows === 0) {
-    header("Location: /classroom/student/dashboard.php");
+    header("Location: /classroomv2/student/dashboard.php");
     exit;
 }
 
@@ -45,7 +45,7 @@ $subq->execute();
 $subject = $subq->get_result()->fetch_assoc();
 
 if (!$subject) {
-    header("Location: /classroom/student/dashboard.php");
+    header("Location: /classroomv2/student/dashboard.php");
     exit;
 }
 
@@ -101,9 +101,9 @@ if (!in_array($active_tab, $valid_tabs)) $active_tab = 'overview';
 
 // ── Type config ───────────────────────────────────────────────
 $type_colors = [
-    'General Education'      => '#7aa3ff',
-    'Professional Education' => '#34d399',
-    'Major Subject'          => '#fbbf24',
+    'General Education'      => '#6c8dda',
+    'Professional Education' => '#ff2407',
+    'Major Subject'          => '#00ff1a',
 ];
 $subject_color = $type_colors[$subject['subject_type']] ?? '#7aa3ff';
 
@@ -120,27 +120,27 @@ $pass = $fg >= 75;
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
   <style>body.page-student-subject_detail{--subject-color:<?php echo htmlspecialchars($subject_color, ENT_QUOTES, 'UTF-8'); ?>;}</style>
 
 </head>
 <body class="page-student-subject_detail">
 
 <nav class="navbar">
-  <a class="brand" href="/classroom/student/dashboard.php"><img src="/classroom/assets/images/TCM logo (2).png" alt="Classroom Management System" width="32" height="32"></span>Classroom Management System</a>
+  <a class="brand" href="/classroomv2/student/dashboard.php"><img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom Management System" width="32" height="32"></span>Classroom Management System</a>
   <div class="nav-sep"></div>
-  <a href="/classroom/student/dashboard.php" class="nav-link"><i class="ti ti-home"></i> Home</a>
-  <a href="/classroom/student/subjects.php"  class="nav-link"><i class="ti ti-books"></i> My Subjects</a>
+  <a href="/classroomv2/student/dashboard.php" class="nav-link"><i class="ti ti-home"></i> Home</a>
+  <a href="/classroomv2/student/subjects.php"  class="nav-link"><i class="ti ti-books"></i> My Subjects</a>
   <div class="nav-right">
     <span class="nav-role">Student</span>
     <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
 <div class="page-wrap">
 
-  <a href="/classroom/student/dashboard.php" class="back-link">
+  <a href="/classroomv2/student/dashboard.php" class="back-link">
     <i class="ti ti-arrow-left"></i> Back to Dashboard
   </a>
 
@@ -171,7 +171,7 @@ $pass = $fg >= 75;
         </div>
         <div class="grade-label">Final Grade</div>
         <?php else: ?>
-        <div class="grade-big" style="color:var(--text3);">—</div>
+        <div class="grade-big" style="color:var(--text7);">—</div>
         <div class="grade-label">No grade yet</div>
         <?php endif; ?>
       </div>
@@ -240,6 +240,8 @@ $pass = $fg >= 75;
   <!-- Grade weights breakdown -->
   <div class="card">
     <p class="card-title"><i class="ti ti-percentage" style="color:var(--subject-color);"></i> Grade Composition</p>
+      <hr class="thin-line">
+
     <?php
     $breakdown = [
       ['Major Exams',    '#7aa3ff', (float)$subject['exam_pct'],        (float)($grade['exam_avg'] ?? 0)],
@@ -253,22 +255,22 @@ $pass = $fg >= 75;
       <div class="weight-label">
         <span class="weight-dot" style="background:<?php echo $color; ?>;"></span>
         <?php echo $label; ?>
-        <span style="font-size:10px;color:var(--text3);margin-left:auto;"><?php echo (int)$weight; ?>%</span>
+        <span><?php echo (int)$weight; ?>%</span>
       </div>
       <div class="weight-bar-track">
         <div class="weight-bar-fill" style="width:<?php echo min($avg,100); ?>%;background:<?php echo $color; ?>;opacity:.75;"></div>
       </div>
-      <div class="weight-val" style="color:<?php echo $avg>=75?'var(--green)':($avg>0?'var(--red)':'var(--text3)'); ?>;">
+      <div class="weight-val" style="color:<?php echo $avg>=75?'var(--green)':($avg>0?'var(--red)':'var(--text7)'); ?>;">
         <?php echo $avg > 0 ? number_format($avg,1).'%' : '—'; ?>
       </div>
-      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);min-width:70px;text-align:right;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text7);min-width:70px;text-align:right;">
         <?php echo $avg > 0 ? '+'.number_format($contribution,2).' pts' : ''; ?>
       </div>
     </div>
     <?php endforeach; ?>
 
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;gap:12px;">
-      <span style="font-size:12px;color:var(--text2);">Final Grade</span>
+      <span>Final Grade</span>
       <span style="font-family:var(--font-head);font-size:20px;font-weight:700;color:<?php echo $pass?'var(--green)':($fg>0?'var(--red)':'var(--text3)'); ?>;">
         <?php echo $fg > 0 ? number_format($fg,2).'%' : '—'; ?>
       </span>
@@ -285,7 +287,7 @@ $pass = $fg >= 75;
         <div class="att-chip-lbl">Present</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--yellow);">
-        <div class="att-chip-val" style="color:var(--yellow);"><?php echo $att_late; ?></div>
+        <div class="att-chip-val" style="color:var(--text6);"><?php echo $att_late; ?></div>
         <div class="att-chip-lbl">Late</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--red);">
@@ -339,6 +341,8 @@ $pass = $fg >= 75;
       <?php endif; ?>
     </p>
 
+  <hr class="thin-line">
+
     <?php if (empty($comp_scores)): ?>
     <div class="empty-state">
       <i class="ti <?php echo $comp_icon; ?>"></i>
@@ -387,7 +391,7 @@ $pass = $fg >= 75;
     </div>
     <!-- Summary bar -->
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;">
-      <span style="font-size:12px;color:var(--text2);"><?php echo count($comp_scores); ?> entr<?php echo count($comp_scores)===1?'y':'ies'; ?> · Average</span>
+      <span style="font-size:12px;color:var(--text7);"><?php echo count($comp_scores); ?> entr<?php echo count($comp_scores)===1?'y':'ies'; ?> · Average</span>
       <div style="flex:1;height:6px;background:var(--bg3);border-radius:99px;overflow:hidden;">
         <div style="height:100%;width:<?php echo min($avg,100); ?>%;background:<?php echo $comp_color; ?>;border-radius:99px;"></div>
       </div>
@@ -420,7 +424,7 @@ $pass = $fg >= 75;
         <div class="att-chip-lbl">Present</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--yellow);">
-        <div class="att-chip-val" style="color:var(--yellow);"><?php echo $att_late; ?></div>
+        <div class="att-chip-val" style="color:var(--text6);"><?php echo $att_late; ?></div>
         <div class="att-chip-lbl">Late</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--red);">
@@ -438,7 +442,7 @@ $pass = $fg >= 75;
       $rate = ($att_present + $att_late * 0.5) / $att_total * 100;
     ?>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-      <span style="font-size:12px;color:var(--text2);white-space:nowrap;">Attendance Rate</span>
+      <span>Attendance Rate</span>
       <div style="flex:1;height:8px;background:var(--bg3);border-radius:99px;overflow:hidden;">
         <div style="height:100%;width:<?php echo min($rate,100); ?>%;background:var(--purple);border-radius:99px;"></div>
       </div>
@@ -459,7 +463,7 @@ $pass = $fg >= 75;
       <div class="att-row">
         <span class="att-date"><?php echo date('D, M d Y', strtotime($ar['date'])); ?></span>
         <span class="att-time">
-          <?php echo $ar['time_in'] ? 'Time in: '.date('g:i A', strtotime($ar['time_in'])) : ''; ?>
+          <!-- <?php echo $ar['time_in'] ? 'Time in: '.date('g:i A', strtotime($ar['time_in'])) : ''; ?> -->
         </span>
         <span class="status-badge <?php echo $status_class; ?>"><?php echo $ar['status']; ?></span>
       </div>

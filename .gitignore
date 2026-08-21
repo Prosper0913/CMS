@@ -6,3 +6,7 @@ notes.md
 .env
 !database/schema.sql
 *.md
+firmware/classroom_biometric/secrets.h
+!firmware/classroom_biometric/secrets.example.h
+**/secrets.h
+!**/secrets.example.h

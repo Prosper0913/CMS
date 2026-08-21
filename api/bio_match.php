@@ -41,10 +41,8 @@ header('Content-Type: application/json');
 require_once '../config/db.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-// ── Config: adjust these to match your WSL setup ───────────────
-define('WSL_USER',      'dances');
-define('MINDTCT_BIN',   '/home/' . WSL_USER . '/nbis/mindtct/bin/mindtct');
-define('BOZORTH3_BIN',  '/home/' . WSL_USER . '/nbis/bozorth3/bin/bozorth3');
+// ── Config ────────────────────────────────────────────────────
+require_once '../includes/nbis_config.php';   // mindtct/bozorth3 runner — auto-detects Windows+WSL dev vs Linux production
 define('MATCH_THRESHOLD', 40);     // bozorth3 score cutoff — tune once you have real captures
 define('IMG_WIDTH',  256);
 define('IMG_HEIGHT', 288);
@@ -222,21 +220,10 @@ if (!$pngOk) {
 }
 $cleanupFiles[] = $pngPath;
 
-// ── Translate Windows path -> WSL path ───────────────────────────
-function winToWsl($winPath) {
-    $p = str_replace('\\', '/', $winPath);
-    if (preg_match('#^([A-Za-z]):/(.*)$#', $p, $m)) {
-        return '/mnt/' . strtolower($m[1]) . '/' . $m[2];
-    }
-    return $p; // already posix-style
-}
-
-$pngWsl   = winToWsl(realpath($pngPath));
-$orootWsl = winToWsl($orootWin);
-
 // ── Run mindtct on the probe image ───────────────────────────────
-$cmd = 'wsl.exe -d Ubuntu ' . MINDTCT_BIN . ' ' . escapeshellarg($pngWsl) . ' ' . escapeshellarg($orootWsl) . ' 2>&1';
-$mindtctOut = shell_exec($cmd);
+$pngReal = realpath($pngPath);
+$nbis = runNbis(MINDTCT_BIN_WSL, MINDTCT_BIN_LINUX, [$pngReal, $orootWin]);
+$mindtctOut = $nbis['output'];
 
 if (!file_exists($xytPath)) {
     logAttempt($conn, $device, $session_id, $subject_id, $scan_date, $scan_time, $ip, 'error', 'mindtct failed: ' . trim((string)$mindtctOut));
@@ -256,11 +243,11 @@ foreach ($candidates as $cand) {
     if (empty($cand['xyt_data'])) continue;
 
     file_put_contents($candXytPath, $cand['xyt_data']);
-    $candWsl = winToWsl(realpath($candXytPath));
-    $probeXytWsl = winToWsl(realpath($xytPath));
+    $candReal  = realpath($candXytPath);
+    $probeReal = realpath($xytPath);
 
-    $cmd = 'wsl.exe -d Ubuntu ' . BOZORTH3_BIN . ' ' . escapeshellarg($probeXytWsl) . ' ' . escapeshellarg($candWsl) . ' 2>&1';
-    $out = trim((string)shell_exec($cmd));
+    $nbis  = runNbis(BOZORTH3_BIN_WSL, BOZORTH3_BIN_LINUX, [$probeReal, $candReal]);
+    $out   = trim($nbis['output']);
     $score = is_numeric($out) ? (int)$out : -1;
 
     if ($score > $bestScore) {

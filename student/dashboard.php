@@ -55,9 +55,9 @@ $passing->bind_param("s",$sid); $passing->execute();
 $pass_count = $passing->get_result()->fetch_assoc()['c'];
 
 $type_colors = [
-    'General Education'      => ['bar'=>'#7aa3ff','badge'=>'rgba(91,141,238,.15)','text'=>'#7aa3ff'],
-    'Professional Education' => ['bar'=>'#34d399','badge'=>'rgba(52,211,153,.12)', 'text'=>'#34d399'],
-    'Major Subject'          => ['bar'=>'#fbbf24','badge'=>'rgba(251,191,36,.12)', 'text'=>'#fbbf24'],
+    'General Education'      => ['bar'=>'#6c8dda','badge'=>'rgba(91,141,238,.15)','text'=>'#6c8dda'],
+    'Professional Education' => ['bar'=>'#ff2407','badge'=>'rgba(52,211,153,.12)', 'text'=>'#ff2407'],
+    'Major Subject'          => ['bar'=>'#00ff1a','badge'=>'rgba(251,191,36,.12)', 'text'=>'#00ff1a'],
 ];
 ?>
 <!DOCTYPE html>
@@ -70,22 +70,22 @@ $type_colors = [
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
 
 </head>
 <body class="page-student-dashboard">
 
 <nav class="navbar">
-  <a class="brand" href="/classroom/student/dashboard.php">
-    <img src="/classroom/assets/images/TCM logo (2).png" alt="TCM logo" width="32" height="32"></span>Classroom Management System
+  <a class="brand" href="/classroomv2/student/dashboard.php">
+    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="TCM logo" width="32" height="32"></span>Classroom Management System
   </a>
   <div class="nav-sep"></div>
-  <a href="/classroom/student/dashboard.php" class="nav-link active"><i class="ti ti-home"></i> Home</a>
-  <a href="/classroom/student/subjects.php"  class="nav-link"><i class="ti ti-books"></i> My Subjects</a>
+  <a href="/classroomv2/student/dashboard.php" class="nav-link active"><i class="ti ti-home"></i> Home</a>
+  <a href="/classroomv2/student/subjects.php"  class="nav-link"><i class="ti ti-books"></i> My Subjects</a>
   <div class="nav-right">
     <span class="nav-role">Student</span>
     <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
@@ -104,41 +104,18 @@ $type_colors = [
       <div style="font-family:var(--font-head);font-size:36px;font-weight:800;color:<?php echo $overall>=75?'var(--green)':'var(--red)'; ?>;">
         <?php echo $overall > 0 ? $overall.'%' : '—'; ?>
       </div>
-      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;">Overall Average</div>
-    </div>
-  </div>
-
-  <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-card stat-accent">
-      <div class="stat-label">Enrolled Subjects</div>
-      <div class="stat-value"><?php echo $total_subjects; ?></div>
-    </div>
-    <div class="stat-card stat-green">
-      <div class="stat-label">Passing</div>
-      <div class="stat-value"><?php echo $pass_count; ?></div>
-      <div class="stat-sub">grade ≥ 75</div>
-    </div>
-    <div class="stat-card stat-red">
-      <div class="stat-label">Failing / No Grade</div>
-      <div class="stat-value"><?php echo $total_subjects - $pass_count; ?></div>
-    </div>
-    <div class="stat-card stat-accent">
-      <div class="stat-label">Overall Average</div>
-      <div class="stat-value" style="color:<?php echo $overall>=75?'var(--green)':'var(--red)'; ?>">
-        <?php echo $overall > 0 ? $overall.'%' : '—'; ?>
-      </div>
+      <div>Overall Average</div>
     </div>
   </div>
 
   <!-- Subject cards -->
-  <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:16px;">
+  <p class="bottom-margin">
     My Subjects This Semester
   </p>
 
   <?php if ($total_subjects === 0): ?>
   <div class="empty-state">
-    <i class="ti ti-books" style="color:var(--text3);"></i>
+    <i class="ti ti-books" style="color:var(--text6);"></i>
     <p>You are not enrolled in any subjects yet.</p>
     <p style="font-size:12px;margin-top:6px;color:var(--text3);">Contact your teacher to be enrolled.</p>
   </div>
@@ -160,7 +137,7 @@ $type_colors = [
         default   => ['bg'=>'var(--bg3)',            'text'=>'var(--text3)'],
       };
     ?>
-    <a href="/classroom/student/subject_detail.php?id=<?php echo $sub['id']; ?>"
+    <a href="/classroomv2/student/subject_detail.php?id=<?php echo $sub['id']; ?>"
        class="subject-card">
 
       <div class="sc-top-bar" style="background:<?php echo $tc['bar']; ?>;"></div>
@@ -203,18 +180,18 @@ $type_colors = [
           $v = (float)$val;
         ?>
         <div class="comp-bar-row">
-          <span class="comp-bar-label"><?php echo $label; ?> <span style="color:var(--text3);">(<?php echo (int)$weight; ?>%)</span></span>
+          <span class="comp-bar-label"><?php echo $label; ?> <span>(<?php echo (int)$weight; ?>%)</span></span>
           <div class="comp-bar-track">
             <div class="comp-bar-fill" style="width:<?php echo min($v,100); ?>%;background:<?php echo $color; ?>;opacity:.8;"></div>
           </div>
-          <span class="comp-bar-val" style="color:<?php echo $v>=75?'var(--green)':($v>0?'var(--red)':'var(--text3)'); ?>">
+          <span class="comp-bar-val" style="color:<?php echo $v>=75?'var(--green)':($v>0?'var(--red)':'var(--text7)'); ?>">
             <?php echo $v>0?number_format($v,1).'%':'—'; ?>
           </span>
         </div>
         <?php endforeach; ?>
       </div>
       <?php else: ?>
-      <div style="padding:12px 0;font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;">
+      <div>
         <i class="ti ti-dots"></i> No grades recorded yet
       </div>
       <!-- Weight chips -->

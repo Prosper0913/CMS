@@ -154,7 +154,9 @@ $comp_colors = [
     'Written Work'     => ['color'=>'#34d399','icon'=>'ti-pencil'],
     'Performance Task' => ['color'=>'#fbbf24','icon'=>'ti-star'],
 ];
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -165,18 +167,18 @@ $comp_colors = [
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="/classroom/assets/style.css">
+    <link rel="stylesheet" href="/classroomv2/assets/style.css">
 
 </head>
 <body class="page-teacher-dashboard">
 
 <!-- ── NAVBAR ── -->
 <nav class="navbar">
-  <a class="brand" href="/classroom/teacher/dashboard.php">
-    <img src="/classroom/assets/images/TCM logo (2).png" alt="Classroom CMS" width="32" height="32"></span>Classroom Management System
+  <a class="brand" href="/classroomv2/teacher/dashboard.php">
+    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom CMS" width="32" height="32"></span>Classroom Management System
   </a>
   <div class="nav-sep"></div>
-  <a href="/classroom/teacher/dashboard.php" class="nav-link active">
+  <a href="/classroomv2/teacher/dashboard.php" class="nav-link active">
     <i class="ti ti-layout-dashboard"></i> Dashboard
   </a>
 
@@ -193,35 +195,35 @@ $comp_colors = [
       while ($ns = $all_subs->fetch_assoc()):
         $dc = $type_cfg[$ns['subject_type']]['color'] ?? '#00ff1a';
       ?>
-      <a href="/classroom/teacher/subject_view.php?id=<?php echo $ns['id']; ?>" class="dd-item">
+      <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $ns['id']; ?>" class="dd-item">
         <span class="dd-dot" style="background:<?php echo $dc; ?>;"></span>
         <span class="dd-main"><?php echo htmlspecialchars($ns['subject_code'].' — '.$ns['subject_name']); ?></span>
         <span class="dd-sub"><?php echo htmlspecialchars($ns['section']); ?></span>
       </a>
       <?php endwhile; ?>
       <div class="dd-divider"></div>
-      <a href="/classroom/teacher/add_subject.php" class="dd-item">
-        <i class="ti ti-plus" style="color:var(--green);font-size:13px;"></i>
-        <span class="dd-main">Add New Subject</span>
+      <a href="/classroomv2/teacher/all_subjects.php" class="dd-item">
+        <i class="ti ti-eye" style="color:var(--green);font-size:13px;"></i>
+        <span class="dd-main">View All Subjects</span>
       </a>
     </div>
   </div>
   <?php endif; ?>
 
-  <a href="/classroom/teacher/add_subject.php" class="nav-link">
+  <a href="/classroomv2/teacher/add_subject.php" class="nav-link">
     <i class="ti ti-book-plus"></i> Add Subject
   </a>
-  <a href="/classroom/teacher/manage_sections.php" class="nav-link">
+  <a href="/classroomv2/teacher/manage_sections.php" class="nav-link">
     <i class="ti ti-building-community"></i> Sections
   </a>
-  <a href="/classroom/teacher/students.php" class="nav-link">
+  <!-- <a href="/classroomv2/teacher/students.php" class="nav-link">
     <i class="ti ti-users"></i> Students
-  </a>
+  </a> -->
 
   <div class="nav-right">
     <span class="nav-role">Teacher</span>
     <span style="font-size:13px;color:var(--text);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroom/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
+    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
   </div>
 </nav>
 
@@ -233,142 +235,23 @@ $comp_colors = [
       <h1>Welcome back, <?php echo htmlspecialchars($_SESSION['username']); ?> 👋</h1>
       <p><?php echo date('l, F d Y'); ?> &nbsp;·&nbsp; <?php echo (int)($t['total_subjects']??0); ?> active subject<?php echo ($t['total_subjects']??0)!=1?'s':''; ?> this semester</p>
     </div>
-    <div class="welcome-actions">
-      <a href="/classroom/teacher/add_subject.php" class="btn btn-primary">
-        <i class="ti ti-book-plus"></i> Add Subject
-      </a>
-      <a href="/classroom/teacher/students.php" class="btn btn-outline">
-        <i class="ti ti-user-plus"></i> Add Student
-      </a>
-    </div>
   </div>
 
-  <!-- ── TOP STATS ── -->
-  <div class="stats-row">
-    <div class="stat-card stat-green">
-      <div class="stat-label">Subjects</div>
-      <div class="stat-value"><?php echo (int)($t['total_subjects']??0); ?></div>
-      <div class="stat-sub">active this semester</div>
-    </div>
-    <div class="stat-card stat-accent">
-      <div class="stat-label">Total Students</div>
-      <div class="stat-value"><?php echo (int)($t['total_students']??0); ?></div>
-      <div class="stat-sub">across all subjects</div>
-    </div>
-    <div class="stat-card stat-green">
-      <div class="stat-label">Passing</div>
-      <div class="stat-value"><?php echo (int)($t['total_passing']??0); ?></div>
-      <div class="stat-sub">grade ≥ 75</div>
-    </div>
-    <div class="stat-card stat-red">
-      <div class="stat-label">Failing</div>
-      <div class="stat-value"><?php echo (int)($t['total_failing']??0); ?></div>
-      <div class="stat-sub">need attention</div>
-    </div>
-    <div class="stat-card stat-yellow">
-      <div class="stat-label">Overall Avg</div>
-      <div class="stat-value"><?php echo $t['overall_avg'] ? $t['overall_avg'].'%' : '—'; ?></div>
-      <div class="stat-sub">all subjects</div>
-    </div>
-  </div>
+
 
   <!-- ── SUBJECT CARDS ── -->
   <?php if ($all_subs->num_rows === 0): ?>
   <div class="card" style="text-align:center;padding:64px 24px;">
-    <i class="ti ti-books" style="font-size:44px;color:var(--text3);display:block;margin-bottom:16px;"></i>
-    <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;">No subjects yet</p>
-    <p style="font-size:13px;color:var(--text);margin-bottom:24px;">Create your first subject to get started.</p>
-    <a href="/classroom/teacher/add_subject.php" class="btn btn-primary" style="display:inline-flex;">
+    <i class="ti ti-books" style="font-size:44px;color:var(--text6);display:block;margin-bottom:16px;"></i>
+    <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text6);margin-bottom:8px;">No subjects yet</p>
+    <p style="font-size:13px;color:var(--text6);margin-bottom:24px;">Create your first subject to get started.</p>
+    <a href="/classroomv2/teacher/add_subject.php" class="btn btn-primary" style="display:inline-flex;">
       <i class="ti ti-book-plus"></i> Add Your First Subject
     </a>
   </div>
-
   <?php else:
     $all_subs->data_seek(0);
   ?>
-
-  <hr class="thin-line">
-
-  <div class="section-label";>
-    <span style="color: var(--text);">Your Subject-Sections</span>
-    <a href="/classroom/teacher/add_subject.php" class="btn btn-outline btn-sm">
-      <i class="ti ti-plus"></i> New Subject
-    </a>
-  </div>
-
-  <div class="subject-grid">
-    <?php while ($sub = $all_subs->fetch_assoc()):
-      $cfg   = $type_cfg[$sub['subject_type']] ?? $type_cfg['General Education'];
-      $avg   = (float)($sub['class_avg'] ?? 0);
-      $count = (int)$sub['enrollee_count'];
-      $days  = (int)$sub['class_days'];
-    ?>
-    <a href="/classroom/teacher/subject_view.php?id=<?php echo $sub['id']; ?>" class="subject-card">
-      <div class="sc-bar" style="background:<?php echo $cfg['color']; ?>;"></div>
-
-      <div class="sc-top">
-        <div>
-          <div class="sc-code"><?php echo htmlspecialchars($sub['subject_code']); ?></div>
-          <div class="sc-name"><?php echo htmlspecialchars($sub['subject_name']); ?></div>
-        </div>
-        <span class="sc-type-pill"
-          style="background:<?php echo $cfg['bg']; ?>;color:<?php echo $cfg['color']; ?>;border:1px solid <?php echo $cfg['color'].'33'; ?>;">
-          <?php echo $cfg['label']; ?>
-        </span>
-      </div>
-
-      <div class="sc-meta">
-        <span><i class="ti ti-users"></i> <?php echo $count; ?> students</span>
-        <span><i class="ti ti-school"></i> <?php echo htmlspecialchars($sub['section']); ?></span>
-        <span><i class="ti ti-calendar"></i> <?php echo $sub['semester']; ?> — <?php echo htmlspecialchars($sub['school_year']); ?></span>
-        <?php if ($days > 0): ?>
-        <span><i class="ti ti-calendar-check"></i> <?php echo $days; ?> class day<?php echo $days!=1?'s':''; ?></span>
-        <?php endif; ?>
-      </div>
-
-      <div class="sc-weights">
-        <span class="wc exam"><i class="ti ti-file-certificate" style="font-size:10px;"></i> Exam <?php echo (int)$sub['exam_pct']; ?>%</span>
-        <span class="wc written"><i class="ti ti-pencil" style="font-size:10px;"></i> Written <?php echo (int)$sub['written_pct']; ?>%</span>
-        <span class="wc perf"><i class="ti ti-star" style="font-size:10px;"></i> Perf <?php echo (int)$sub['performance_pct']; ?>%</span>
-      </div>
-
-      <?php if ($avg > 0): ?>
-      <div class="sc-grade-row">
-        <span>Class Average</span>
-        <span style="font-weight:700;color:<?php echo $avg>=75?'var(--green)':'var(--red)'; ?>">
-          <?php echo $avg; ?>%
-        </span>
-      </div>
-      <div class="score-bar-track">
-        <div class="score-bar-fill"
-          style="width:<?php echo min($avg,100); ?>%;
-                 background:<?php echo $avg>=75?'var(--green)':'var(--red)'; ?>;">
-        </div>
-      </div>
-      <div class="sc-pass-row">
-        <span style="color:var(--green);">
-          <i class="ti ti-check"></i> <?php echo (int)($sub['passing']??0); ?> passing
-        </span>
-        <span style="color:var(--red);">
-          <i class="ti ti-x"></i> <?php echo (int)($sub['failing']??0); ?> failing
-        </span>
-      </div>
-      <?php else: ?>
-      <div style="font-size:12px;color:var(--text3);padding-top:4px;display:flex;align-items:center;gap:5px;">
-        <i class="ti ti-clock"></i> No grades recorded yet — click to start
-      </div>
-      <?php endif; ?>
-
-    </a>
-    <?php endwhile; ?>
-  </div>
-
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#7aa3ff;"></div>General Education (30/30/40)</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#34d399;"></div>Professional Education (25/25/50)</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div>Major Subject (40/20/40)</div>
-  </div>
-
   <?php endif; ?>
 
   <hr class="thin-line">
@@ -379,7 +262,7 @@ $comp_colors = [
 
     <!-- At-risk students -->
     <div class="card">
-      <p class="card-title" style="color:var(--red);">
+      <p class="card-title">
         <i class="ti ti-alert-triangle" style="color:var(--red);"></i>
         At-Risk Students
         <?php if ($risk_result->num_rows > 0): ?>
@@ -391,7 +274,7 @@ $comp_colors = [
       <?php if ($risk_result->num_rows === 0): ?>
         <div class="empty-state" style="padding:24px;">
           <i class="ti ti-circle-check" style="color:var(--green);font-size:28px;"></i>
-          <p style="color:var(--text);margin-top:8px;">No failing students — great job!</p>
+          <p style="color:var(--text7);margin-top:8px;">No failing students — great job!</p>
         </div>
       <?php else: ?>
         <?php while ($r = $risk_result->fetch_assoc()):
@@ -414,11 +297,10 @@ $comp_colors = [
     <!-- Top & Lowest performers (each subject's own most recent activity) -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-trophy" style="color:var(--yellow);"></i>
+        <i class="ti ti-trophy" style="color: var(--yellow2);"></i>
         Top &amp; Lowest Performers
         <?php if (!empty($subject_perf)): ?>
-          <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;font-weight:400;
-                       text-transform:none;letter-spacing:0;color:var(--text3);">
+          <span class="tlp-sub-count">
             <?php echo count($subject_perf); ?> subject<?php echo count($subject_perf)!=1?'s':''; ?>
           </span>
         <?php endif; ?>
@@ -427,7 +309,7 @@ $comp_colors = [
       <?php if (empty($subject_perf)): ?>
         <div class="empty-state" style="padding:24px;">
           <i class="ti ti-pencil-off"></i>
-          <p>No score entries yet.</p>
+          <p class="grey-font">No score entries yet.</p>
         </div>
       <?php else: ?>
 
@@ -437,46 +319,44 @@ $comp_colors = [
           $top1 = $data['top'][0]    ?? null;
           $bot1 = $data['bottom'][0] ?? null;
         ?>
-        <div style="border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;
-                      padding:10px 12px;cursor:pointer;background:var(--bg2);"
-               onclick="togglePerf('<?php echo $pkey; ?>')">
-            <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-              <i class="ti ti-chevron-down" id="perf_chev_<?php echo $pkey; ?>"
-                 style="transition:transform .2s;color:var(--text3);flex-shrink:0;"></i>
+        <div class="tlp-entry">
+          <div class="tlp-entry-off"
+              onclick="togglePerf('<?php echo $pkey; ?>')">
+            <div class="per-student-performer">
+              <i class="ti ti-chevron-down tlp-dd" id="perf_chev_<?php echo $pkey; ?>"></i>
               <div style="min-width:0;">
-                <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                <div class="tlp-sub-perf-title">
                   <?php echo htmlspecialchars($act['subject_code']); ?> · <?php echo htmlspecialchars($act['entry_name']); ?>
                 </div>
-                <div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                <div class="tlp-sec-date">
                   <?php echo htmlspecialchars($act['section']); ?> · <?php echo date('M d', strtotime($act['date_given'])); ?>
                 </div>
               </div>
             </div>
-            <div style="display:flex;gap:10px;font-size:11px;flex-shrink:0;font-family:var(--font-mono);">
+            <div class="inside-chevdown3">
               <?php if ($top1):
                 $p1 = $top1['total_items'] > 0 ? round($top1['score']/$top1['total_items']*100,1) : 0;
               ?>
-              <span style="color:var(--green);"><i class="ti ti-arrow-up"></i> <?php echo $p1; ?>%</span>
+              <span class="green-font"><i class="ti ti-arrow-up"></i> <?php echo $p1; ?>%</span>
               <?php endif; ?>
               <?php if ($bot1):
                 $p2 = $bot1['total_items'] > 0 ? round($bot1['score']/$bot1['total_items']*100,1) : 0;
               ?>
-              <span style="color:var(--red);"><i class="ti ti-arrow-down"></i> <?php echo $p2; ?>%</span>
+              <span class="red-font"><i class="ti ti-arrow-down"></i> <?php echo $p2; ?>%</span>
               <?php endif; ?>
             </div>
           </div>
 
-          <div id="perf_body_<?php echo $pkey; ?>" style="display:none;padding:12px; background: var(--bg2)" >
-            <div class="perf-subhead" style="color:var(--green);">
+          <div id="perf_body_<?php echo $pkey; ?>" class="perf-body">
+            <div class="perf-subhead green-font">
               <i class="ti ti-arrow-up"></i> Top Performers
             </div>
             <?php foreach ($data['top'] as $r):
               $pct = $r['total_items'] > 0 ? round($r['score'] / $r['total_items'] * 100, 1) : 0;
               $initials = strtoupper(substr($r['last_name'],0,1).substr($r['first_name'],0,1));
             ?>
-            <div class="perf-item" style="background:rgb(0, 255, 81, .1);border:1px solid rgba(211, 52, 52, 0.1);">
-              <div class="perf-avatar" style="background:rgba(0, 255, 150, 0.3);border-color:rgba(52,211,153,.2);color:var(--bg3);">
+            <div class="perf-item">
+              <div class="perf-avatar">
                 <?php echo $initials; ?>
               </div>
               <div>
@@ -487,18 +367,18 @@ $comp_colors = [
             </div>
             <?php endforeach; ?>
 
-            <div class="perf-subhead" style="color:var(--red);margin-top:14px;">
+            <div class="perf-subhead">
               <i class="ti ti-arrow-down"></i> Lowest Performers
             </div>
             <?php if (empty($data['bottom'])): ?>
-              <p style="font-size:12px;color:var(--text3);">Not enough separate scores yet to list lowest performers.</p>
+              <p class="empty-state2">Not enough separate scores yet to list lowest performers.</p>
             <?php else: ?>
               <?php foreach ($data['bottom'] as $r):
                 $pct = $r['total_items'] > 0 ? round($r['score'] / $r['total_items'] * 100, 1) : 0;
                 $initials = strtoupper(substr($r['last_name'],0,1).substr($r['first_name'],0,1));
               ?>
-              <div class="perf-item" style="background:rgba(251, 0, 0, 0.1);border:1px solid rgba(248,113,113,.1);">
-                <div class="perf-avatar" style="background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.2);color:var(--red);">
+              <div class="perf-item perf-item-lowest">
+                <div class="perf-avatar perf-avatar-lowest">
                   <?php echo $initials; ?>
                 </div>
                 <div>
@@ -519,13 +399,13 @@ $comp_colors = [
     <!-- Recent score entries -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-activity" style="color:var(--green);"></i>
+        <i class="ti ti-activity" style="color: var(--green);"></i>
         Recent Entries
       </p>
       <?php if ($recent->num_rows === 0): ?>
         <div class="empty-state" style="padding:24px;">
           <i class="ti ti-pencil-off"></i>
-          <p>No score entries yet.</p>
+          <p class="grey-font">No score entries yet.</p>
         </div>
       <?php else: ?>
         <?php while ($r = $recent->fetch_assoc()):
@@ -539,13 +419,13 @@ $comp_colors = [
           <div class="recent-main">
             <div class="recent-title">
               <?php echo htmlspecialchars($r['entry_name']); ?>
-              <span style="font-size:11px;color:var(--text);font-weight:400;">
+              <span>
                 &nbsp; · &nbsp;&nbsp;<?php echo htmlspecialchars($r['subject_code']); ?>
               </span>
             </div>
             <div class="recent-sub">
               <?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?>
-              &nbsp; · &nbsp;&nbsp;<?php echo date('M d', strtotime($r['date_given'])); ?>
+              &nbsp; ·<?php echo date('M d', strtotime($r['date_given'])); ?>
             </div>
           </div>
           <div class="recent-score">
