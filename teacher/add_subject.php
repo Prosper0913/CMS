@@ -184,9 +184,9 @@ $prefill_section = (int)($_GET['prefill_section'] ?? 0);
 // Nav subjects
 $nav_subs = getTeacherSubjects($conn, $teacher_id);
 $type_cfg = [
-    'General Education'      => ['color'=>'#6c8dda','label'=>'GE'],
-    'Professional Education' => ['color'=>'#ff2407','label'=>'PE'],
-    'Major Subject'          => ['color'=>'#00ff1a','label'=>'MAJ'],
+    'General Education'      => ['color'=>'#1e5f4e','label'=>'GE'],
+    'Professional Education' => ['color'=>'#1e5f4e','label'=>'PE'],
+    'Major Subject'          => ['color'=>'#1e5f4e','label'=>'MAJ'],
 ];
 ?>
 <!DOCTYPE html>

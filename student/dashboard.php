@@ -55,9 +55,9 @@ $passing->bind_param("s",$sid); $passing->execute();
 $pass_count = $passing->get_result()->fetch_assoc()['c'];
 
 $type_colors = [
-    'General Education'      => ['bar'=>'#6c8dda','badge'=>'rgba(91,141,238,.15)','text'=>'#6c8dda'],
-    'Professional Education' => ['bar'=>'#ff2407','badge'=>'rgba(52,211,153,.12)', 'text'=>'#ff2407'],
-    'Major Subject'          => ['bar'=>'#00ff1a','badge'=>'rgba(251,191,36,.12)', 'text'=>'#00ff1a'],
+    'General Education'      => ['bar'=>'#1e5f4e','badge'=>'rgba(91,141,238,.15)','text'=>'##1e5f4e'],
+    'Professional Education' => ['bar'=>'#1e5f4e','badge'=>'rgba(52,211,153,.12)', 'text'=>'#1e5f4e'],
+    'Major Subject'          => ['bar'=>'#1e5f4e','badge'=>'rgba(251,191,36,.12)', 'text'=>'#1e5f4e'],
 ];
 ?>
 <!DOCTYPE html>

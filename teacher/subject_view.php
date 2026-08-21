@@ -704,10 +704,10 @@ if ($active_tab === 'settings') {
 
 // Type colors
 $type_color = match($subject['subject_type']) {
-    'General Education'      => '#7aa3ff',
-    'Professional Education' => '#4ade80',
-    'Major Subject'          => '#fbbf24',
-    default                  => '#7aa3ff',
+    'General Education'      => '#1e5f4e',
+    'Professional Education' => '#1e5f4e',
+    'Major Subject'          => '#1e5f4e',
+    default                  => '#1e5f4e',
 };
 
 $page_title        = $subject['subject_code'] . ' — ' . $subject['section'];

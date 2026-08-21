@@ -32,9 +32,9 @@ $res->execute();
 $subs = $res->get_result();
 
 $type_colors = [
-    'General Education'      => '#6c8dda',
-    'Professional Education' => '#ff2407',
-    'Major Subject'          => '#00ff1a',
+    'General Education'      => '#1e5f4e',
+    'Professional Education' => '#1e5f4e',
+    'Major Subject'          => '#1e5f4e',
 ];
 ?>
 <!DOCTYPE html>

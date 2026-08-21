@@ -101,9 +101,9 @@ if (!in_array($active_tab, $valid_tabs)) $active_tab = 'overview';
 
 // ── Type config ───────────────────────────────────────────────
 $type_colors = [
-    'General Education'      => '#6c8dda',
-    'Professional Education' => '#ff2407',
-    'Major Subject'          => '#00ff1a',
+    'General Education'      => '#1e5f4e',
+    'Professional Education' => '#1e5f4e',
+    'Major Subject'          => '#1e5f4e',
 ];
 $subject_color = $type_colors[$subject['subject_type']] ?? '#7aa3ff';
 
@@ -345,8 +345,8 @@ $pass = $fg >= 75;
 
     <?php if (empty($comp_scores)): ?>
     <div class="empty-state">
-      <i class="ti <?php echo $comp_icon; ?>"></i>
-      <p>No <?php echo strtolower($comp_name); ?> scores recorded yet.</p>
+      <i class="ti <?php echo $comp_icon; ?>"  style="color: var(--text7);"></i>
+      <p  style="color: var(--text7);">No <?php echo strtolower($comp_name); ?> scores recorded yet.</p>
     </div>
     <?php else: ?>
     <div class="table-wrap">
@@ -412,8 +412,8 @@ $pass = $fg >= 75;
 
     <?php if ($att_total === 0): ?>
     <div class="empty-state">
-      <i class="ti ti-calendar-off"></i>
-      <p>No attendance records yet.</p>
+      <i class="ti ti-calendar-off"  style="color: var(--text7);"></i>
+      <p  style="color: var(--text7);">No attendance records yet.</p>
     </div>
     <?php else: ?>
 

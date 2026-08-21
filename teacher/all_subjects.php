@@ -105,9 +105,9 @@ $totals_stmt->execute();
 $t = $totals_stmt->get_result()->fetch_assoc();
 
 $type_cfg = [
-    'General Education'      => ['color'=>'#7aa3ff','bg'=>'rgba(122,163,255,.1)', 'label'=>'GE'],
-    'Professional Education' => ['color'=>'#34d399','bg'=>'rgba(52,211,153,.1)',  'label'=>'PE'],
-    'Major Subject'          => ['color'=>'#fbbf24','bg'=>'rgba(251,191,36,.1)',  'label'=>'MAJ'],
+    'General Education'      => ['color'=>'#1e5f4e','bg'=>'rgba(122,163,255,.1)', 'label'=>'GE'],
+    'Professional Education' => ['color'=>'#1e5f4e','bg'=>'rgba(52,211,153,.1)',  'label'=>'PE'],
+    'Major Subject'          => ['color'=>'#1e5f4e','bg'=>'rgba(251,191,36,.1)',  'label'=>'MAJ'],
 ];
 
 // helper to keep other filters when a filter link is clicked
@@ -278,11 +278,11 @@ function qs($overrides = []) {
   <!-- ── SUBJECT CARDS ── -->
   <?php if ($subjects->num_rows === 0): ?>
   <div class="card" style="text-align:center;padding:64px 24px;">
-    <i class="ti ti-books" style="font-size:44px;color:var(--text3);display:block;margin-bottom:16px;"></i>
-    <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;">
+    <i class="ti ti-books" style="font-size:44px;color:var(--text7);display:block;margin-bottom:16px;"></i>
+    <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text7);margin-bottom:8px;">
       No subjects match these filters
     </p>
-    <p style="font-size:13px;color:var(--text);margin-bottom:24px;">
+    <p style="font-size:13px;color:var(--text7);margin-bottom:24px;">
       Try clearing search or adjusting the filters above.
     </p>
     <a href="all_subjects.php" class="btn btn-primary" style="display:inline-flex;">
@@ -377,11 +377,11 @@ function qs($overrides = []) {
     <?php endwhile; ?>
   </div>
 
-  <div class="legend">
+  <!-- <div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:#7aa3ff;"></div>General Education (30/30/40)</div>
     <div class="legend-item"><div class="legend-dot" style="background:#34d399;"></div>Professional Education (25/25/50)</div>
     <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div>Major Subject (40/20/40)</div>
-  </div>
+  </div> -->
 
   <?php endif; ?>
 

@@ -144,9 +144,9 @@ foreach ($latest_by_subject as $sid => $act) {
 
 
 $type_cfg = [
-    'General Education'      => ['color'=>'#6c8dda','bg'=>'rgba(91,141,238,.1)', 'label'=>'GE'],
-    'Professional Education' => ['color'=>'#ff2407','bg'=>'rgba(52,211,153,.1)', 'label'=>'PE'],
-    'Major Subject'          => ['color'=>'#00ff1a','bg'=>'rgba(251,191,36,.1)', 'label'=>'MAJ'],
+    'General Education'      => ['color'=>'#1e5f4e','bg'=>'rgba(91,141,238,.1)', 'label'=>'GE'],
+    'Professional Education' => ['color'=>'#1e5f4e','bg'=>'rgba(52,211,153,.1)', 'label'=>'PE'],
+    'Major Subject'          => ['color'=>'#1e5f4e','bg'=>'rgba(251,191,36,.1)', 'label'=>'MAJ'],
 ];
 
 $comp_colors = [
