@@ -25,8 +25,8 @@ define('BOZORTH3_BIN_WSL', '/home/' . WSL_USER . '/nbis/bozorth3/bin/bozorth3');
 // After installing NBIS on the droplet, run `which mindtct` and
 // `which bozorth3` (or note wherever you built/installed them) and
 // put the real paths here. These are NOT used at all on Windows.
-define('MINDTCT_BIN_LINUX',  '/usr/local/bin/mindtct');
-define('BOZORTH3_BIN_LINUX', '/usr/local/bin/bozorth3');
+define('MINDTCT_BIN_LINUX',  '/usr/local/nbis/bin/mindtct');
+define('BOZORTH3_BIN_LINUX', '/usr/local/nbis/bin/bozorth3');
 
 /**
  * Translate a Windows-style path (C:\foo\bar) to the equivalent
