@@ -8,6 +8,8 @@
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
+require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
+require_once __DIR__ . '/../includes/sync_to_guidance.php';
 
 $teacher_id = $_SESSION['user_id'];
 $success_msg = '';
@@ -103,66 +105,84 @@ if (isset($_POST['add_student'])) {
 // ── DELETE student ───────────────────────────────────────────
 if (isset($_GET['delete'])) {
     $del_id = trim($_GET['delete']);
-    $conn->begin_transaction();
-    try {
-        $d1 = $conn->prepare("DELETE FROM users WHERE student_id=?");
-        $d1->bind_param("s",$del_id); $d1->execute();
-        $d2 = $conn->prepare("DELETE FROM students WHERE student_id=?");
-        $d2->bind_param("s",$del_id); $d2->execute();
-        $conn->commit();
-        header("Location: students.php?msg=deleted"); exit;
-    } catch (Exception $e) {
-        $conn->rollback();
-        $error_msg = "Could not delete: ".$e->getMessage();
+    if (!teacherOwnsStudent($conn, $teacher_id, $del_id)) {
+        $error_msg = "You can only delete students enrolled in one of your own subjects.";
+    } else {
+        $conn->begin_transaction();
+        try {
+            $d1 = $conn->prepare("DELETE FROM users WHERE student_id=?");
+            $d1->bind_param("s",$del_id); $d1->execute();
+            $d2 = $conn->prepare("DELETE FROM students WHERE student_id=?");
+            $d2->bind_param("s",$del_id); $d2->execute();
+            $conn->commit();
+            // Keep Tooltrack/Guidance in sync — same as admin/students.php.
+            // Failures never break the delete.
+            push_student_deletion_to_tooltrack($del_id);
+            push_student_deletion_to_guidance($del_id);
+            header("Location: students.php?msg=deleted"); exit;
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error_msg = "Could not delete: ".$e->getMessage();
+        }
     }
 }
 
 // ── LOAD edit mode ───────────────────────────────────────────
 if (isset($_GET['edit'])) {
-    $edit_mode = true;
-    $es = $conn->prepare("SELECT * FROM students WHERE student_id=?");
-    $es->bind_param("s",$_GET['edit']); $es->execute();
-    $edit_data = $es->get_result()->fetch_assoc();
-    if (!$edit_data) { $edit_mode = false; }
+    if (!teacherOwnsStudent($conn, $teacher_id, $_GET['edit'])) {
+        $error_msg = "You can only edit students enrolled in one of your own subjects.";
+    } else {
+        $edit_mode = true;
+        $es = $conn->prepare("SELECT * FROM students WHERE student_id=?");
+        $es->bind_param("s",$_GET['edit']); $es->execute();
+        $edit_data = $es->get_result()->fetch_assoc();
+        if (!$edit_data) { $edit_mode = false; }
+    }
 }
 
 // ── UPDATE student ───────────────────────────────────────────
 if (isset($_POST['update_student'])) {
     $student_id    = trim($_POST['student_id']);
-    $last_name     = trim($_POST['last_name']);
-    $first_name    = trim($_POST['first_name']);
-    $middle_initial= trim($_POST['middle_initial']);
-    $email         = trim($_POST['email']);
-    $username      = trim($_POST['username']);
 
-    $upd = $conn->prepare(
-        "UPDATE students SET
-            last_name=?,first_name=?,middle_initial=?,email=?,username=?
-         WHERE student_id=?"
-    );
-    $upd->bind_param("ssssss",
-        $last_name,$first_name,$middle_initial,$email,$username,$student_id
-    );
-    $upd->execute();
+    if (!teacherOwnsStudent($conn, $teacher_id, $student_id)) {
+        $error_msg = "You can only edit students enrolled in one of your own subjects.";
+    } else {
+        $last_name     = trim($_POST['last_name']);
+        $first_name    = trim($_POST['first_name']);
+        $middle_initial= trim($_POST['middle_initial']);
+        $email         = trim($_POST['email']);
+        $username      = trim($_POST['username']);
 
-    // Keep username in sync in users table
-    $upd2 = $conn->prepare("UPDATE users SET username=? WHERE student_id=?");
-    $upd2->bind_param("ss",$username,$student_id);
-    $upd2->execute();
+        $upd = $conn->prepare(
+            "UPDATE students SET
+                last_name=?,first_name=?,middle_initial=?,email=?,username=?
+             WHERE student_id=?"
+        );
+        $upd->bind_param("ssssss",
+            $last_name,$first_name,$middle_initial,$email,$username,$student_id
+        );
+        $upd->execute();
 
-    header("Location: students.php?msg=updated"); exit;
+        // Keep username in sync in users table
+        $upd2 = $conn->prepare("UPDATE users SET username=? WHERE student_id=?");
+        $upd2->bind_param("ss",$username,$student_id);
+        $upd2->execute();
+
+        header("Location: students.php?msg=updated"); exit;
+    }
 }
 
 // ── RESET password ───────────────────────────────────────────
 if (isset($_POST['reset_password'])) {
     $student_id  = trim($_POST['student_id']);
     $new_password= trim($_POST['new_password']);
-    if (strlen($new_password) < 6) {
+
+    if (!teacherOwnsStudent($conn, $teacher_id, $student_id)) {
+        $error_msg = "You can only reset passwords for students enrolled in one of your own subjects.";
+    } elseif (strlen($new_password) < 6) {
         $error_msg = "Password must be at least 6 characters.";
     } else {
         $hashed = password_hash($new_password, PASSWORD_DEFAULT);
-        $conn->prepare("UPDATE students SET password=? WHERE student_id=?")
-             ->bind_param("ss",$hashed,$student_id) && null;
         $p1 = $conn->prepare("UPDATE students SET password=? WHERE student_id=?");
         $p1->bind_param("ss",$hashed,$student_id); $p1->execute();
         $p2 = $conn->prepare("UPDATE users SET password=? WHERE student_id=?");
@@ -189,24 +209,43 @@ $search = trim($_GET['search'] ?? '');
 if ($search !== '') {
     $like = "%{$search}%";
     $res = $conn->prepare(
-        "SELECT s.*,
+        "SELECT DISTINCT s.*,
             (SELECT COUNT(*) FROM subject_enrollments e WHERE e.student_id=s.student_id) AS subject_count
          FROM students s
-         WHERE s.last_name LIKE ? OR s.first_name LIKE ? OR s.student_id LIKE ? OR s.username LIKE ?
+         JOIN subject_enrollments se ON se.student_id = s.student_id
+         JOIN subjects sub ON sub.id = se.subject_id
+         WHERE sub.teacher_id = ?
+           AND (s.last_name LIKE ? OR s.first_name LIKE ? OR s.student_id LIKE ? OR s.username LIKE ?)
          ORDER BY s.last_name ASC"
     );
-    $res->bind_param("ssss",$like,$like,$like,$like);
+    $res->bind_param("issss",$teacher_id,$like,$like,$like,$like);
     $res->execute();
     $students = $res->get_result();
 } else {
-    $students = $conn->query(
-        "SELECT s.*,
+    $stmt = $conn->prepare(
+        "SELECT DISTINCT s.*,
             (SELECT COUNT(*) FROM subject_enrollments e WHERE e.student_id=s.student_id) AS subject_count
-         FROM students s ORDER BY s.last_name ASC"
+         FROM students s
+         JOIN subject_enrollments se ON se.student_id = s.student_id
+         JOIN subjects sub ON sub.id = se.subject_id
+         WHERE sub.teacher_id = ?
+         ORDER BY s.last_name ASC"
     );
+    $stmt->bind_param("i", $teacher_id);
+    $stmt->execute();
+    $students = $stmt->get_result();
 }
 
-$total_students = $conn->query("SELECT COUNT(*) AS c FROM students")->fetch_assoc()['c'];
+$total_stmt = $conn->prepare(
+    "SELECT COUNT(DISTINCT s.student_id) AS c
+     FROM students s
+     JOIN subject_enrollments se ON se.student_id = s.student_id
+     JOIN subjects sub ON sub.id = se.subject_id
+     WHERE sub.teacher_id = ?"
+);
+$total_stmt->bind_param("i", $teacher_id);
+$total_stmt->execute();
+$total_students = $total_stmt->get_result()->fetch_assoc()['c'];
 
 $page_title = "Students";
 $active_nav = "students";

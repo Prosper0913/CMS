@@ -108,9 +108,20 @@ if (isset($_POST['save_subject'])) {
                 }
             } else {
                 // Individual checkboxes
+                // ── ACCESS CONTROL (server-side, do NOT skip this) ──
+                // Same rule as the section path above: never trust that a
+                // submitted student_id is legitimate just because the
+                // checkbox list only displayed students already in one of
+                // this teacher's sections — a POST can be crafted/replayed
+                // with ANY student_id. Re-check ownership here. Abort the
+                // whole save (rather than silently skipping) so the
+                // teacher notices instead of getting a partial enrollment.
                 foreach ($enrollees as $sid) {
                     $sid = trim($sid);
                     if ($sid==='') continue;
+                    if (!teacherHasStudentInAnySection($conn, $teacher_id, $sid)) {
+                        throw new Exception("One of the selected students isn't in any of your sections.");
+                    }
                     $to_enroll[] = ['student_id'=>$sid,'section_id'=>null];
                 }
             }
@@ -143,12 +154,22 @@ if (isset($_POST['save_subject'])) {
         }
     }
 }
-https://github.com/addyosmani/critical/blob/master/README.md
 // ── Load data ─────────────────────────────────────────────────
-$all_students = $conn->query(
-    "SELECT student_id,last_name,first_name,middle_initial
-     FROM students ORDER BY last_name ASC, first_name ASC"
+// Only students already in one of THIS teacher's own sections —
+// same rule as manage_sections.php. A student who isn't in any of
+// your sections shouldn't be pickable here; they only become
+// reachable via the section access request -> approval -> clone flow.
+$all_students_stmt = $conn->prepare(
+    "SELECT DISTINCT s.student_id, s.last_name, s.first_name, s.middle_initial
+     FROM students s
+     JOIN section_students ss ON ss.student_id = s.student_id
+     JOIN sections sec ON sec.id = ss.section_id
+     WHERE sec.teacher_id = ?
+     ORDER BY s.last_name ASC, s.first_name ASC"
 );
+$all_students_stmt->bind_param('i', $teacher_id);
+$all_students_stmt->execute();
+$all_students = $all_students_stmt->get_result();
 $student_count = $all_students->num_rows;
 
 // Sections list

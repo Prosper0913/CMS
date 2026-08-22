@@ -137,6 +137,11 @@ if (isset($_POST['add_to_section'])) {
         $error_msg = "Please select a student.";
     } elseif (!sectionAccessible($conn, $sec_id, $teacher_id)) {
         $error_msg = "Only the section's creator can add students to it.";
+    } elseif (!teacherHasStudentInAnySection($conn, $teacher_id, $sid)) {
+        // Prevents pulling in a brand-new / unclaimed student directly —
+        // they can only become accessible via the section access
+        // request -> approval -> clone flow, not a raw POST here.
+        $error_msg = "That student isn't in any of your existing sections yet. Request access to a section that includes them instead.";
     } else {
         $chk = $conn->prepare(
             "SELECT id FROM section_students WHERE section_id = ? AND student_id = ? LIMIT 1"
@@ -517,28 +522,48 @@ if ($active_sec_id) {
         }
 
         // Students NOT in section (for add dropdown) — filtered to the
-        // section's course when one is set. Students with no course on
-        // file are shown regardless, so they don't get stuck invisible
-        // until someone assigns them a course.
+        // section's course when one is set, AND restricted to students
+        // who are already in one of THIS teacher's own sections. This
+        // is a roster-management tool for moving your own students
+        // between your own sections — it is NOT a way to pick up brand
+        // new / unclaimed students system-wide. A newly admin-added
+        // student who isn't yet in any of your sections should only
+        // become reachable through the section access request ->
+        // approval -> clone flow, same as everything else here.
         $section_course = trim((string)($active_section['course'] ?? ''));
         $course_clause = $section_course !== ''
-            ? "AND (course IS NULL OR course = '' OR UPPER(TRIM(course)) = UPPER(TRIM(?)))"
+            ? "AND (s.course IS NULL OR s.course = '' OR UPPER(TRIM(s.course)) = UPPER(TRIM(?)))"
             : "";
 
         if ($in_ids) {
             $ph = implode(',', array_fill(0, count($in_ids), '?'));
-            $sql = "SELECT student_id, last_name, first_name, course FROM students
-                    WHERE student_id NOT IN ($ph) $course_clause ORDER BY last_name ASC";
+            $sql = "SELECT DISTINCT s.student_id, s.last_name, s.first_name, s.course
+                    FROM students s
+                    JOIN section_students ss2 ON ss2.student_id = s.student_id
+                    JOIN sections sec2 ON sec2.id = ss2.section_id
+                    WHERE sec2.teacher_id = ?
+                      AND s.student_id NOT IN ($ph)
+                      $course_clause
+                    ORDER BY s.last_name ASC";
             $ne = $conn->prepare($sql);
-            $types = str_repeat('s', count($in_ids)) . ($section_course !== '' ? 's' : '');
-            $bind_args = $in_ids;
+            $types = 'i' . str_repeat('s', count($in_ids)) . ($section_course !== '' ? 's' : '');
+            $bind_args = array_merge([$teacher_id], $in_ids);
             if ($section_course !== '') $bind_args[] = $section_course;
             $ne->bind_param($types, ...$bind_args);
         } else {
-            $sql = "SELECT student_id, last_name, first_name, course FROM students
-                    WHERE 1=1 $course_clause ORDER BY last_name ASC";
+            $sql = "SELECT DISTINCT s.student_id, s.last_name, s.first_name, s.course
+                    FROM students s
+                    JOIN section_students ss2 ON ss2.student_id = s.student_id
+                    JOIN sections sec2 ON sec2.id = ss2.section_id
+                    WHERE sec2.teacher_id = ?
+                      $course_clause
+                    ORDER BY s.last_name ASC";
             $ne = $conn->prepare($sql);
-            if ($section_course !== '') $ne->bind_param('s', $section_course);
+            if ($section_course !== '') {
+                $ne->bind_param('is', $teacher_id, $section_course);
+            } else {
+                $ne->bind_param('i', $teacher_id);
+            }
         }
         $ne->execute();
         $ne_res = $ne->get_result();
@@ -1180,7 +1205,11 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <h3><i class="ti ti-user-plus" style="color:var(--bg5);"></i> Add Student to Section</h3>
     <p class="modal-sub">Select a student to add to <strong><?php echo htmlspecialchars($active_section['section_name'] ?? ''); ?></strong>.</p>
     <?php if (empty($not_in_section)): ?>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">All registered students are already in this section.</p>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">
+        No students available to add — this only lists students already in one of
+        your other sections. To bring in a new student, request access to a
+        section that includes them from the Sections tab.
+      </p>
     <?php else: ?>
     <form method="POST">
       <input type="hidden" name="sec_id" value="<?php echo $active_sec_id; ?>">

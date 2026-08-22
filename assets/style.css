@@ -2175,7 +2175,7 @@ transform: scale(1.05);
 }
 
 .search-input-wrap input:focus {
-  border-color:var(--yellow);
+  border-color:var(--text7);
 }
 
 .checklist-actions {
