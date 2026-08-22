@@ -966,7 +966,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
       <div class="card">
         <p class="card-title">
           <i class="ti ti-rocket"></i> Bulk Enroll into Subject
-          <span style="font-size:11px;font-weight:400;color:var(--text3);margin-left:4px;">
+          <span style="font-size:11px;font-weight:400;color:var(--text7);margin-left:4px;">
             Enroll all <?php echo count($section_students_list); ?> students at once
           </span>
         </p>
@@ -1001,7 +1001,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
           <p class="card-title" style="margin:0;">
             <i class="ti ti-list-details"></i> Student Roster
-            <span style="font-size:11px;font-weight:400;color:var(--text3);margin-left:4px;">
+            <span style="font-size:11px;font-weight:400;color:var(--text7);margin-left:4px;">
               <?php echo count($section_students_list); ?> student<?php echo count($section_students_list) !== 1 ? 's' : ''; ?>
             </span>
           </p>
