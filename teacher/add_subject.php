@@ -467,7 +467,7 @@ $type_cfg = [
             </div>
             <i class="ti ti-<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'circle-check' : 'circle' ?>"
               id="secicon-<?= $sec['id'] ?>"
-              style="font-size:18px;color:<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'var(--green)' : 'var(--text7)' ?>;"></i>
+              style="font-size:18px; color:<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'var(--green)' : 'var(--text7)' ?>;"></i>
           </div>
           <?php endforeach; ?>
         </div>
