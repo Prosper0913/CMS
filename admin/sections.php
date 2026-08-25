@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  admin/sections.php
 //  Sections are now created and rostered by admin only (teachers

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  admin/teachers.php
 //  Full CRUD for teacher accounts. Admin-only.

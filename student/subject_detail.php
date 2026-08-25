@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  student/subject_detail.php
 //  Student's detailed view of one subject:

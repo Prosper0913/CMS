@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  teacher/subject_view.php
 //  The main subject management hub. Tabs:

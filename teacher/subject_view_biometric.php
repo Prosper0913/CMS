@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  teacher/subject_view_biometric.php
 //  Embedded biometric session panel for subject_view.php

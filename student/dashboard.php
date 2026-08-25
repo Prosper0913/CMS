@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  student/dashboard.php
 //  Personal home page — student sees their enrolled subjects

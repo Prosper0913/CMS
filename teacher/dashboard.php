@@ -1,4 +1,4 @@
-﻿<!------cat > /mnt/user-data/outputs/classroom_v2/teacher/dashboard.php << 'PHPEOF'--->
+<!------cat > /mnt/user-data/outputs/classroom_v2/teacher/dashboard.php << 'PHPEOF'--->
 <?php
 // ============================================================
 //  teacher/dashboard.php  —  v2 redesign

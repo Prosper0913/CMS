@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  teacher/students.php
 //  Add, edit, delete student accounts.

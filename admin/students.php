@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  admin/students.php
 //  View and manage every student in the system. Under the

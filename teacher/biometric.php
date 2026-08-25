@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  teacher/biometric.php  —  Host-Driven Biometric Dashboard
 //  Rebuilt for the new architecture:

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  admin/import_students.php
 //  Bulk-enroll students from a CSV or XLSX file. Reuses the exact

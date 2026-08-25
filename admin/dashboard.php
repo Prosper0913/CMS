@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  admin/dashboard.php
 //  System-wide overview: total teachers, total students,

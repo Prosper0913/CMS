@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  teacher/add_subject.php  — v3 (section-aware enrollment)
 //

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  student/subjects.php
 //  Lists all enrolled subjects. Clicking one opens

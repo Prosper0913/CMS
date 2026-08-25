@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  teacher/manage_teachers.php
 //  Lets any logged-in teacher create additional teacher accounts
