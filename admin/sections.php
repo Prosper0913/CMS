@@ -371,7 +371,7 @@ $active_nav = 'sections';
             <td><?php echo htmlspecialchars($r['teacher_display_name'] ?: $r['teacher_username']); ?></td>
             <td>
               <?php echo htmlspecialchars($r['subject_code'].' — '.$r['subject_name']); ?>
-              <div style="font-size:11px;color:var(--text3);"><?php echo htmlspecialchars($r['subject_section_label']); ?></div>
+              <div style="font-size:11px;color:var(--text7);"><?php echo htmlspecialchars($r['subject_section_label']); ?></div>
             </td>
             <td>
               <?php echo htmlspecialchars($r['section_name']); ?>

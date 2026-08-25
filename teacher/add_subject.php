@@ -398,7 +398,9 @@ $type_cfg = [
               oninput="updateWeights()" required>
           </div>
           <div class="form-group">
-            <label><span style="color:#a78bfa;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;background:#a78bfa;"></span>Attendance % <span style="font-weight:400;font-size:10px;color:var(--text3);">(inside Perf)</span></label>
+            <label><span style="color:#a78bfa;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;background:#a78bfa;">
+
+            </span>Attendance % <span style="font-weight:400;font-size:10px;color:var(--text7);">(under Perf)</span></label>
             <input type="number" id="attendance_pct" name="attendance_pct" class="form-control"
               min="1" max="50" step="1"
               value="<?= (int)($_POST['attendance_pct']??10) ?>" required>
@@ -465,7 +467,7 @@ $type_cfg = [
             </div>
             <i class="ti ti-<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'circle-check' : 'circle' ?>"
               id="secicon-<?= $sec['id'] ?>"
-              style="font-size:18px;color:<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'var(--green)' : 'var(--text3)' ?>;"></i>
+              style="font-size:18px;color:<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'var(--green)' : 'var(--text7)' ?>;"></i>
           </div>
           <?php endforeach; ?>
         </div>
@@ -490,7 +492,7 @@ $type_cfg = [
         <?php else: ?>
         <div class="checklist-header">
           <div class="search-input-wrap">
-            <i class="ti ti-search" style="color: var(--bg);"></i>
+            <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text7);font-size:13px;pointer-events:none;"></i>
             <input type="text" id="srch" placeholder="Search students…" oninput="filterStudents()">
           </div>
           <div class="checklist-actions">

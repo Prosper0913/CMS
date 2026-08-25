@@ -339,9 +339,9 @@ $active_nav = 'students';
                 <?php endforeach; ?>
               </div>
             <?php else: ?>
-              <p style="font-size:12px;color:var(--text3);margin:0;">Not in any section yet.</p>
+              <p style="font-size:12px;color:var(--text7);margin:0;">Not in any section yet.</p>
             <?php endif; ?>
-            <p style="font-size:11px;color:var(--text3);margin-top:6px;">
+            <p style="font-size:11px;color:var(--text7);margin-top:6px;">
               Section membership is managed from <a href="sections.php" style="color:var(--accent)">Manage Sections</a>.
             </p>
           </div>
@@ -457,7 +457,7 @@ $active_nav = 'students';
           <tbody>
             <?php if ($students->num_rows === 0): ?>
             <tr><td colspan="7">
-              <div class="empty-state">
+              <div class="empty-state" style="color: var(--text7);">
                 <i class="ti ti-users-off"></i>
                 <p><?php echo $search ? "No students matched \"$search\"" : "No students found."; ?></p>
               </div>

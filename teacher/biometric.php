@@ -394,7 +394,7 @@ $type_cfg  = [
 <!-- NAVBAR -->
 <nav class="navbar">
   <a class="brand" href="/classroomv2/teacher/dashboard.php">
-    <span class="brand-dot"></span>Classroom CMS
+    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom CMS" width="32" height="32"></span>Classroom Management System
   </a>
   <div class="nav-sep"></div>
   <a href="/classroomv2/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
@@ -951,7 +951,7 @@ $type_cfg  = [
         <label>Device Key <span style="color:var(--red);">*</span></label>
         <input type="text" name="device_key" class="form-control"
           placeholder="e.g. rm201-scanner-a3f9" required autofocus>
-        <small>Must match DEVICE_KEY in the .ino sketch exactly.</small>
+        <small style="color:var(--text7)">Must match DEVICE_KEY in the .ino sketch exactly.</small>
       </div>
       <div class="form-group">
         <label>Label <span style="color:var(--red);">*</span></label>
@@ -968,7 +968,7 @@ $type_cfg  = [
           </option>
           <?php endforeach; ?>
         </select>
-        <small>You can change this later without reflashing the device.</small>
+        <small style="color: var(--text7);">You can change this later without reflashing the device.</small>
       </div>
       <div style="display:flex;gap:8px;">
         <button type="submit" name="register_device" class="btn btn-primary" style="flex:1;justify-content:center;">

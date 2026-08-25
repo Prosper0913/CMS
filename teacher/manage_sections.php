@@ -928,7 +928,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
       <?php else: ?>
 
       <!-- ── SECTION HERO ── -->
-      <div class="section-hero">
+      <div class="section-hero" style="margin-bottom:24px;background:linear-gradient(135deg,rgba(19, 95, 63, 0.75) 0%,transparent 100%);border-color:rgba(36, 90, 31, 0.2);">
         <div style="flex:1;">
           <div class="sh-name"><?php echo htmlspecialchars($active_section['section_name']); ?></div>
           <?php if ($active_section['description']): ?>
@@ -1242,7 +1242,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 </div>
     <div style="text-align:center;margin-top:20px;">
       <p style="font-size:12px;color:var(--text7);margin-top:-14px;margin-bottom:20px;">
-      Sections are created by admin now — you get access by requesting one, either from another
+      Sections are created by admin — you get access by requesting one, either from another
       teacher's section or from admin's pool. Approval always gives you your own independent copy.
       </p>
     </div>
