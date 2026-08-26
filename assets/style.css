@@ -4897,13 +4897,13 @@ color:var(--text7);
 .sidebar {
   width: 232px;
   flex-shrink: 0;
-  background: var(--bg);
+  background: var(--bg3);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: 91vh;
+  height: 100vh;
   overflow-y: auto;
 }
 
@@ -5013,14 +5013,65 @@ color:var(--text7);
 .main-content {
   flex: 1;
   min-width: 0;
-  overflow-x: hidden;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+.mobile-menu-btn {
+  display: none;
 }
 
 @media (max-width: 860px) {
-  .sidebar { width: 68px; }
-  .sidebar-brand span, .sidebar-link span, .sidebar-username, .sidebar-role { display: none; }
-  .sidebar-brand { justify-content: center; padding: 20px 10px; }
-  .sidebar-link { justify-content: center; padding: 10px; }
-  .sidebar-link .badge-count { position: absolute; top: 4px; right: 4px; margin-left: 0; }
-  .sidebar-logout span { display: none; }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.3);
+  }
+  .sidebar.is-open { transform: translateX(0); }
+
+  /* Full labels stay visible once the drawer is open — only the
+     icon-only collapse used to apply here; a slide-in drawer has
+     room for full text, so no need to hide it. */
+  .sidebar-brand span, .sidebar-link span, .sidebar-username, .sidebar-role, .sidebar-logout span {
+    display: inline;
+  }
+  .sidebar-brand { justify-content: flex-start; padding: 20px 18px; }
+  .sidebar-link { justify-content: flex-start; padding: 9px 12px; }
+  .sidebar-link .badge-count { position: static; margin-left: auto; }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 190;
+  }
+  .sidebar-overlay.is-open { display: block; }
+
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 180;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 19px;
+    cursor: pointer;
+  }
+
+  .main-content { padding-top: 64px; }
 }

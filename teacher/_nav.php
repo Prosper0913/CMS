@@ -7,6 +7,10 @@
 $active_nav = $active_nav ?? '';
 function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ? ' active' : ''); }
 ?>
+<button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('is-open'); document.querySelector('.sidebar-overlay').classList.toggle('is-open');" aria-label="Toggle menu">
+  <i class="ti ti-menu-2"></i>
+</button>
+<div class="sidebar-overlay" onclick="document.querySelector('.sidebar').classList.remove('is-open'); this.classList.remove('is-open');"></div>
 <aside class="sidebar">
   <a class="sidebar-brand" href="/classroomv2/teacher/dashboard.php">
     <img src="/classroomv2/assets/images/TCM logo (2).png" alt="TCM logo">

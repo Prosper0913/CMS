@@ -27,7 +27,7 @@ const OCES_API_BASE = 'http://localhost/capstone';
 
 // Shared secret — must match $SYNC_RECEIVE_KEY in
 // oces/_receive_common.php.
-const OCES_SYNC_KEY = '30fceb36b4cc5c5422ab192d5bead0de7dd88596c37a372c0e14abc1551ad0e8';
+const OCES_SYNC_KEY = '1ff3aa6089f6e0897082946894b6f66f7e09b7c9a08651a8bc2c8f36fdf9a28e';
 
 // Subject filter — only students enrolled in at least one of these
 // subjects (by subject_name, case-insensitive) sync to OCES.
