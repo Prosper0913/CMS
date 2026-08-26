@@ -97,13 +97,13 @@ $type_icons = [
 
   <?php if (empty($notifications)): ?>
   <div class="empty-state">
-    <i class="ti ti-bell-off" style="color:var(--text6);"></i>
-    <p>No notifications yet.</p>
+    <i class="ti ti-bell-off" style="color:var(--yellow2);"></i>
+    <p style="color: var(--text7);">No notifications yet.</p>
   </div>
   <?php else: ?>
   <div class="card">
     <?php foreach ($notifications as $n):
-      [$icon, $color] = $type_icons[$n['type']] ?? ['ti-bell', 'var(--text7)'];
+      [$icon, $color] = $type_icons[$n['type']] ?? ['ti-bell', 'var(--yellow2)'];
     ?>
     <a href="notifications.php?read=<?php echo $n['id']; ?>"
        style="display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--border);text-decoration:none;color:inherit;<?php echo $n['is_read'] ? 'opacity:.6;' : ''; ?>">
