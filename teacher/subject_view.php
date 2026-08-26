@@ -32,7 +32,7 @@ $subject = $sub_stmt->get_result()->fetch_assoc();
 if (!$subject) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
 $active_tab = $_GET['tab'] ?? 'overview';
-$valid_tabs = ['overview','written','exams','performance','attendance','biometric','grades','settings'];
+$valid_tabs = ['overview','written','exams','performance','attendance','biometric','grades','announcements','settings'];
 if (!in_array($active_tab, $valid_tabs)) $active_tab = 'overview';
 
 $success_msg = '';
@@ -184,6 +184,15 @@ if (isset($_POST['add_score'])) {
              $ins->execute();
              
              recalcSubjectGrade($conn, $subject_id, $sid);
+
+             createNotification(
+                 $conn, $sid, 'new_output',
+                 "New {$component} posted: {$entry_name}",
+                 "Your score for \"{$entry_name}\" ({$component}) has been posted.",
+                 "/classroomv2/student/subject_detail.php?id={$subject_id}&tab=grades",
+                 $subject_id
+             );
+
              $saved++;
          }
          $success_msg = "{$saved} score(s) saved under <strong>{$component} — {$entry_name}</strong>.";
@@ -317,9 +326,46 @@ if (isset($_POST['save_attendance'])) {
         $a->bind_param("issssss", $subject_id, $sid, $att_date, $time_in, $status, $remarks, $src);
         $a->execute();
         recalcSubjectGrade($conn, $subject_id, $sid);
+        if ($status === 'Absent') {
+            checkAbsenceStreakNotification($conn, $subject_id, $sid);
+        }
     }
     $success_msg = "Attendance saved for <strong>{$att_date}</strong>.";
 }
+
+// ── POST announcement ─────────────────────────────────────────
+if (isset($_POST['post_announcement'])) {
+    $ann_title   = trim($_POST['ann_title'] ?? '');
+    $ann_message = trim($_POST['ann_message'] ?? '');
+    if ($ann_title === '' || $ann_message === '') {
+        $error_msg = "Both a title and message are required.";
+    } else {
+        $ins = $conn->prepare(
+            "INSERT INTO announcements (subject_id, teacher_id, title, message) VALUES (?, ?, ?, ?)"
+        );
+        $ins->bind_param("iiss", $subject_id, $teacher_id, $ann_title, $ann_message);
+        $ins->execute();
+
+        notifyAllEnrolledStudents(
+            $conn, $subject_id, 'announcement',
+            $ann_title, $ann_message,
+            "/classroomv2/student/subject_detail.php?id={$subject_id}&tab=announcements"
+        );
+
+        $success_msg = "Announcement posted and sent to all enrolled students.";
+    }
+}
+
+// ── DELETE announcement ─────────────────────────────────────────
+if (isset($_GET['del_announcement'])) {
+    $ann_id = (int)$_GET['del_announcement'];
+    $d = $conn->prepare("DELETE FROM announcements WHERE id = ? AND subject_id = ?");
+    $d->bind_param("ii", $ann_id, $subject_id);
+    $d->execute();
+    header("Location: subject_view.php?id={$subject_id}&tab=announcements&ann_deleted=1");
+    exit;
+}
+if (isset($_GET['ann_deleted'])) $success_msg = "Announcement deleted.";
 
 // ── EDIT a single attendance record ──────────────────────────
 // Note: the per-row "Edit" button opens that day's bulk-edit form
@@ -767,66 +813,12 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
 
 </head>
 <body class="page-teacher-subject_view">
+<div class="app-shell">
+
 
 <?php $teacher_subjects = getTeacherSubjects($conn, $teacher_id); ?>
-<nav class="navbar">
-  <a class="brand" href="/classroomv2/teacher/dashboard.php">
-    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="TCM logo" width="32" height="32">
-    Classroom Management System
-  </a>
-  <div class="nav-sep"></div>
-  <a href="/classroomv2/teacher/dashboard.php" class="nav-link">
-    <i class="ti ti-layout-dashboard"></i> Dashboard
-  </a>
-
-  <div class="nav-dropdown">
-    <button class="nav-dd-btn" id="ddBtn" onclick="toggleDD()">
-      <i class="ti ti-books"></i>
-      <?php echo htmlspecialchars($subject['subject_code'] . ' — ' . $subject['section']); ?>
-      <i class="ti ti-chevron-down" class="black-font"></i>
-    </button>
-    <div class="nav-dd-menu" id="ddMenu">
-      <?php
-      $teacher_subjects->data_seek(0);
-      while ($ns = $teacher_subjects->fetch_assoc()):
-        $dot_color = match($ns['subject_type']) {
-            'General Education'      => '#6c8dda',
-            'Professional Education' => '#ff2407',
-            'Major Subject'          => '#00ff1a',
-            default                  => '#7aa3ff',
-        };
-      ?>
-      <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $ns['id']; ?>"
-         class="dd-item <?php echo $ns['id'] == $subject_id ? 'active' : ''; ?>">
-        <span class="dd-dot" style="background:<?php echo $dot_color; ?>"></span>
-        <span class="dd-main"><?php echo htmlspecialchars($ns['subject_code'] . ' ' . $ns['subject_name']); ?></span>
-        <span class="dd-sub"><?php echo htmlspecialchars($ns['section']); ?></span>
-      </a>
-      <?php endwhile; ?>
-      <div class="dd-divider"></div>
-      <a href="/classroomv2/teacher/add_subject.php" class="dd-item">
-        <i class="ti ti-plus" style="color:var(--accent);font-size:13px;"></i>
-        <span class="dd-main" style="color:var(--accent);">Add New Subject</span>
-      </a>
-    </div>
-  </div>
-
-  <a href="/classroomv2/teacher/add_subject.php" class="nav-link">
-    <i class="ti ti-book-plus"></i> Add Subject
-  </a>
-  <a href="/classroomv2/teacher/manage_sections.php" class="nav-link">
-    <i class="ti ti-building-community"></i> Sections
-  </a>
-  <!-- <a href="/classroomv2/teacher/students.php" class="nav-link">
-    <i class="ti ti-users"></i> Students
-  </a> -->
-
-  <div class="nav-right">
-    <span class="nav-role">Teacher</span>
-    <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
-  </div>
-</nav>
+<?php $active_nav = null; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <!-- ── SUBJECT HERO ── -->
 <div class="subject-hero">
@@ -909,6 +901,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
     ['attendance',  'ti-calendar-check',    'Attendance',     null],
     ['biometric',   'ti-fingerprint',       'Biometric',      null],
     ['grades',      'ti-chart-bar',         'Grades',         null],
+    ['announcements','ti-speakerphone',     'Announcements',  null],
     ['settings',    'ti-settings',          'Settings',       null],
   ];
   foreach ($tabs as [$tab_id, $icon, $label, $count]):
@@ -2085,7 +2078,7 @@ elseif ($active_tab === 'biometric'):
     if (s === 'Present') return badge('Present','#34d399','rgba(52,211,153,.12)');
     if (s === 'Late')    return badge('Late','#fbbf24','rgba(251,191,36,.12)');
     if (s === 'Absent')  return badge('Absent','#f87171','rgba(248,113,113,.12)');
-    return badge('—','#3d4560','#1a1e2b');
+    return badge('—','#979090','#1e5f4e');
   }
   function sourceBadge(src) {
     if (!src) return '';
@@ -2225,8 +2218,8 @@ elseif ($active_tab === 'grades'):
         <tr>
           <th>#</th>
           <th>Student</th>
-          <th style="color:#7aa3ff;">Exam Avg <span style="font-weight:400;color:var(--text3);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
-          <th style="color:#34d399;">Written Avg <span style="font-weight:400;color:var(--text3);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
+          <th style="color:#7aa3ff;">Exam Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
+          <th style="color:#34d399;">Written Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
           <th style="color:#fbbf24;">Perf. Task</th>
           <th style="color:#a78bfa;">Attendance</th>
           <th>Final Grade</th>
@@ -2269,14 +2262,14 @@ elseif ($active_tab === 'grades'):
               <div class="score-bar-track">
                 <div class="score-bar-fill" style="width:<?php echo min($v,100); ?>%;background:<?php echo $color; ?>;opacity:.7;"></div>
               </div>
-              <span style="font-size:12px;min-width:40px;text-align:right;color:<?php echo $v >= 75 ? 'var(--green)' : ($v > 0 ? 'var(--red)' : 'var(--text3)'); ?>;">
+              <span style="font-size:12px;min-width:40px;text-align:right;color:<?php echo $v >= 75 ? 'var(--green)' : ($v > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
                 <?php echo $v > 0 ? number_format($v,1) . '%' : '—'; ?>
               </span>
             </div>
           </td>
           <?php endforeach; ?>
           <td>
-            <span style="font-family:var(--font-head);font-size:18px;font-weight:700;color:<?php echo $fg >= 75 ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text3)'); ?>;">
+            <span style="font-family:var(--font-head);font-size:18px;font-weight:700;color:<?php echo $fg >= 75 ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
               <?php echo $fg > 0 ? number_format($fg,2) . '%' : '—'; ?>
             </span>
           </td>
@@ -2289,7 +2282,7 @@ elseif ($active_tab === 'grades'):
                 <?php echo $pass ? 'Passed' : 'Failed'; ?>
               </span>
             <?php else: ?>
-              <span style="color:var(--text3);font-size:12px;">No data</span>
+              <span style="color:var(--text7);font-size:12px;">No data</span>
             <?php endif; ?>
           </td>
         </tr>
@@ -2301,6 +2294,66 @@ elseif ($active_tab === 'grades'):
     Performance component = (Perf. Task Avg × <?php echo (int)($subject['performance_pct'] - $subject['attendance_pct']); ?>% + Attendance × <?php echo (int)$subject['attendance_pct']; ?>%) / <?php echo (int)$subject['performance_pct']; ?>%
     &nbsp;·&nbsp; Last computed: <?php echo date('M d, Y g:i A'); ?>
   </p>
+</div>
+
+<?php
+// ══════════════════════════════════════════════════════
+//  TAB: ANNOUNCEMENTS
+// ══════════════════════════════════════════════════════
+elseif ($active_tab === 'announcements'):
+    $ann_stmt = $conn->prepare(
+        "SELECT id, title, message, created_at FROM announcements
+         WHERE subject_id = ? ORDER BY created_at DESC"
+    );
+    $ann_stmt->bind_param("i", $subject_id);
+    $ann_stmt->execute();
+    $announcements = $ann_stmt->get_result();
+?>
+<div class="settings-wrap">
+
+  <div class="card" style="max-width:600px;margin-bottom:20px;">
+    <p class="card-title"><i class="ti ti-speakerphone"></i> Post an Announcement</p>
+    <p style="font-size:12px;color:var(--text7);margin-bottom:14px;">
+      Sent immediately as a notification to every student currently enrolled in this subject.
+    </p>
+    <form method="POST">
+      <input type="hidden" name="post_announcement">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" class="form-control" name="ann_title" placeholder="e.g. Midterm Exam Schedule" required maxlength="150">
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label>Message</label>
+        <textarea name="ann_message" class="form-control" rows="4" placeholder="e.g. Midterm exam will be on August 29, 2026. Please review Chapters 1-4." required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:14px;">
+        <i class="ti ti-send"></i> Post Announcement
+      </button>
+    </form>
+  </div>
+
+  <div class="card" style="max-width:700px;">
+    <p class="card-title"><i class="ti ti-list"></i> Past Announcements</p>
+    <?php if ($announcements->num_rows === 0): ?>
+      <p style="font-size:13px;color:var(--text2);">No announcements posted yet for this subject.</p>
+    <?php else: while ($ann = $announcements->fetch_assoc()): ?>
+      <div style="padding:14px 0;border-top:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <div style="font-weight:600;font-size:14px;"><?php echo htmlspecialchars($ann['title']); ?></div>
+            <div style="font-size:12px;color:var(--text7);margin-top:2px;"><?php echo date('M d, Y g:i A', strtotime($ann['created_at'])); ?></div>
+          </div>
+          <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=announcements&del_announcement=<?php echo $ann['id']; ?>"
+             class="btn btn-sm btn-delete"
+             onclick="return confirm('Delete this announcement? Students will still keep the notification they already received.');">
+            <i class="ti ti-trash"></i>
+          </a>
+        </div>
+        <p style="font-size:13.5px;margin-top:8px;white-space:pre-wrap;"><?php echo htmlspecialchars($ann['message']); ?></p>
+      </div>
+    <?php endwhile; endif; ?>
+  </div>
+
 </div>
 
 <?php
@@ -2417,7 +2470,7 @@ elseif ($active_tab === 'settings'):
     <p class="card-title"><i class="ti ti-users"></i>
       Enrollee Management
       <hr class="thin-line">
-      <span style="font-weight:400;font-size:11px;color:var(--text3);margin-left:4px;">
+      <span style="font-weight:400;font-size:11px;color:var(--text7);margin-left:4px;">
         (<?php echo $enrolled_list ? $enrolled_list->num_rows : 0; ?> enrolled)
       </span>
     </p>
@@ -2774,5 +2827,7 @@ new Chart(document.getElementById('gradeChart'), {
 <?php endif; ?>
 </script>    
 
+</main>
+</div>
 </body>
 </html>

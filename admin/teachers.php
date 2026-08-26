@@ -165,8 +165,11 @@ $active_nav = 'teachers';
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-admin-teachers">
+<div class="app-shell">
 
-<?php include __DIR__ . '/_nav.php'; ?>
+
+<?php $active_nav = 'teachers'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
@@ -344,5 +347,7 @@ document.getElementById('resetModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeReset();
 });
 </script>
+</main>
+</div>
 </body>
 </html>

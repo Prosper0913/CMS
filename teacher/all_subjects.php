@@ -132,66 +132,12 @@ function qs($overrides = []) {
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-teacher-all_subjects">
+<div class="app-shell">
+
 
 <!-- ── NAVBAR ── -->
-<nav class="navbar">
-  <a class="brand" href="/classroomv2/teacher/dashboard.php">
-    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom CMS" width="32" height="32">Classroom Management System
-  </a>
-  <div class="nav-sep"></div>
-  <a href="/classroomv2/teacher/dashboard.php" class="nav-link">
-    <i class="ti ti-layout-dashboard"></i> Dashboard
-  </a>
-
-  <!-- Subject dropdown (only if subjects exist) -->
-  <?php if ($nav_subs->num_rows > 0): ?>
-  <div class="nav-dropdown">
-    <button class="nav-dd-btn" id="ddBtn" onclick="toggleDD()">
-      <i class="ti ti-books"></i> My Subjects
-      <i class="ti ti-chevron-down"></i>
-    </button>
-    <div class="nav-dd-menu" id="ddMenu">
-      <?php while ($ns = $nav_subs->fetch_assoc()):
-        $dc = $type_cfg[$ns['subject_type']]['color'] ?? '#7aa3ff';
-      ?>
-      <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $ns['id']; ?>" class="dd-item">
-        <span class="dd-dot" style="background:<?php echo $dc; ?>;"></span>
-        <span class="dd-main"><?php echo htmlspecialchars($ns['subject_code'].' — '.$ns['subject_name']); ?></span>
-        <span class="dd-sub"><?php echo htmlspecialchars($ns['section']); ?></span>
-      </a>
-      <?php endwhile; ?>
-      <div class="dd-divider"></div>
-      <a href="/classroomv2/teacher/all_subjects.php" class="dd-item">
-        <i class="ti ti-layout-grid" style="color:var(--text3);font-size:13px;"></i>
-        <span class="dd-main">View All Subjects</span>
-      </a>
-      <a href="/classroomv2/teacher/add_subject.php" class="dd-item">
-        <i class="ti ti-plus" style="color:var(--green);font-size:13px;"></i>
-        <span class="dd-main">Add New Subject</span>
-      </a>
-    </div>
-  </div>
-  <?php endif; ?>
-
-  <a href="/classroomv2/teacher/all_subjects.php" class="nav-link active">
-    <i class="ti ti-layout-grid"></i> All Subjects
-  </a>
-  <a href="/classroomv2/teacher/add_subject.php" class="nav-link">
-    <i class="ti ti-book-plus"></i> Add Subject
-  </a>
-  <a href="/classroomv2/teacher/manage_sections.php" class="nav-link">
-    <i class="ti ti-building-community"></i> Sections
-  </a>
-  <!-- <a href="/classroomv2/teacher/students.php" class="nav-link">
-    <i class="ti ti-users"></i> Students
-  </a> -->
-
-  <div class="nav-right">
-    <span class="nav-role">Teacher</span>
-    <span style="font-size:13px;color:var(--text);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
-  </div>
-</nav>
+<?php $active_nav = 'subjects'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
 
@@ -401,5 +347,7 @@ document.addEventListener('click',e=>{
 });
 </script>
 
+</main>
+</div>
 </body>
 </html>

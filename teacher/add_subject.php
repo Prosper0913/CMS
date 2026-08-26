@@ -224,43 +224,11 @@ $type_cfg = [
 
 </head>
 <body class="page-teacher-add_subject">
+<div class="app-shell">
 
-<nav class="navbar">
-  <a class="brand" href="/classroomv2/teacher/dashboard.php">
-    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom CMS" width="32" height="32"></span>Classroom Management System
-  </a>
-  <div class="nav-sep"></div>
-  <a href="/classroomv2/teacher/dashboard.php" class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
-  <?php if ($nav_subs->num_rows > 0): ?>
-  <div style="position:relative;" id="ddWrap">
-    <button style="display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:var(--radius);
-      font-size:13px;font-weight:500;color:var(--text2);background:transparent;border:none;cursor:pointer;
-      font-family:inherit;" id="ddBtn" onclick="toggleDD()">
-      <i class="ti ti-books"></i> My Subjects <i class="ti ti-chevron-down" style="font-size:11px;"></i>
-    </button>
-    <div id="ddMenu" style="display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:250px;
-      background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:5px;
-      box-shadow:var(--shadow);z-index:200;max-height:380px;overflow-y:auto;">
-      <?php while ($ns=$nav_subs->fetch_assoc()): $dc=$type_cfg[$ns['subject_type']]['color']??'#00ff1a'; ?>
-      <a href="/classroomv2/teacher/subject_view.php?id=<?= $ns['id'] ?>"
-        style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:var(--radius);text-decoration:none;">
-        <span style="width:6px;height:6px;border-radius:50%;background:<?= $dc ?>;flex-shrink:0;"></span>
-        <span style="font-size:13px;font-weight:500;color:var(--text);flex:1;"><?= htmlspecialchars($ns['subject_code'].' — '.$ns['subject_name']) ?></span>
-        <span style="font-size:11px;color:var(--text3);"><?= htmlspecialchars($ns['section']) ?></span>
-      </a>
-      <?php endwhile; ?>
-    </div>
-  </div>
-  <?php endif; ?>
-  <a href="/classroomv2/teacher/add_subject.php" class="nav-link active"><i class="ti ti-book-plus"></i> Add Subject</a>
-  <a href="/classroomv2/teacher/manage_sections.php" class="nav-link"><i class="ti ti-building-community"></i> Sections</a>
-  <!-- <a href="/classroomv2/teacher/students.php" class="nav-link"><i class="ti ti-users"></i> Students</a> -->
-  <div class="nav-right">
-    <span class="nav-role">Teacher</span>
-    <span style="font-size:13px;color:var(--text2);"><?= htmlspecialchars($_SESSION['username']) ?></span>
-    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
-  </div>
-</nav>
+
+<?php $active_nav = 'subjects'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
 
@@ -678,5 +646,7 @@ switchTab(activeTab);
 const savedType = document.getElementById('subject_type_hidden').value;
 if (savedType) selectType(savedType);
 </script>
+</main>
+</div>
 </body>
 </html>

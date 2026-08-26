@@ -55,7 +55,9 @@ $recent_students = $conn->query(
 </head>
 <body class="page-admin-dashboard">
 
+<div class="app-shell">
 <?php $active_nav = 'dashboard'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
@@ -145,5 +147,7 @@ $recent_students = $conn->query(
   </div>
 </div>
 
+</main>
+</div>
 </body>
 </html>

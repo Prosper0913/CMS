@@ -95,8 +95,11 @@ $active_nav = 'api_keys';
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-admin-apikeys">
+<div class="app-shell">
 
-<?php include __DIR__ . '/_nav.php'; ?>
+
+<?php $active_nav = 'api_keys'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
@@ -229,5 +232,7 @@ $active_nav = 'api_keys';
   </div>
 </div>
 
+</main>
+</div>
 </body>
 </html>

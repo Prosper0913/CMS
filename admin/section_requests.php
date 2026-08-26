@@ -204,8 +204,11 @@ $active_nav = 'section_requests';
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-admin-section-requests">
+<div class="app-shell">
 
-<?php include __DIR__ . '/_nav.php'; ?>
+
+<?php $active_nav = 'section_requests'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
@@ -328,5 +331,7 @@ $active_nav = 'section_requests';
   </div>
 </div>
 
+</main>
+</div>
 </body>
 </html>

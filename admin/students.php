@@ -269,8 +269,11 @@ $active_nav = 'students';
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-admin-students">
+<div class="app-shell">
 
-<?php include __DIR__ . '/_nav.php'; ?>
+
+<?php $active_nav = 'students'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
@@ -574,5 +577,7 @@ document.getElementById('resetModal').addEventListener('click',function(e){
   if(e.target===this) closeResetModal();
 });
 </script>
+</main>
+</div>
 </body>
 </html>

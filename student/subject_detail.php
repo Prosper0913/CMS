@@ -14,6 +14,7 @@ $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 $sid        = $_SESSION['student_id'];
 $subject_id = (int)($_GET['id'] ?? 0);
+$unread_count = getUnreadNotificationCount($conn, $sid);
 
 if (!$subject_id) {
     header("Location: /classroomv2/student/dashboard.php");
@@ -96,8 +97,17 @@ foreach ($att_rows as $ar) {
 
 // ── Active tab ────────────────────────────────────────────────
 $active_tab = $_GET['tab'] ?? 'overview';
-$valid_tabs = ['overview', 'exam', 'written', 'performance', 'attendance'];
+$valid_tabs = ['overview', 'exam', 'written', 'performance', 'attendance', 'announcements'];
 if (!in_array($active_tab, $valid_tabs)) $active_tab = 'overview';
+
+// ── Announcements for this subject ──────────────────────────────
+$annq = $conn->prepare(
+    "SELECT title, message, created_at FROM announcements
+     WHERE subject_id = ? ORDER BY created_at DESC"
+);
+$annq->bind_param("i", $subject_id);
+$annq->execute();
+$announcements = $annq->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // ── Type config ───────────────────────────────────────────────
 $type_colors = [
@@ -125,18 +135,11 @@ $pass = $fg >= 75;
 
 </head>
 <body class="page-student-subject_detail">
+<div class="app-shell">
 
-<nav class="navbar">
-  <a class="brand" href="/classroomv2/student/dashboard.php"><img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom Management System" width="32" height="32"></span>Classroom Management System</a>
-  <div class="nav-sep"></div>
-  <a href="/classroomv2/student/dashboard.php" class="nav-link"><i class="ti ti-home"></i> Home</a>
-  <a href="/classroomv2/student/subjects.php"  class="nav-link"><i class="ti ti-books"></i> My Subjects</a>
-  <div class="nav-right">
-    <span class="nav-role">Student</span>
-    <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
-  </div>
-</nav>
+
+<?php $active_nav = 'subjects'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
 
@@ -187,6 +190,7 @@ $pass = $fg >= 75;
       'written'     => ['ti ti-pencil',        'Written Works'],
       'performance' => ['ti ti-star',          'Performance'],
       'attendance'  => ['ti ti-calendar-check','Attendance'],
+      'announcements' => ['ti ti-speakerphone','Announcements'],
     ];
     foreach ($tabs as $key => [$icon, $label]):
     ?>
@@ -473,9 +477,33 @@ $pass = $fg >= 75;
     <?php endif; ?>
   </div>
 
-  <?php endif; /* comp_map / attendance */ ?>
+  <!-- ═══════════════════════════════════════════
+       TAB: ANNOUNCEMENTS
+  ════════════════════════════════════════════ -->
+  <?php elseif ($active_tab === 'announcements'): ?>
+
+  <div class="card">
+    <p class="card-title"><i class="ti ti-speakerphone" style="color:var(--subject-color);"></i> Announcements</p>
+
+    <?php if (empty($announcements)): ?>
+    <div class="empty-state">
+      <i class="ti ti-speakerphone-off" style="color:var(--text7);"></i>
+      <p style="color:var(--text7);">No announcements posted for this subject yet.</p>
+    </div>
+    <?php else: foreach ($announcements as $ann): ?>
+    <div style="padding:14px 0;border-top:1px solid var(--border);">
+      <div style="font-weight:600;font-size:14px;"><?php echo htmlspecialchars($ann['title']); ?></div>
+      <div style="font-size:12px;color:var(--text7);margin-top:2px;"><?php echo date('M d, Y g:i A', strtotime($ann['created_at'])); ?></div>
+      <p style="font-size:13.5px;margin-top:8px;white-space:pre-wrap;"><?php echo htmlspecialchars($ann['message']); ?></p>
+    </div>
+    <?php endforeach; endif; ?>
+  </div>
+
+  <?php endif; /* comp_map / attendance / announcements */ ?>
   <?php endif; /* overview vs other tabs */ ?>
 
 </div><!-- end page-wrap -->
+</main>
+</div>
 </body>
 </html>

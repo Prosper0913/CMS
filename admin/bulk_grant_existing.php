@@ -122,8 +122,11 @@ $pending_count = count(array_filter($pairs, fn($p) => !$p['already_granted']));
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-admin-bulk-grant">
+<div class="app-shell">
 
-<?php include __DIR__ . '/_nav.php'; ?>
+
+<?php $active_nav = null; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
@@ -200,5 +203,7 @@ $pending_count = count(array_filter($pairs, fn($p) => !$p['already_granted']));
   </div>
 </div>
 
+</main>
+</div>
 </body>
 </html>

@@ -10,6 +10,7 @@ requireRole('student');
 require_once '../config/db.php';
 
 $sid = $_SESSION['student_id'];
+$unread_count = getUnreadNotificationCount($conn, $sid);
 
 // Fetch enrolled subjects with full grade breakdown
 $res = $conn->prepare(
@@ -51,18 +52,11 @@ $type_colors = [
 
 </head>
 <body class="page-student-subjects">
+<div class="app-shell">
 
-<nav class="navbar">
-  <a class="brand" href="/classroomv2/student/dashboard.php"><img src="/classroomv2/assets/images/TCM logo (2).png" alt="Classroom Management System" width="32" height="32"></span>Classroom Management System</a>
-  <div class="nav-sep"></div>
-  <a href="/classroomv2/student/dashboard.php" class="nav-link"><i class="ti ti-home"></i> Home</a>
-  <a href="/classroomv2/student/subjects.php"  class="nav-link active"><i class="ti ti-books"></i> My Subjects</a>
-  <div class="nav-right">
-    <span class="nav-role">Student</span>
-    <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="/classroomv2/logout.php" class="btn-logout"><i class="ti ti-logout"></i> Logout</a>
-  </div>
-</nav>
+
+<?php $active_nav = 'subjects'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
@@ -168,5 +162,7 @@ $type_colors = [
   </div>
 </div>
 
+</main>
+</div>
 </body>
 </html>

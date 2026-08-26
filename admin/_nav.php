@@ -1,65 +1,30 @@
 <?php
 // ============================================================
-//  admin/_nav.php  —  Shared admin navbar
+//  admin/_nav.php  —  Shared admin sidebar
 //  Included by every admin/*.php page. Expects $active_nav to
-//  be set beforehand ('dashboard' | 'teachers' | 'students').
+//  be set beforehand ('dashboard' | 'teachers' | 'sections' |
+//  'students' | 'import' | 'api_keys' | 'section_requests').
 // ============================================================
 $active_nav = $active_nav ?? '';
+function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ? ' active' : ''); }
 ?>
- <nav class="navbar"> <!--style="height:56px;background:var(--bg);border-bottom:1px solid var(--border); 
-  display:flex;align-items:center;padding:0 28px;gap:4px;position:sticky;top:0;z-index:100;">-->
-  <a class="brand" href="/classroomv2/admin/dashboard.php"
-    style="font-family:var(--font-head);font-size:15px;font-weight:700;color:var(--text);
-    text-decoration:none;display:flex;align-items:center;gap:8px;flex-shrink:0;margin-right:8px;">
-<img src="/classroomv2/assets/images/TCM logo (2).png" alt="TCM logo" width="32" height="32">
-    Classroom Management System
+<aside class="sidebar">
+  <a class="sidebar-brand" href="/classroomv2/admin/dashboard.php">
+    <img src="/classroomv2/assets/images/TCM logo (2).png" alt="TCM logo">
+    <span>Classroom Management System</span>
   </a>
-  <div style="width:1px;height:20px;background:var(--border2);margin:0 6px;"></div>
-  <a href="/classroomv2/admin/dashboard.php"
-    style="font-size:13px;font-weight:500;text-decoration:none;
-    padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;
-    <?php echo $active_nav==='dashboard' ? 'background:var(--bg3);color:var(--text);' : 'color:var(--text2);'; ?>"
-    class="nav-link"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
-  <a href="/classroomv2/admin/teachers.php"
-    style="font-size:13px;font-weight:500;text-decoration:none;
-    padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;
-    <?php echo $active_nav==='teachers' ? 'background:var(--bg3);color:var(--text);' : 'color:var(--text2);'; ?>"
-    class="nav-link"><i class="ti ti-user-star"></i> Teachers</a>
-  <a href="/classroomv2/admin/sections.php"
-    style="font-size:13px;font-weight:500;text-decoration:none;
-    padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;
-    <?php echo $active_nav==='sections' ? 'background:var(--bg3);color:var(--text);' : 'color:var(--text2);'; ?>"
-    class="nav-link"><i class="ti ti-building-community"></i> Sections</a>
-  <a href="/classroomv2/admin/students.php"
-    style="font-size:13px;font-weight:500;text-decoration:none;
-    padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;
-    <?php echo $active_nav==='students' ? 'background:var(--bg3);color:var(--text);' : 'color:var(--text2);'; ?>"
-    class="nav-link"><i class="ti ti-users"></i> Students</a>
-  <a href="/classroomv2/admin/import_students.php"
-    style="font-size:13px;font-weight:500;text-decoration:none;
-    padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;
-    <?php echo $active_nav==='import' ? 'background:var(--bg3);color:var(--text);' : 'color:var(--text2);'; ?>"
-    class="nav-link"><i class="ti ti-file-import"></i> Import</a>
-  <a href="/classroomv2/admin/api_keys.php"
-    style="font-size:13px;font-weight:500;text-decoration:none;
-    padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;
-    <?php echo $active_nav==='api_keys' ? 'background:var(--bg3);color:var(--text);' : 'color:var(--text2);'; ?>"
-    class="nav-link"><i class="ti ti-key"></i> API Keys</a>
-  <a href="/classroomv2/admin/section_requests.php"
-    style="font-size:13px;font-weight:500;text-decoration:none;
-    padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:5px;
-    <?php echo $active_nav==='section_requests' ? 'background:var(--bg3);color:var(--text);' : 'color:var(--text2);'; ?>"
-    class="nav-link"><i class="ti ti-hand-stop"></i> Section Requests</a>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
-    <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
-      padding:3px 9px;border-radius:99px;background:rgba(239,68,68,.12);color:var(--red);
-      border:1px solid rgba(239,68,68,.25);">Admin</span>
-    <span style="font-size:13px;color:var(--text2);"><?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?></span>
-    <a href="/classroomv2/logout.php"
-      style="font-size:12px;padding:5px 12px;border-radius:8px;background:transparent;
-      border:1px solid var(--border2);color:var(--text2);cursor:pointer;text-decoration:none;
-      display:inline-flex;align-items:center;gap:5px;">
-      <i class="ti ti-logout"></i> Logout
-    </a>
+  <nav class="sidebar-links">
+    <a href="/classroomv2/admin/dashboard.php" class="<?php echo _nav_class('dashboard', $active_nav); ?>"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></a>
+    <a href="/classroomv2/admin/teachers.php" class="<?php echo _nav_class('teachers', $active_nav); ?>"><i class="ti ti-user-star"></i><span>Teachers</span></a>
+    <a href="/classroomv2/admin/sections.php" class="<?php echo _nav_class('sections', $active_nav); ?>"><i class="ti ti-building-community"></i><span>Sections</span></a>
+    <a href="/classroomv2/admin/students.php" class="<?php echo _nav_class('students', $active_nav); ?>"><i class="ti ti-users"></i><span>Students</span></a>
+    <a href="/classroomv2/admin/import_students.php" class="<?php echo _nav_class('import', $active_nav); ?>"><i class="ti ti-file-import"></i><span>Import</span></a>
+    <a href="/classroomv2/admin/api_keys.php" class="<?php echo _nav_class('api_keys', $active_nav); ?>"><i class="ti ti-key"></i><span>API Keys</span></a>
+    <a href="/classroomv2/admin/section_requests.php" class="<?php echo _nav_class('section_requests', $active_nav); ?>"><i class="ti ti-hand-stop"></i><span>Section Requests</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <span class="sidebar-role role-admin">Admin</span>
+    <div class="sidebar-username"><?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?></div>
+    <a href="/classroomv2/logout.php" class="sidebar-logout"><i class="ti ti-logout"></i><span>Logout</span></a>
   </div>
-</nav>
+</aside>

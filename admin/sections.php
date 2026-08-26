@@ -330,8 +330,11 @@ $active_nav = 'sections';
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-admin-sections">
+<div class="app-shell">
 
-<?php include __DIR__ . '/_nav.php'; ?>
+
+<?php $active_nav = 'sections'; include __DIR__ . '/_nav.php'; ?>
+<main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
@@ -628,5 +631,7 @@ function filterAddStudentList(){
 window.addEventListener('DOMContentLoaded', () => openCreateModal());
 <?php endif; ?>
 </script>
+</main>
+</div>
 </body>
 </html>
