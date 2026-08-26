@@ -20,6 +20,8 @@ require_once '../config/db.php';
 // See includes/sync_to_tooltrack.php for the full design.
 require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
 require_once __DIR__ . '/../includes/sync_to_guidance.php';
+// Push-based sync to OCES (NSTP 1/2 students only).
+require_once __DIR__ . '/../includes/sync_to_oces.php';
 
 $admin_id    = (int)$_SESSION['user_id'];
 $success_msg = '';
@@ -129,6 +131,8 @@ if (isset($_POST['add_to_section'])) {
             push_all_fpst_subjects_for_section($conn, $sec_id);
             // Push to Guidance: ALL students sync
             push_student_to_guidance($conn, $sid);
+            // ── Push to OCES: only syncs if student has NSTP 1/2 enrollment.
+            push_student_to_oces($conn, $sid);
             header("Location: sections.php?sec={$sec_id}&msg=student_added");
             exit;
         }
@@ -155,6 +159,8 @@ if (isset($_POST['remove_from_section'])) {
     // both calls. Failures never break the removal.
     auto_unenroll_student_from_fpst_subjects($conn, $sec_id, $sid);
     push_all_fpst_subjects_for_section($conn, $sec_id);
+    // ── Push to OCES: re-push state (if no more NSTP, OCES deactivates).
+    push_student_to_oces($conn, $sid);
     header("Location: sections.php?sec={$sec_id}&msg=student_removed");
     exit;
 }
@@ -208,13 +214,18 @@ if (isset($_POST['respond_request'])) {
             // denials are no-ops. Failures never break the approval itself.
             if ($decision === 'approved') {
                 push_section_subject_to_tooltrack($conn, (int)$reqrow['section_id'], (int)$reqrow['subject_id']);
-                // Push to Guidance: every student in this section gets new enrollment
+                // ── Push to Guidance: every student in this section just got
+                // a new subject_enrollments row. Push each student's full
+                // state so Guidance sees the new enrollment. ALL students
+                // sync (no course filter). Failures never break the approval.
                 $sq2 = $conn->prepare("SELECT student_id FROM section_students WHERE section_id = ?");
                 $sq2->bind_param('i', $reqrow['section_id']);
                 $sq2->execute();
                 $srows2 = $sq2->get_result();
                 while ($sr2 = $srows2->fetch_assoc()) {
                     push_student_to_guidance($conn, $sr2['student_id']);
+                    // ── Push to OCES: same student, only syncs if they have NSTP 1/2
+                    push_student_to_oces($conn, $sr2['student_id']);
                 }
             }
             $success_msg = $decision === 'approved'

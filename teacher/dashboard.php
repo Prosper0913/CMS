@@ -259,7 +259,7 @@ $comp_colors = [
 
       <?php if (empty($subject_perf)): ?>
         <div class="empty-state" style="padding:24px;">
-          <i class="ti ti-pencil-off"></i>
+          <i class="ti ti-pencil-off" style="color: var(--text7);"></i>
           <p class="grey-font">No score entries yet.</p>
         </div>
       <?php else: ?>
@@ -355,7 +355,7 @@ $comp_colors = [
       </p>
       <?php if ($recent->num_rows === 0): ?>
         <div class="empty-state" style="padding:24px;">
-          <i class="ti ti-pencil-off"></i>
+          <i class="ti ti-pencil-off" style="color: var(--text7);"></i>
           <p class="grey-font">No score entries yet.</p>
         </div>
       <?php else: ?>

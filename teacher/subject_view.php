@@ -16,6 +16,8 @@ require_once '../config/db.php';
 // See includes/sync_to_tooltrack.php for the full design.
 require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
 require_once __DIR__ . '/../includes/sync_to_guidance.php';
+// Push-based sync to OCES (NSTP 1/2 students only).
+require_once __DIR__ . '/../includes/sync_to_oces.php';
 
 $teacher_id = $_SESSION['user_id'];
 
@@ -583,6 +585,8 @@ if (isset($_POST['enroll_section'])) {
     $srows3 = $sq3->get_result();
     while ($sr3 = $srows3->fetch_assoc()) {
         push_student_to_guidance($conn, $sr3['student_id']);
+        // ── Push to OCES: same student, only syncs if NSTP 1/2 enrolled
+        push_student_to_oces($conn, $sr3['student_id']);
     }
 }
 
@@ -624,6 +628,8 @@ if (isset($_POST['enroll_single'])) {
             push_subject_to_tooltrack($conn, $subject_id);
             // Push to Guidance: push student's full state
             push_student_to_guidance($conn, $sid);
+            // ── Push to OCES: same student (only syncs if NSTP 1/2)
+            push_student_to_oces($conn, $sid);
         }
     }
 }
@@ -646,6 +652,8 @@ if (isset($_POST['unenroll_student'])) {
     push_subject_to_tooltrack($conn, $subject_id);
     // Push to Guidance: re-push student state (enrollment removed)
     push_student_to_guidance($conn, $sid);
+    // ── Push to OCES: re-push state (if no more NSTP, OCES deactivates)
+    push_student_to_oces($conn, $sid);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2335,7 +2343,7 @@ elseif ($active_tab === 'announcements'):
   <div class="card" style="max-width:700px;">
     <p class="card-title"><i class="ti ti-list"></i> Past Announcements</p>
     <?php if ($announcements->num_rows === 0): ?>
-      <p style="font-size:13px;color:var(--text2);">No announcements posted yet for this subject.</p>
+      <p style="font-size:13px;color:var(--text7);">No announcements posted yet for this subject.</p>
     <?php else: while ($ann = $announcements->fetch_assoc()): ?>
       <div style="padding:14px 0;border-top:1px solid var(--border);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
