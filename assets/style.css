@@ -1310,19 +1310,6 @@ tbody td {
   gap:18px;
 }
 
-@media (max-width: 700px) {
-  .subjects-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-  .subjects-grid .subject-card {
-    padding: 12px;
-  }
-  .subjects-grid .sc-name {
-    font-size: 13px;
-  }
-}
-
 .sc-top-bar {
   position:absolute;
   top:0;
@@ -1762,11 +1749,6 @@ tbody td {
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
-}
-
-@media (max-width: 480px) {
-  .weight-label { width: 108px; font-size: 11.5px; }
-  .gc-row { gap: 8px; }
 }
 
 /* score bar inline */ .inline-bar {
@@ -2838,13 +2820,6 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   margin-bottom:32px;
 }
 
-@media (max-width: 700px) {
-  .subject-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-}
-
 .sc-bar {
   position:absolute;
   top:0;
@@ -3183,11 +3158,15 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   align-items: start;
 }
 
+/* Disabled: now relying on the global .app-shell zoom (see near the
+   end of this file) to shrink the whole desktop layout uniformly,
+   rather than reflowing this to a single column on mobile.
 @media (max-width: 900px) {
   .sections-layout {
     grid-template-columns: 1fr;
   }
 }
+*/
 
 /* ── SIDEBAR: SECTION LIST ────────────────────────────── */ .section-sidebar {
   display: flex;
@@ -4172,11 +4151,14 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   gap: 12px;
 }
 
+/* Disabled: relying on the global .app-shell zoom instead of
+   reflowing this to a single column on mobile.
 @media (max-width: 560px) {
   .settings-wrap .form-row {
     grid-template-columns: 1fr;
   }
 }
+*/
 
 .settings-wrap .weight-row {
   display: grid;
@@ -4184,11 +4166,14 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   gap: 10px;
 }
 
+/* Disabled: relying on the global .app-shell zoom instead of
+   reflowing this to fewer columns on mobile.
 @media (max-width: 700px) {
   .settings-wrap .weight-row {
     grid-template-columns: 1fr 1fr;
   }
 }
+*/
 
 .enroll-block {
   background: var(--bg6);
@@ -4898,12 +4883,15 @@ color:var(--text7);
 /* Fix 1: .two-col keeps its 100px side margins even after it
    stacks to one column on mobile — leaves almost no usable width.
    Reusing the same 800px breakpoint the existing rule already uses. */
+/* Disabled: relying on the global .app-shell zoom instead of
+   adjusting margins independently on mobile.
 @media (max-width: 800px) {
   .two-col {
     margin-left: 0;
     margin-right: 0;
   }
 }
+*/
 
 /* Fix 2: .nav-links is overflow:hidden with no wrapping and no
    mobile query anywhere — extra links just get clipped and become
@@ -5093,63 +5081,12 @@ color:var(--text7);
 }
 
 @media (max-width: 860px) {
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 240px;
-    z-index: 200;
-    transform: translateX(-100%);
-    transition: transform .25s ease;
-    box-shadow: 4px 0 24px rgba(0,0,0,.3);
-  }
-  .sidebar.is-open { transform: translateX(0); }
-
-  /* Full labels stay visible once the drawer is open — only the
-     icon-only collapse used to apply here; a slide-in drawer has
-     room for full text, so no need to hide it. */
-  .sidebar-brand span, .sidebar-link span, .sidebar-username, .sidebar-role, .sidebar-logout span {
-    display: inline;
-  }
-  .sidebar-brand { justify-content: flex-start; padding: 20px 18px; }
-  .sidebar-link { justify-content: flex-start; padding: 9px 12px; }
-  .sidebar-link .badge-count { position: static; margin-left: auto; }
-
-  .sidebar-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.45);
-    z-index: 190;
-  }
-  .sidebar-overlay.is-open { display: block; }
-
-  .mobile-menu-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: fixed;
-    top: 14px;
-    left: 14px;
-    z-index: 180;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-size: 19px;
-    cursor: pointer;
-  }
-
-  .main-content { padding-top: 64px; }
-
-  /* teacher/subject_view.php specifically requested a literal
-     "same as desktop, just smaller" mobile treatment rather than
-     the single-column reflow used elsewhere — scoped to this one
-     page's content only (not the sidebar/hamburger, which sit
-     outside .main-content as siblings, so they're unaffected). */
-  body.page-teacher-subject_view .main-content {
+  /* "Same as desktop, just smaller" — the whole app-shell (sidebar +
+     content together) scales down as one unit, so the sidebar stays
+     always-visible and in-flow exactly like desktop, not an
+     off-canvas drawer. This replaces the earlier icon-collapse /
+     slide-in-drawer approach entirely. */
+  .app-shell {
     zoom: 0.4;
   }
 }
