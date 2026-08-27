@@ -612,6 +612,33 @@ filter:brightness(120%);
 
 /* ── TABLE ───────────────────────────────────────────────── */ .table-wrap {
   overflow-x: auto;
+  position: relative;
+}
+
+/* Scroll hint arrow — mobile only, applies automatically to every
+   .table-wrap / .tabs / .tab-strip instance across the whole app
+   since it's class-based, not per-template. */
+@media (max-width: 700px) {
+  .table-wrap::after, .tabs::after, .tab-strip::after {
+    content: "\276F";
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg5);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text2);
+    box-shadow: -10px 0 14px -4px var(--bg5);
+  }
+  .tabs, .tab-strip { position: relative; }
 }
 
 /* Add a thin line under the header cells */
@@ -1723,6 +1750,23 @@ tbody td {
   font-size:12px;
   min-width:52px;
   text-align:right;
+}
+
+/* ── GRADE COMPOSITION CARD (student subject_detail.php) ──
+   Uses .weight-label / .weight-dot / .weight-bar-track / .weight-val
+   (already correct, flex-child-shaped) but needed its own row
+   wrapper — .weight-row itself is a 4-col grid meant for the
+   teacher's Weight Editor form, unrelated to this display card. */
+.gc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 480px) {
+  .weight-label { width: 108px; font-size: 11.5px; }
+  .gc-row { gap: 8px; }
 }
 
 /* score bar inline */ .inline-bar {
@@ -4928,6 +4972,7 @@ color:var(--text7);
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh; /* accounts for mobile browser toolbar showing/hiding — 100vh alone can push footer content below the visible fold on phones */
   overflow-y: auto;
 }
 
@@ -5098,4 +5143,13 @@ color:var(--text7);
   }
 
   .main-content { padding-top: 64px; }
+
+  /* teacher/subject_view.php specifically requested a literal
+     "same as desktop, just smaller" mobile treatment rather than
+     the single-column reflow used elsewhere — scoped to this one
+     page's content only (not the sidebar/hamburger, which sit
+     outside .main-content as siblings, so they're unaffected). */
+  body.page-teacher-subject_view .main-content {
+    zoom: 0.4;
+  }
 }

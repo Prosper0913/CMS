@@ -255,7 +255,7 @@ $pass = $fg >= 75;
     foreach ($breakdown as [$label, $color, $weight, $avg]):
       $contribution = $avg * $weight / 100;
     ?>
-    <div class="weight-row">
+    <div class="gc-row">
       <div class="weight-label">
         <span class="weight-dot" style="background:<?php echo $color; ?>;"></span>
         <?php echo $label; ?>
