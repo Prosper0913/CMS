@@ -15,8 +15,6 @@ require_once '../config/db.php';
 require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
 // Push-based sync to Guidance Appointment System (ALL students sync).
 require_once __DIR__ . '/../includes/sync_to_guidance.php';
-// Push-based sync to OCES (NSTP 1/2 students only).
-require_once __DIR__ . '/../includes/sync_to_oces.php';
 
 $admin_id    = (int)$_SESSION['user_id'];
 $success_msg = '';
@@ -94,9 +92,6 @@ if (isset($_POST['add_student'])) {
                 // profile (from their section), and subject enrollments.
                 // Failures never break the add.
                 push_student_to_guidance($conn, $student_id);
-                // ── Push to OCES: only syncs if student has NSTP 1/2 enrollment.
-                // If not, push_student_to_oces() handles it internally (no-op or deactivate).
-                push_student_to_oces($conn, $student_id);
                 $success_msg = "Student <strong>"
                     .htmlspecialchars($last_name.', '.$first_name)
                     ."</strong> added. They can now log in as <code>{$username}</code>.";
@@ -162,8 +157,6 @@ if (isset($_POST['update_student'])) {
     // ── Push to Guidance: re-push the student's full state so Guidance
     // sees the updated name/username/password. ALL students sync.
     push_student_to_guidance($conn, $student_id);
-    // ── Push to OCES: re-push updated state (only if NSTP 1/2 enrolled).
-    push_student_to_oces($conn, $student_id);
 
     header("Location: students.php?msg=updated"); exit;
 }
@@ -204,8 +197,6 @@ if (isset($_GET['delete'])) {
         // student_enrollments rows. We do NOT delete the user row because
         // appointments/referrals reference it. Failures never break the delete.
         push_student_deletion_to_guidance($del_id);
-        // ── Push to OCES: soft-deactivate the user (no NSTP enrollment anymore).
-        push_student_deletion_to_oces($del_id);
         header("Location: students.php?msg=deleted"); exit;
     } catch (Exception $e) {
         $conn->rollback();
@@ -303,7 +294,7 @@ $active_nav = 'students';
   <div class="alert alert-error"><i class="ti ti-alert-circle"></i><div><?php echo $error_msg; ?></div></div>
   <?php endif; ?>
 
-  <div class="two-col" style="margin-left: -120px;">
+  <div class="two-col">
 
     <!-- ── Add / Edit Student Form ── -->
     <div>

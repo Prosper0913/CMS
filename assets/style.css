@@ -329,8 +329,13 @@ body {
   grid-template-columns: 35% 1fr;
   gap: 25px;
   align-items: start;
-  margin-right: 100px;
-  margin-left: 100px;
+  /* Removed hardcoded margin-left/margin-right: 100px — this was
+     tuned for the old full-width layout with no sidebar. Stacked
+     on top of .page-wrap's own max-width:1280px centering, it was
+     pushing content off-balance and, combined with a couple of
+     pages' own negative-margin overrides, causing content to
+     overlap the sidebar. .page-wrap's padding already gives
+     sensible edge spacing on its own. */
   /* background:var(--bg7); */
 
 }
@@ -5081,12 +5086,56 @@ color:var(--text7);
 }
 
 @media (max-width: 860px) {
-  /* "Same as desktop, just smaller" — the whole app-shell (sidebar +
-     content together) scales down as one unit, so the sidebar stays
-     always-visible and in-flow exactly like desktop, not an
-     off-canvas drawer. This replaces the earlier icon-collapse /
-     slide-in-drawer approach entirely. */
-  .app-shell {
+  /* Sidebar stays at full, real scale as an off-canvas drawer —
+     it must NOT be zoomed along with content, since zoom on a
+     position:fixed element with height:100dvh scales that height
+     down too, causing it to only cover part of the screen. Only
+     the actual page content gets the "smaller than desktop" zoom
+     treatment; the sidebar/nav chrome stays normal-sized. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.3);
+  }
+  .sidebar.is-open { transform: translateX(0); }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 190;
+  }
+  .sidebar-overlay.is-open { display: block; }
+
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 210;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 19px;
+    cursor: pointer;
+  }
+
+  /* "Same as desktop, just smaller" — applies to the actual page
+     content only, not the drawer sidebar/hamburger button (which
+     sit outside .main-content as siblings, so they're unaffected). */
+  .main-content {
     zoom: 0.4;
+    padding-top: 64px;
   }
 }
