@@ -247,14 +247,32 @@ if (isset($_GET['msg'])) {
     $success_msg = $msgs[$_GET['msg']] ?? $success_msg;
 }
 
-// ── Load all sections with counts ─────────────────────────────
-$sections_res = $conn->query(
-    "SELECT s.*, COUNT(ss.student_id) AS student_count
-     FROM sections s
-     LEFT JOIN section_students ss ON ss.section_id = s.id
-     GROUP BY s.id
-     ORDER BY s.section_name ASC"
-);
+// ── Load all sections with counts, optionally filtered by course ──
+$filter_course = trim($_GET['course_filter'] ?? '');
+$allowed_courses = ['BSIT','LAED','BSBA','BSN','FPST','BSA'];
+if (!in_array($filter_course, $allowed_courses, true)) $filter_course = '';
+
+if ($filter_course !== '') {
+    $sections_stmt = $conn->prepare(
+        "SELECT s.*, COUNT(ss.student_id) AS student_count
+         FROM sections s
+         LEFT JOIN section_students ss ON ss.section_id = s.id
+         WHERE s.course = ?
+         GROUP BY s.id
+         ORDER BY s.section_name ASC"
+    );
+    $sections_stmt->bind_param("s", $filter_course);
+    $sections_stmt->execute();
+    $sections_res = $sections_stmt->get_result();
+} else {
+    $sections_res = $conn->query(
+        "SELECT s.*, COUNT(ss.student_id) AS student_count
+         FROM sections s
+         LEFT JOIN section_students ss ON ss.section_id = s.id
+         GROUP BY s.id
+         ORDER BY s.section_name ASC"
+    );
+}
 $all_sections = [];
 while ($r = $sections_res->fetch_assoc()) $all_sections[] = $r;
 
@@ -423,6 +441,14 @@ $active_nav = 'sections';
           <p class="card-title" style="margin:0;"><i class="ti ti-list"></i> All Sections (<?php echo count($all_sections); ?>)</p>
           <button type="button" class="btn btn-sm btn-primary" onclick="openCreateModal()"><i class="ti ti-plus"></i> New</button>
         </div>
+        <form method="GET" style="margin-bottom:14px;">
+          <select name="course_filter" class="form-control" onchange="this.form.submit()">
+            <option value="">All Courses</option>
+            <?php foreach ($allowed_courses as $c): ?>
+            <option value="<?php echo $c; ?>" <?php echo $filter_course === $c ? 'selected' : ''; ?>><?php echo $c; ?></option>
+            <?php endforeach; ?>
+          </select>
+        </form>
         <?php if (empty($all_sections)): ?>
         <div class="empty-state"><i class="ti ti-building-community"></i><p>No sections yet. Create your first one.</p></div>
         <?php else: ?>
@@ -508,7 +534,12 @@ $active_nav = 'sections';
       </div>
       <div class="form-group">
         <label>Course</label>
-        <input type="text" name="course" class="form-control" placeholder="e.g. BSIT">
+        <select name="course" class="form-control">
+          <option value="">No specific course</option>
+          <?php foreach (['BSIT','LAED','BSBA','BSN','FPST','BSA'] as $c): ?>
+          <option value="<?php echo $c; ?>"><?php echo $c; ?></option>
+          <?php endforeach; ?>
+        </select>
       </div>
       <div class="form-group">
         <label>Year Level</label>
@@ -543,7 +574,12 @@ $active_nav = 'sections';
       </div>
       <div class="form-group">
         <label>Course</label>
-        <input type="text" name="course" class="form-control" value="<?php echo htmlspecialchars($active_section['course'] ?? ''); ?>">
+        <select name="course" class="form-control">
+          <option value="">No specific course</option>
+          <?php foreach (['BSIT','LAED','BSBA','BSN','FPST','BSA'] as $c): ?>
+          <option value="<?php echo $c; ?>" <?php echo (($active_section['course'] ?? '') === $c) ? 'selected' : ''; ?>><?php echo $c; ?></option>
+          <?php endforeach; ?>
+        </select>
       </div>
       <div class="form-group">
         <label>Year Level</label>

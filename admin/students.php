@@ -41,6 +41,8 @@ if (isset($_POST['add_student'])) {
 
     if ($student_id===''||$last_name===''||$first_name===''||$username===''||$password==='') {
         $error_msg = "Student ID, name, username, and password are all required.";
+    } elseif (!in_array($course, ['BSIT','LAED','BSBA','BSN','FPST','BSA'], true)) {
+        $error_msg = "Please select a valid course.";
     } else {
         $chk = $conn->prepare("SELECT id FROM students WHERE student_id=? OR username=? LIMIT 1");
         $chk->bind_param("ss",$student_id,$username);
@@ -136,6 +138,10 @@ if (isset($_POST['update_student'])) {
     $course         = trim($_POST['course'] ?? '');
     $username       = trim($_POST['username']);
 
+    if (!in_array($course, ['BSIT','LAED','BSBA','BSN','FPST','BSA'], true)) {
+        $error_msg = "Please select a valid course.";
+    } else {
+
     $upd = $conn->prepare(
         "UPDATE students SET
             last_name=?,first_name=?,middle_initial=?,email=?,course=?,username=?
@@ -159,6 +165,7 @@ if (isset($_POST['update_student'])) {
     push_student_to_guidance($conn, $student_id);
 
     header("Location: students.php?msg=updated"); exit;
+    }
 }
 
 // ── RESET password ───────────────────────────────────────────
@@ -324,9 +331,13 @@ $active_nav = 'students';
               value="<?php echo htmlspecialchars($edit_data['email'] ?? ''); ?>">
           </div>
           <div class="form-group">
-            <label>Course</label>
-            <input type="text" name="course" class="form-control" placeholder="e.g. BSIT"
-              value="<?php echo htmlspecialchars($edit_data['course'] ?? ''); ?>">
+            <label>Course <span style="color:var(--red)">*</span></label>
+            <select name="course" class="form-control" required>
+              <option value="">Select course</option>
+              <?php foreach (['BSIT','LAED','BSBA','BSN','FPST','BSA'] as $c): ?>
+              <option value="<?php echo $c; ?>" <?php echo (($edit_data['course'] ?? '') === $c) ? 'selected' : ''; ?>><?php echo $c; ?></option>
+              <?php endforeach; ?>
+            </select>
           </div>
           <div class="form-group">
             <label>Username <span style="color:var(--red)">*</span></label>
@@ -379,10 +390,15 @@ $active_nav = 'students';
             <input type="email" name="email" class="form-control" placeholder="Enter email">
           </div>
           <div class="form-group">
-            <label>Course</label>
-            <input type="text" name="course" class="form-control" placeholder="e.g. BSIT">
+            <label>Course <span style="color:var(--red)">*</span></label>
+            <select name="course" class="form-control" required>
+              <option value="">Select course</option>
+              <?php foreach (['BSIT','LAED','BSBA','BSN','FPST','BSA'] as $c): ?>
+              <option value="<?php echo $c; ?>"><?php echo $c; ?></option>
+              <?php endforeach; ?>
+            </select>
             <p style="font-size:11px;color:var(--text7);margin-top:4px;">
-              Used to filter which students show up when enrolling into a section — leave blank if unsure.
+              Used to filter which students show up when enrolling into a section.
             </p>
           </div>
           <div class="form-group">

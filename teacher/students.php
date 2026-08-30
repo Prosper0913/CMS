@@ -14,8 +14,6 @@ require_once __DIR__ . '/../includes/sync_to_guidance.php';
 $teacher_id = $_SESSION['user_id'];
 $success_msg = '';
 $error_msg   = '';
-$edit_mode   = false;
-$edit_data   = [];
 
 
 // ── Subjects with per-subject stats ─────────────────────────
@@ -44,62 +42,11 @@ $subjects_stmt->bind_param("i", $teacher_id);
 $subjects_stmt->execute();
 $all_subs = $subjects_stmt->get_result();
 
-// ── ADD student ─────────────────────────────────────────────
+// ── ADD student — disabled. Teachers can no longer create student
+//    accounts; this is handled by Admin → Students. Server-side
+//    block kept as defense in depth even though the form is gone. ──
 if (isset($_POST['add_student'])) {
-    $student_id    = trim($_POST['student_id']);
-    $last_name     = trim($_POST['last_name']);
-    $first_name    = trim($_POST['first_name']);
-    $middle_initial= trim($_POST['middle_initial']);
-    $email         = trim($_POST['email']);
-    $username      = trim($_POST['username']);
-    $password      = trim($_POST['password']);
-
-    if ($student_id===''||$last_name===''||$first_name===''||$username===''||$password==='') {
-        $error_msg = "Student ID, name, username, and password are all required.";
-    } else {
-        // Check duplicate student_id or username
-        $chk = $conn->prepare(
-            "SELECT id FROM students WHERE student_id=? OR username=? LIMIT 1"
-        );
-        $chk->bind_param("ss",$student_id,$username);
-        $chk->execute();
-        $chk->store_result();
-
-        if ($chk->num_rows > 0) {
-            $error_msg = "Student ID or username already exists. Please use a unique value.";
-        } else {
-            $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $conn->begin_transaction();
-            try {
-                // Insert into students
-                $ins = $conn->prepare(
-                    "INSERT INTO students
-                        (student_id,last_name,first_name,middle_initial,email,username,password)
-                     VALUES (?,?,?,?,?,?,?)"
-                );
-                $ins->bind_param("sssssss",
-                    $student_id,$last_name,$first_name,$middle_initial,$email,$username,$hashed
-                );
-                $ins->execute();
-
-                // Insert into users (so they can log in)
-                $ins2 = $conn->prepare(
-                    "INSERT INTO users (username,password,role,student_id)
-                     VALUES (?,?,'student',?)"
-                );
-                $ins2->bind_param("sss",$username,$hashed,$student_id);
-                $ins2->execute();
-
-                $conn->commit();
-                $success_msg = "Student <strong>"
-                    .htmlspecialchars($last_name.', '.$first_name)
-                    ."</strong> added. They can now log in as <code>{$username}</code>.";
-            } catch (Exception $e) {
-                $conn->rollback();
-                $error_msg = "Database error: ".$e->getMessage();
-            }
-        }
-    }
+    $error_msg = "Adding students is now handled by an administrator.";
 }
 
 // ── DELETE student ───────────────────────────────────────────
@@ -127,49 +74,11 @@ if (isset($_GET['delete'])) {
     }
 }
 
-// ── LOAD edit mode ───────────────────────────────────────────
-if (isset($_GET['edit'])) {
-    if (!teacherOwnsStudent($conn, $teacher_id, $_GET['edit'])) {
-        $error_msg = "You can only edit students enrolled in one of your own subjects.";
-    } else {
-        $edit_mode = true;
-        $es = $conn->prepare("SELECT * FROM students WHERE student_id=?");
-        $es->bind_param("s",$_GET['edit']); $es->execute();
-        $edit_data = $es->get_result()->fetch_assoc();
-        if (!$edit_data) { $edit_mode = false; }
-    }
-}
-
-// ── UPDATE student ───────────────────────────────────────────
-if (isset($_POST['update_student'])) {
-    $student_id    = trim($_POST['student_id']);
-
-    if (!teacherOwnsStudent($conn, $teacher_id, $student_id)) {
-        $error_msg = "You can only edit students enrolled in one of your own subjects.";
-    } else {
-        $last_name     = trim($_POST['last_name']);
-        $first_name    = trim($_POST['first_name']);
-        $middle_initial= trim($_POST['middle_initial']);
-        $email         = trim($_POST['email']);
-        $username      = trim($_POST['username']);
-
-        $upd = $conn->prepare(
-            "UPDATE students SET
-                last_name=?,first_name=?,middle_initial=?,email=?,username=?
-             WHERE student_id=?"
-        );
-        $upd->bind_param("ssssss",
-            $last_name,$first_name,$middle_initial,$email,$username,$student_id
-        );
-        $upd->execute();
-
-        // Keep username in sync in users table
-        $upd2 = $conn->prepare("UPDATE users SET username=? WHERE student_id=?");
-        $upd2->bind_param("ss",$username,$student_id);
-        $upd2->execute();
-
-        header("Location: students.php?msg=updated"); exit;
-    }
+// ── Editing student info — disabled. Teachers can no longer edit
+//    student records; this is handled by Admin → Students. Server-side
+//    block kept as defense in depth even though the edit form is gone. ──
+if (isset($_GET['edit']) || isset($_POST['update_student'])) {
+    $error_msg = "Editing student information is now handled by an administrator.";
 }
 
 // ── RESET password ───────────────────────────────────────────
@@ -302,117 +211,20 @@ $active_nav = "students";
 
   <div class="two-col" style="justify-content: center;">
 
-    <!-- ── FORM PANEL ── -->
+    <!-- ── FORM PANEL (read-only info — teachers can no longer add/edit students) ── -->
     <div>
       <div class="card">
-        <p class="card-title">
-          <i class="ti ti-<?php echo $edit_mode?'edit':'user-plus'; ?>"></i>
-          <?php echo $edit_mode ? 'Edit Student' : 'Add New Student'; ?>
+        <p class="card-title"><i class="ti ti-info-circle"></i> Student Records</p>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;">
+          Adding new students and editing student information is now handled by an
+          administrator, under <strong>Admin &rarr; Students</strong>.
         </p>
-
-        <form method="POST" autocomplete="off">
-
-          <?php if ($edit_mode): ?>
-            <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($edit_data['student_id']); ?>">
-            <!-- Show student ID as read-only when editing -->
-            <div class="form-group">
-              <label>Student ID</label>
-              <input type="text" class="form-control" value="<?php echo htmlspecialchars($edit_data['student_id']); ?>" disabled style="opacity:.5;">
-            </div>
-          <?php else: ?>
-            <div class="form-group">
-              <label>Student ID</label>
-              <div class="input-wrap">
-                <i class="ti ti-id-badge"></i>
-                <input type="text" name="student_id" class="form-control"
-                  placeholder="e.g. STU-001"
-                  value="<?php echo htmlspecialchars($_POST['student_id']??''); ?>" required>
-              </div>
-            </div>
-          <?php endif; ?>
-
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Last Name</label>
-              <input type="text" name="last_name" class="form-control"
-                placeholder="Dances"
-                value="<?php echo htmlspecialchars($edit_mode?$edit_data['last_name']:($_POST['last_name']??'')); ?>" required>
-            </div>
-            <div class="form-group">
-              <label>First Name</label>
-              <input type="text" name="first_name" class="form-control"
-                placeholder="Anthony"
-                value="<?php echo htmlspecialchars($edit_mode?$edit_data['first_name']:($_POST['first_name']??'')); ?>" required>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Middle Initial</label>
-            <input type="text" name="middle_initial" class="form-control"
-              placeholder="C." maxlength="5"
-              value="<?php echo htmlspecialchars($edit_mode?($edit_data['middle_initial']??''):($_POST['middle_initial']??'')); ?>">
-          </div>
-
-          <div class="form-group">
-            <label>Email Address</label>
-            <div class="input-wrap">
-              <i class="ti ti-mail green-font"></i>
-              <input type="email" name="email" class="form-control"
-                placeholder="anthonydances@school.edu.ph"
-                value="<?php echo htmlspecialchars($edit_mode?($edit_data['email']??''):($_POST['email']??'')); ?>">
-            </div>
-          </div>
-
-          <div class="divider"></div>
-          <p class="bottom-margin">Login Credentials</p>
-
-          <div class="form-group">
-            <label>Username</label>
-            <div class="input-wrap">
-              <i class="ti ti-at"></i>
-              <input type="text" name="username" class="form-control"
-                placeholder="anthony.dances"
-                value="<?php echo htmlspecialchars($edit_mode?$edit_data['username']:($_POST['username']??'')); ?>" required>
-            </div>
-          </div>
-
-          <?php if (!$edit_mode): ?>
-          <div class="form-group">
-            <label>Password</label>
-            <div class="input-wrap" style="position:relative;">
-              <i class="ti ti-lock"></i>
-              <input type="password" name="password" id="pw-input" class="form-control"
-                placeholder="Set initial password" required>
-              <button type="button" class="show-pw" onclick="togglePw()"
-                style="position:absolute;right:15px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;">
-                 &ensp;<i class="ti ti-eye"></i> &nbsp;&emsp;<i id="pw-icon"></i>
-              </button>
-            </div>
-          </div>
-          <?php else: ?>
-          <div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:var(--radius);padding:10px 14px;font-size:12px;color:var(--text7);display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-            <i class="ti ti-info-circle"></i>
-            To change the password, use the Reset Password button in the student list.
-          </div>
-          <?php endif; ?>
-
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
-            <?php if ($edit_mode): ?>
-              <button type="submit" name="update_student" class="btn btn-primary">
-                <i class="ti ti-check"></i> Update Student
-              </button>
-              <a href="students.php" class="btn btn-cancel" style="color: var(--text7);">
-                <i class="ti ti-x"></i> Cancel
-              </a>
-            <?php else: ?>
-              <button type="submit" name="add_student" class="btn btn-primary">
-                <i class="ti ti-user-plus"></i> Add Student
-              </button>
-            <?php endif; ?>
-          </div>
-        </form>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:10px;">
+          To add or remove which students are in your classes, use
+          <a href="manage_sections.php" style="color:var(--accent)">Manage Sections</a>.
+        </p>
       </div>
+    </div>
 
       <!-- Info box -->
       <!-- <div class="card"> 
@@ -507,10 +319,6 @@ $active_nav = "students";
               </td>
               <td>
                 <div class="td-actions">
-                  <a href="students.php?edit=<?php echo urlencode($s['student_id']); ?>"
-                     class="btn btn-sm btn-edit">
-                    <i class="ti ti-edit"></i> Edit
-                  </a>
                   <button type="button"
                     class="btn btn-sm btn-yellow"
                     onclick="openResetModal('<?php echo htmlspecialchars($s['student_id'],ENT_QUOTES); ?>','<?php echo htmlspecialchars($s['last_name'].', '.$s['first_name'],ENT_QUOTES); ?>')">
