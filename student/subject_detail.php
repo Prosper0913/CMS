@@ -165,10 +165,10 @@ $pass = $fg >= 75;
       </div>
       <div class="hero-grade">
         <?php if ($fg > 0): ?>
-        <div class="grade-big" style="color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>">
+        <!-- <div class="grade-big" style="color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>">
           <?php echo number_format($fg, 2); ?>
-        </div>
-        <div class="grade-letter" style="color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>">
+        </div> -->
+        <div class="grade-big" style="color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>">
           <?php echo $grade['letter_grade'] ?? '—'; ?>
           <span style="font-size:11px;color:var(--text7);font-weight:400;"> · <?php echo $pass ? 'PASSED' : 'FAILED'; ?></span>
         </div>
@@ -273,12 +273,12 @@ $pass = $fg >= 75;
     </div>
     <?php endforeach; ?>
 
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;gap:12px;">
+    <!-- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;gap:12px;">
       <span>Final Grade</span>
       <span style="font-family:var(--font-head);font-size:20px;font-weight:700;color:<?php echo $pass?'var(--green)':($fg>0?'var(--red)':'var(--text3)'); ?>;">
         <?php echo $fg > 0 ? number_format($fg,2).'%' : '—'; ?>
       </span>
-    </div>
+    </div> -->
   </div>
 
   <!-- Attendance quick stat on overview -->

@@ -94,7 +94,7 @@ $type_colors = [
     </div>
     <div style="text-align:right;">
       <div style="font-family:var(--font-head);font-size:36px;font-weight:800;color:<?php echo $overall>=75?'var(--green)':'var(--red)'; ?>;">
-        <?php echo $overall > 0 ? $overall.'%' : '—'; ?>
+        <?php echo $overall > 0 ? letterGrade($overall) : '—'; ?>
       </div>
       <div>Overall Average</div>
     </div>
@@ -148,9 +148,9 @@ $type_colors = [
       <!-- Grade display -->
       <?php if ($fg > 0): ?>
       <div class="grade-display">
-        <div class="grade-big" style="color:<?php echo $pass?'var(--green)':'var(--red)'; ?>">
+        <!-- <div class="grade-big" style="color:<?php echo $pass?'var(--green)':'var(--red)'; ?>">
           <?php echo number_format($fg,2); ?>%
-        </div>
+        </div> -->
         <div class="grade-letter" style="background:<?php echo $lg_color['bg']; ?>;color:<?php echo $lg_color['text']; ?>;">
           <?php echo $sub['letter_grade']; ?>
         </div>
