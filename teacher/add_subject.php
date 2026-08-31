@@ -29,6 +29,9 @@ if (isset($_POST['save_subject'])) {
     $written_pct     = (float)$_POST['written_pct'];
     $performance_pct = (float)$_POST['performance_pct'];
     $attendance_pct  = (float)$_POST['attendance_pct'];
+    $schedule_days   = implode(',', $_POST['schedule_days'] ?? []);
+    $schedule_start  = trim($_POST['schedule_start_time'] ?? '');
+    $schedule_end    = trim($_POST['schedule_end_time'] ?? '');
 
     // Enrollees can come from:
     //   a) individual checkboxes  (enrollees[])
@@ -39,6 +42,7 @@ if (isset($_POST['save_subject'])) {
 
     $valid_types = ['General Education','Professional Education','Major Subject'];
     $valid_sems  = ['1st','2nd','Summer'];
+    $valid_days  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     $total_pct   = $exam_pct + $written_pct + $performance_pct;
 
     if ($subject_code===''||$subject_name==='') {
@@ -47,6 +51,12 @@ if (isset($_POST['save_subject'])) {
         $error_msg = "Please select a valid subject type.";
     } elseif (!in_array($semester,$valid_sems)) {
         $error_msg = "Please select a valid semester.";
+    } elseif (empty($_POST['schedule_days']) || array_diff($_POST['schedule_days'], $valid_days)) {
+        $error_msg = "Please select at least one valid class day.";
+    } elseif ($schedule_start === '' || $schedule_end === '') {
+        $error_msg = "Please set both a start and end time for the class schedule.";
+    } elseif ($schedule_start >= $schedule_end) {
+        $error_msg = "Class end time must be after the start time.";
     } elseif (round($total_pct,2) !== 100.00) {
         $error_msg = "Grade weights must total exactly 100%. Current total: <strong>{$total_pct}%</strong>";
     } elseif ($attendance_pct <= 0) {
@@ -60,12 +70,14 @@ if (isset($_POST['save_subject'])) {
             $ins = $conn->prepare(
                 "INSERT INTO subjects
                    (teacher_id,subject_code,subject_name,section,subject_type,
-                    school_year,semester,exam_pct,written_pct,performance_pct,attendance_pct)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+                    school_year,semester,exam_pct,written_pct,performance_pct,attendance_pct,
+                    schedule_days,schedule_start_time,schedule_end_time)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             );
-            $ins->bind_param("issssssdddd",
+            $ins->bind_param("issssssddddsss",
                 $teacher_id,$subject_code,$subject_name,$section,$subject_type,
-                $school_year,$semester,$exam_pct,$written_pct,$performance_pct,$attendance_pct
+                $school_year,$semester,$exam_pct,$written_pct,$performance_pct,$attendance_pct,
+                $schedule_days,$schedule_start,$schedule_end
             );
             $ins->execute();
             $new_subject_id = $conn->insert_id;
@@ -298,6 +310,38 @@ $type_cfg = [
               </option>
               <?php endforeach; ?>
             </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Class Schedule -->
+      <div class="card" style="margin-bottom:20px;">
+        <p class="card-title"><i class="ti ti-calendar-time"></i> Class Schedule <span style="color:var(--red)">*</span></p>
+        <div class="form-group">
+          <label>Days</label>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <?php
+            $day_labels = ['Mon'=>'Mon','Tue'=>'Tue','Wed'=>'Wed','Thu'=>'Thu','Fri'=>'Fri','Sat'=>'Sat','Sun'=>'Sun'];
+            $checked_days = $_POST['schedule_days'] ?? [];
+            foreach ($day_labels as $val => $label):
+            ?>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" name="schedule_days[]" value="<?= $val ?>" <?= in_array($val, $checked_days) ? 'checked' : '' ?>>
+              <?= $label ?>
+            </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start Time</label>
+            <input type="time" name="schedule_start_time" class="form-control"
+              value="<?= htmlspecialchars($_POST['schedule_start_time']??'') ?>" required>
+          </div>
+          <div class="form-group">
+            <label>End Time</label>
+            <input type="time" name="schedule_end_time" class="form-control"
+              value="<?= htmlspecialchars($_POST['schedule_end_time']??'') ?>" required>
           </div>
         </div>
       </div>

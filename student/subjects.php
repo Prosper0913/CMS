@@ -106,6 +106,10 @@ $type_colors = [
                 <div>
                   <div style="font-weight:600;"><?php echo htmlspecialchars($sub['subject_name']); ?></div>
                   <div class="td-mono"><?php echo htmlspecialchars($sub['subject_code']); ?> · <?php echo htmlspecialchars($sub['section']); ?></div>
+                  <?php $sched = formatSchedule($sub['schedule_days'] ?? '', $sub['schedule_start_time'] ?? '', $sub['schedule_end_time'] ?? ''); ?>
+                  <?php if ($sched): ?>
+                  <div class="td-mono" style="color:var(--text7);"><i class="ti ti-clock" style="font-size:10px;"></i> <?php echo $sched; ?></div>
+                  <?php endif; ?>
                 </div>
               </div>
             </td>

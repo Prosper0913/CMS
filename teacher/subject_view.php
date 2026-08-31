@@ -529,20 +529,29 @@ if (isset($_POST['update_subject_meta'])) {
     $syear = trim($_POST['school_year']);
     $ssem  = $_POST['semester'];
     $stype = $_POST['subject_type'];
+    $sched_days  = implode(',', $_POST['schedule_days'] ?? []);
+    $sched_start = trim($_POST['schedule_start_time'] ?? '');
+    $sched_end   = trim($_POST['schedule_end_time'] ?? '');
     $valid_types = ['General Education', 'Professional Education', 'Major Subject'];
     $valid_sems  = ['1st', '2nd', 'Summer'];
+    $valid_days  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     if ($sname === '' || $scode === '') {
         $error_msg = "Subject name and code are required.";
     } elseif (!in_array($stype, $valid_types) || !in_array($ssem, $valid_sems)) {
         $error_msg = "Invalid subject type or semester.";
+    } elseif (empty($_POST['schedule_days']) || array_diff($_POST['schedule_days'], $valid_days)) {
+        $error_msg = "Please select at least one valid class day.";
+    } elseif ($sched_start === '' || $sched_end === '' || $sched_start >= $sched_end) {
+        $error_msg = "Please set a valid start/end time (end must be after start).";
     } else {
         $upd = $conn->prepare(
             "UPDATE subjects
              SET subject_name=?, subject_code=?, section=?,
-                 school_year=?, semester=?, subject_type=?
+                 school_year=?, semester=?, subject_type=?,
+                 schedule_days=?, schedule_start_time=?, schedule_end_time=?
              WHERE id=? AND teacher_id=?"
         );
-        $upd->bind_param('ssssssii', $sname, $scode, $ssect, $syear, $ssem, $stype, $subject_id, $teacher_id);
+        $upd->bind_param('sssssssssii', $sname, $scode, $ssect, $syear, $ssem, $stype, $sched_days, $sched_start, $sched_end, $subject_id, $teacher_id);
         $upd->execute();
         $sub_stmt->execute();
         $subject = $sub_stmt->get_result()->fetch_assoc();
@@ -2373,7 +2382,7 @@ elseif ($active_tab === 'settings'):
 <div class="settings-wrap">
 
   <!-- 1. Subject Details -->
-  <div class="card" style="max-width:600px;margin-bottom:20px; transform: translate(-50px, 0px);">
+  <div class="card" style="max-width:600px;margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-pencil"></i> Edit Subject Details</p>
     <form method="POST">
       <input type="hidden" name="update_subject_meta">
@@ -2421,6 +2430,32 @@ elseif ($active_tab === 'settings'):
           <?php endforeach; ?>
         </select>
       </div>
+      <div class="form-group">
+        <label>Class Schedule — Days <span style="color:var(--red)">*</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+          <?php
+          $current_days = array_filter(explode(',', $subject['schedule_days'] ?? ''));
+          foreach (['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as $d):
+          ?>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" name="schedule_days[]" value="<?php echo $d; ?>" <?php echo in_array($d, $current_days) ? 'checked' : ''; ?>>
+            <?php echo $d; ?>
+          </label>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Time</label>
+          <input type="time" name="schedule_start_time" class="form-control"
+            value="<?php echo htmlspecialchars($subject['schedule_start_time'] ?? ''); ?>" required>
+        </div>
+        <div class="form-group">
+          <label>End Time</label>
+          <input type="time" name="schedule_end_time" class="form-control"
+            value="<?php echo htmlspecialchars($subject['schedule_end_time'] ?? ''); ?>" required>
+        </div>
+      </div>
       <button type="submit" class="btn btn-primary">
         <i class="ti ti-device-floppy"></i> Save Subject Details
       </button>
@@ -2428,7 +2463,7 @@ elseif ($active_tab === 'settings'):
   </div>
 
   <!-- 2. Grade Weights -->
-  <div class="card" style="max-width:600px;margin-bottom:20px; transform: translate(600px, -430px);">
+  <div class="card" style="max-width:600px;margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-percentage"></i> Edit Grade Weights</p>
     <p style="font-size:12px;color:var(--text7);margin-bottom:16px;">
       Changing weights will immediately recompute all student grades for this subject.
@@ -2474,7 +2509,7 @@ elseif ($active_tab === 'settings'):
   </div>
 
   <!-- 3. Enrollee Management -->
-  <div class="card" style="margin-bottom:20px; transform: translate(0px, -300px);">
+  <div class="card" style="margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-users"></i>
       Enrollee Management
       <hr class="thin-line">

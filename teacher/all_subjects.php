@@ -284,6 +284,10 @@ function qs($overrides = []) {
         <?php if ($days > 0): ?>
         <span><i class="ti ti-calendar-check"></i> <?php echo $days; ?> class day<?php echo $days!=1?'s':''; ?></span>
         <?php endif; ?>
+        <?php $sched = formatSchedule($sub['schedule_days'] ?? '', $sub['schedule_start_time'] ?? '', $sub['schedule_end_time'] ?? ''); ?>
+        <?php if ($sched): ?>
+        <span><i class="ti ti-clock"></i> <?php echo $sched; ?></span>
+        <?php endif; ?>
       </div>
 
       <div class="sc-weights">
