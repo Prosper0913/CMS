@@ -162,6 +162,7 @@ if (isset($_POST['add_score'])) {
          $error_msg = "Total items must be greater than 0.";
      } else {
          $saved = 0;
+         $graded_ids = []; // track who actually got a score this save, to find who didn't
          foreach ($scores as $sid => $score) {
              // Skip students the teacher left blank rather than saving a bogus 0
              if ($score === '' || $score === null) continue;
@@ -186,6 +187,7 @@ if (isset($_POST['add_score'])) {
              $ins->execute();
              
              recalcSubjectGrade($conn, $subject_id, $sid);
+             $graded_ids[] = $sid;
 
              createNotification(
                  $conn, $sid, 'new_output',
@@ -195,8 +197,43 @@ if (isset($_POST['add_score'])) {
                  $subject_id
              );
 
+             // Low score alert — flags anything under 50%. Sent as a
+             // separate notification from the "new output" one above so
+             // a struggling student sees it distinctly, not buried in a
+             // generic "posted" message.
+             if ($total_all > 0 && ($score / $total_all * 100) < 50) {
+                 createNotification(
+                     $conn, $sid, 'low_score',
+                     "Low score on {$entry_name}",
+                     "You scored {$score}/{$total_all} on \"{$entry_name}\" in {$subject['subject_name']}.",
+                     "/classroomv2/student/subject_detail.php?id={$subject_id}&tab=grades",
+                     $subject_id
+                 );
+             }
+
              $saved++;
          }
+
+         // Missing output alert — any student enrolled in this subject
+         // who was left blank in this save (the app's existing convention
+         // for "hasn't done this yet", distinct from an intentional 0)
+         // gets notified there's an ungraded item waiting for them.
+         $enrolled_stmt = $conn->prepare("SELECT student_id FROM subject_enrollments WHERE subject_id = ?");
+         $enrolled_stmt->bind_param("i", $subject_id);
+         $enrolled_stmt->execute();
+         $enrolled_res = $enrolled_stmt->get_result();
+         while ($er = $enrolled_res->fetch_assoc()) {
+             if (!in_array($er['student_id'], $graded_ids, true)) {
+                 createNotification(
+                     $conn, $er['student_id'], 'missing_output',
+                     "No score yet: {$entry_name}",
+                     "You don't have a score posted yet for \"{$entry_name}\" ({$component}) in {$subject['subject_name']}.",
+                     "/classroomv2/student/subject_detail.php?id={$subject_id}&tab=grades",
+                     $subject_id
+                 );
+             }
+         }
+
          $success_msg = "{$saved} score(s) saved under <strong>{$component} — {$entry_name}</strong>.";
      }
 }

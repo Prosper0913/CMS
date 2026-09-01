@@ -56,6 +56,8 @@ $type_icons = [
     'absence_streak' => ['ti-calendar-x',    '#f87171'],
     'new_output'     => ['ti-report',        '#7aa3ff'],
     'announcement'   => ['ti-speakerphone',  '#fbbf24'],
+    'low_score'      => ['ti-alert-triangle','#f87171'],
+    'missing_output' => ['ti-file-off',      '#fb923c'],
 ];
 ?>
 <!DOCTYPE html>
