@@ -21,7 +21,7 @@ $new_subject_id = null;
 if (isset($_POST['save_subject'])) {
     $subject_code    = trim($_POST['subject_code']);
     $subject_name    = trim($_POST['subject_name']);
-    $section         = trim($_POST['section']);
+    $section_id      = (int)($_POST['section_id'] ?? 0);
     $subject_type    = trim($_POST['subject_type']);
     $school_year     = trim($_POST['school_year']);
     $semester        = trim($_POST['semester']);
@@ -33,13 +33,6 @@ if (isset($_POST['save_subject'])) {
     $schedule_start  = trim($_POST['schedule_start_time'] ?? '');
     $schedule_end    = trim($_POST['schedule_end_time'] ?? '');
 
-    // Enrollees can come from:
-    //   a) individual checkboxes  (enrollees[])
-    //   b) section bulk-enroll    (enroll_section_id)
-    $enroll_mode   = $_POST['enroll_mode'] ?? 'individual'; // 'section' or 'individual'
-    $section_id_en = (int)($_POST['enroll_section_id'] ?? 0);
-    $enrollees     = $_POST['enrollees'] ?? [];
-
     $valid_types = ['General Education','Professional Education','Major Subject'];
     $valid_sems  = ['1st','2nd','Summer'];
     $valid_days  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -47,6 +40,8 @@ if (isset($_POST['save_subject'])) {
 
     if ($subject_code===''||$subject_name==='') {
         $error_msg = "Subject code and name are required.";
+    } elseif ($section_id <= 0) {
+        $error_msg = "Please select a section.";
     } elseif (!in_array($subject_type,$valid_types)) {
         $error_msg = "Please select a valid subject type.";
     } elseif (!in_array($semester,$valid_sems)) {
@@ -66,6 +61,25 @@ if (isset($_POST['save_subject'])) {
     } else {
         $conn->begin_transaction();
         try {
+            // ── ACCESS CONTROL (server-side, do NOT skip this) ──
+            // Never trust that section_id is one of "my" sections just
+            // because the dropdown only showed my own — a POST request
+            // can be crafted/replayed with ANY section_id. Re-check
+            // ownership here, right before using it.
+            $sec_chk = $conn->prepare(
+                "SELECT id, section_name FROM sections
+                 WHERE id = ? AND (teacher_id = ? OR teacher_id IS NULL)
+                 LIMIT 1"
+            );
+            $sec_chk->bind_param('ii', $section_id, $teacher_id);
+            $sec_chk->execute();
+            $sec_row = $sec_chk->get_result()->fetch_assoc();
+
+            if (!$sec_row) {
+                throw new Exception("You don't have access to that section.");
+            }
+            $section = $sec_row['section_name'];
+
             // 1. Insert subject
             $ins = $conn->prepare(
                 "INSERT INTO subjects
@@ -82,83 +96,33 @@ if (isset($_POST['save_subject'])) {
             $ins->execute();
             $new_subject_id = $conn->insert_id;
 
-            // 2. Build final list of student IDs to enroll
-            $to_enroll   = []; // [ ['student_id'=>..., 'section_id'=>...] ]
-
-            if ($enroll_mode === 'section' && $section_id_en > 0) {
-                // ── ACCESS CONTROL (server-side, do NOT skip this) ──
-                // Never trust that $section_id_en is one of "my" sections
-                // just because the dropdown only showed my own — a POST
-                // request can be crafted/replayed with ANY section_id,
-                // bypassing whatever the UI displayed. Re-check ownership
-                // here, right before using it, with the same rule as the
-                // display query above (owner OR legacy/no-owner).
-                $sec_chk = $conn->prepare(
-                    "SELECT id FROM sections
-                     WHERE id = ? AND (teacher_id = ? OR teacher_id IS NULL)
-                     LIMIT 1"
-                );
-                $sec_chk->bind_param('ii', $section_id_en, $teacher_id);
-                $sec_chk->execute();
-                $sec_chk->store_result();
-
-                if ($sec_chk->num_rows === 0) {
-                    // Not their section — abort the whole save rather than
-                    // silently enrolling nobody, so the teacher notices.
-                    throw new Exception("You don't have access to that section.");
-                }
-
-                // Pull all students in that section
-                $sq = $conn->prepare(
-                    "SELECT student_id FROM section_students WHERE section_id = ?"
-                );
-                $sq->bind_param('i', $section_id_en);
-                $sq->execute();
-                $srows = $sq->get_result();
-                while ($sr = $srows->fetch_assoc()) {
-                    $to_enroll[] = ['student_id'=>$sr['student_id'],'section_id'=>$section_id_en];
-                }
-            } else {
-                // Individual checkboxes
-                // ── ACCESS CONTROL (server-side, do NOT skip this) ──
-                // Same rule as the section path above: never trust that a
-                // submitted student_id is legitimate just because the
-                // checkbox list only displayed students already in one of
-                // this teacher's sections — a POST can be crafted/replayed
-                // with ANY student_id. Re-check ownership here. Abort the
-                // whole save (rather than silently skipping) so the
-                // teacher notices instead of getting a partial enrollment.
-                foreach ($enrollees as $sid) {
-                    $sid = trim($sid);
-                    if ($sid==='') continue;
-                    if (!teacherHasStudentInAnySection($conn, $teacher_id, $sid)) {
-                        throw new Exception("One of the selected students isn't in any of your sections.");
-                    }
-                    $to_enroll[] = ['student_id'=>$sid,'section_id'=>null];
-                }
-            }
-
-            // 3. Enroll each student
-            foreach ($to_enroll as $en_row) {
-                $sid    = $en_row['student_id'];
-                $sec_en = $en_row['section_id'];
+            // 2. Auto-enroll every student currently in the selected section
+            $sq = $conn->prepare(
+                "SELECT student_id FROM section_students WHERE section_id = ?"
+            );
+            $sq->bind_param('i', $section_id);
+            $sq->execute();
+            $srows = $sq->get_result();
+            $enrolled_count = 0;
+            while ($sr = $srows->fetch_assoc()) {
+                $sid = $sr['student_id'];
                 $e1 = $conn->prepare(
                     "INSERT IGNORE INTO subject_enrollments (subject_id,student_id,section_id)
                      VALUES (?,?,?)"
                 );
-                $e1->bind_param("isi",$new_subject_id,$sid,$sec_en);
+                $e1->bind_param("isi",$new_subject_id,$sid,$section_id);
                 $e1->execute();
                 $e2 = $conn->prepare(
                     "INSERT IGNORE INTO subject_grades (subject_id,student_id) VALUES (?,?)"
                 );
                 $e2->bind_param("is",$new_subject_id,$sid);
                 $e2->execute();
+                $enrolled_count++;
             }
 
             $conn->commit();
-            $enrolled_count = count($to_enroll);
             $success_msg = "Subject <strong>{$subject_code} — {$subject_name}</strong> deployed "
-                         . "with {$enrolled_count} student(s) enrolled.";
+                         . "with {$enrolled_count} student(s) enrolled from <strong>".htmlspecialchars($section)."</strong>.";
 
         } catch (Exception $e) {
             $conn->rollback();
@@ -167,22 +131,6 @@ if (isset($_POST['save_subject'])) {
     }
 }
 // ── Load data ─────────────────────────────────────────────────
-// Only students already in one of THIS teacher's own sections —
-// same rule as manage_sections.php. A student who isn't in any of
-// your sections shouldn't be pickable here; they only become
-// reachable via the section access request -> approval -> clone flow.
-$all_students_stmt = $conn->prepare(
-    "SELECT DISTINCT s.student_id, s.last_name, s.first_name, s.middle_initial
-     FROM students s
-     JOIN section_students ss ON ss.student_id = s.student_id
-     JOIN sections sec ON sec.id = ss.section_id
-     WHERE sec.teacher_id = ?
-     ORDER BY s.last_name ASC, s.first_name ASC"
-);
-$all_students_stmt->bind_param('i', $teacher_id);
-$all_students_stmt->execute();
-$all_students = $all_students_stmt->get_result();
-$student_count = $all_students->num_rows;
 
 // Sections list
 // ── ACCESS CONTROL: only show sections this teacher can actually use ──
@@ -263,13 +211,8 @@ $type_cfg = [
   <?php endif; ?>
 
   <form method="POST" id="subjectForm">
-  <!-- hidden: which enroll mode was active -->
-  <input type="hidden" name="enroll_mode" id="enroll_mode_input" value="<?= $prefill_section ? 'section' : 'individual' ?>">
 
-  <div class="two-col">
-
-    <!-- ════ LEFT COLUMN ════ -->
-    <div>
+  <div>
 
       <!-- Subject info -->
       <div class="card" style="margin-bottom:20px;">
@@ -282,10 +225,24 @@ $type_cfg = [
               value="<?= htmlspecialchars($_POST['subject_code']??'') ?>" required>
           </div>
           <div class="form-group">
-            <label>Section</label>
-            <input type="text" name="section" class="form-control"
-              placeholder="e.g. BSIT 2A"
-              value="<?= htmlspecialchars($_POST['section']??'') ?>">
+            <label>Section <span style="color:var(--red)">*</span></label>
+            <select name="section_id" class="form-control" required>
+              <option value="">Select section</option>
+              <?php
+              $selected_section_id = isset($_POST['section_id']) ? (int)$_POST['section_id'] : $prefill_section;
+              foreach ($sections_list as $sec):
+              ?>
+              <option value="<?= $sec['id'] ?>" <?= ($selected_section_id === (int)$sec['id']) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($sec['section_name']) ?> (<?= $sec['sc'] ?> student<?= $sec['sc']!=1?'s':'' ?>)
+              </option>
+              <?php endforeach; ?>
+            </select>
+            <p style="font-size:11px;color:var(--text7);margin-top:4px;">
+              Every student currently in this section will be enrolled automatically.
+              <?php if (empty($sections_list)): ?>
+                You don't have any sections yet — create one first in <a href="manage_sections.php" style="color:var(--accent)">Manage Sections</a>.
+              <?php endif; ?>
+            </p>
           </div>
         </div>
         <div class="form-group">
@@ -437,117 +394,11 @@ $type_cfg = [
       </div>
     </div>
 
-    <!-- ════ RIGHT COLUMN: Enrollment ════ -->
-    <div class="card" style="position:sticky;top:68px;">
-      <p class="card-title"><i class="ti ti-users"></i> Enroll Students</p>
-
-      <!-- Mode tabs -->
-      <div class="enroll-tabs">
-        <div class="enroll-tab <?= (!$prefill_section && ($sections_list===[] || ($_POST['enroll_mode']??'individual')==='individual')) ? 'active' : '' ?>"
-          id="tab-section" onclick="switchTab('section')">
-          <i class="ti ti-building-community"></i> By Section
-        </div>
-        <div class="enroll-tab <?= (!$prefill_section && ($sections_list!==[] || ($_POST['enroll_mode']??'individual')==='individual')) ? '' : 'active' ?>"
-          id="tab-individual" onclick="switchTab('individual')">
-          <i class="ti ti-user"></i> Individual
-        </div>
-      </div>
-
-      <!-- Panel: By Section -->
-      <div class="enroll-panel <?= ($prefill_section || ($_POST['enroll_mode']??'section')==='section') ? 'active' : '' ?>"
-        id="panel-section">
-        <?php if (!$sections_list): ?>
-        <div class="empty-state" style="padding:24px;">
-          <i class="ti ti-building-community"></i>
-          <p>No sections yet.<br>
-            <a href="/classroomv2/teacher/manage_sections.php" style="color:var(--accent)">Create sections first →</a>
-          </p>
-        </div>
-        <?php else: ?>
-        <p >
-          Select a section to enroll all its students at once.
-        </p>
-        <input type="hidden" name="enroll_section_id" id="enroll_section_id" value="<?= $prefill_section ?>">
-        <div id="sectionList">
-          <?php foreach ($sections_list as $sec): ?>
-          <div class="sec-option <?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'selected' : '' ?>"
-            id="secopt-<?= $sec['id'] ?>"
-            onclick="selectSection(<?= $sec['id'] ?>)">
-            <div>
-              <div class="sec-option-name"><?= htmlspecialchars($sec['section_name']) ?></div>
-              <div class="sec-option-count"><?= $sec['sc'] ?> students</div>
-            </div>
-            <i class="ti ti-<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'circle-check' : 'circle' ?>"
-              id="secicon-<?= $sec['id'] ?>"
-              style="font-size:18px; color:<?= ($prefill_section && (int)$sec['id']===$prefill_section) ? 'var(--green)' : 'var(--text7)' ?>;"></i>
-          </div>
-          <?php endforeach; ?>
-        </div>
-        <div>
-          <i class="ti ti-info-circle"></i>
-          Can't find your section?
-          <a href="/classroomv2/teacher/manage_sections.php" style="color:var(--text7);">Manage sections →</a>
-        </div>
-        <?php endif; ?>
-      </div>
-
-      <!-- Panel: Individual -->
-      <div class="enroll-panel <?= ($prefill_section || ($_POST['enroll_mode']??'section')==='section') ? '' : 'active' ?>"
-        id="panel-individual">
-        <?php if ($student_count === 0): ?>
-        <div class="empty-state">
-          <i class="ti ti-users-off"></i>
-          <p>No students yet.<br>
-            <!-- <a href="/classroomv2/teacher/students.php" style="color:var(--accent)">Add students first →</a> -->
-          </p>
-        </div>
-        <?php else: ?>
-        <div class="checklist-header">
-          <div class="search-input-wrap">
-            <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text7);font-size:13px;pointer-events:none;"></i>
-            <input type="text" id="srch" placeholder="Search students…" oninput="filterStudents()">
-          </div>
-          <div class="checklist-actions">
-            <button type="button" class="btn btn-sm btn-outline" onclick="selectAll(true)">
-              <i class="ti ti-check"></i> All
-            </button>
-            <button type="button" class="btn btn-sm btn-outline" onclick="selectAll(false)">
-              <i class="ti ti-x"></i> None
-            </button>
-          </div>
-        </div>
-        <div class="selected-counter">
-          <i class="ti ti-users"></i>
-          <span id="sel_count">0</span> of <?= $student_count ?> selected
-        </div>
-<div class="student-list" id="studentList">
-  <?php while ($s = $all_students->fetch_assoc()):
-    $checked  = in_array($s['student_id'], $_POST['enrollees'] ?? []);
-    $initials = strtoupper(substr($s['last_name'], 0, 1) . substr($s['first_name'], 0, 1));
-  ?>
-  <label class="enrollee-row"
-    data-name="<?= strtolower($s['last_name'].' '.$s['first_name'].' '.$s['student_id']) ?>">
-    <input type="checkbox" name="enrollees[]"
-      value="<?= htmlspecialchars($s['student_id']) ?>"
-      class="enr-check"
-      <?= $checked ? 'checked' : '' ?>
-      onchange="countSelected()">
-    <div class="enr-avatar"><?= $initials ?></div>
-    <div style="flex:1;">
-      <div class="enr-name"><?= htmlspecialchars($s['last_name'].', '.$s['first_name']) ?></div>
-      <div class="enr-id"><?= htmlspecialchars($s['student_id']) ?></div>
-    </div>
-  </label>
-  <?php endwhile; ?>
-</div>
-        <?php endif; ?>
-      </div><!-- end panel-individual -->
-
-      <div class="divider"></div>
+    <div style="margin-top:24px;">
       <button type="submit" name="save_subject" class="btn btn-primary" id="deployBtn">
         <i class="ti ti-rocket"></i> Deploy Subject
       </button>
-    </div><!-- end right card -->
+    </div>
 
   </div>
   </form>
@@ -603,73 +454,6 @@ function updateWeights() {
   document.getElementById('lbl_a').textContent = `Attendance ${a}%`;
 }
 
-// ── Enrollment tabs ──────────────────────────────────────────
-let activeTab = document.getElementById('enroll_mode_input').value === 'section' ? 'section' : 'individual';
-
-function switchTab(tab) {
-  activeTab = tab;
-  document.getElementById('enroll_mode_input').value = tab;
-  document.getElementById('tab-section').classList.toggle('active',   tab==='section');
-  document.getElementById('tab-individual').classList.toggle('active', tab==='individual');
-  document.getElementById('panel-section').classList.toggle('active',   tab==='section');
-  document.getElementById('panel-individual').classList.toggle('active', tab==='individual');
-}
-
-// ── Section selection ────────────────────────────────────────
-let selectedSectionId = <?= $prefill_section ?: 0 ?>;
-
-function selectSection(id) {
-  // Deselect previous
-  if (selectedSectionId) {
-    const prev = document.getElementById('secopt-'+selectedSectionId);
-    const prevIcon = document.getElementById('secicon-'+selectedSectionId);
-    if (prev) prev.classList.remove('selected');
-    if (prevIcon) { prevIcon.className='ti ti-circle'; prevIcon.style.color='var(--text3)'; }
-  }
-  // Toggle
-  if (selectedSectionId === id) {
-    selectedSectionId = 0;
-    document.getElementById('enroll_section_id').value = 0;
-    return;
-  }
-  selectedSectionId = id;
-  document.getElementById('enroll_section_id').value = id;
-  const card = document.getElementById('secopt-'+id);
-  const icon = document.getElementById('secicon-'+id);
-  if (card) card.classList.add('selected');
-  if (icon) { icon.className='ti ti-circle-check'; icon.style.color='var(--green)'; }
-}
-
-// ── Individual checklist ─────────────────────────────────────
-function countSelected() {
-  const n = document.querySelectorAll('.enr-check:checked').length;
-  const el = document.getElementById('sel_count');
-  if (el) el.textContent = n;
-}
-function selectAll(val) {
-  document.querySelectorAll('.enrollee-row').forEach(row => {
-    if (row.style.display==='none') return;
-    const cb = row.querySelector('.enr-check');
-    if (!cb) return;
-    cb.checked = val;
-    row.classList.toggle('selected', val);
-  });
-  countSelected();
-}
-function toggleRow(row) {
-  const cb = row.querySelector('.enr-check');
-  if (!cb) return;
-  cb.checked = !cb.checked;
-  row.classList.toggle('selected', cb.checked);
-  countSelected();
-}
-function filterStudents() {
-  const q = document.getElementById('srch').value.toLowerCase();
-  document.querySelectorAll('.enrollee-row').forEach(row => {
-    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
-  });
-}
-
 // ── Navbar dropdown ──────────────────────────────────────────
 function toggleDD() {
   const m = document.getElementById('ddMenu');
@@ -685,8 +469,6 @@ document.addEventListener('click', e => {
 
 // ── Init ─────────────────────────────────────────────────────
 updateWeights();
-countSelected();
-switchTab(activeTab);
 const savedType = document.getElementById('subject_type_hidden').value;
 if (savedType) selectType(savedType);
 </script>
