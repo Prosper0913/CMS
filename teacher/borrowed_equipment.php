@@ -97,7 +97,7 @@ $status_badge = [
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-tools" style="color:var(--accent)"></i> FPST Borrowed Equipment</h1>
+    <h1><i class="ti ti-tools text-accent"></i> FPST Borrowed Equipment</h1>
     <p>Equipment borrow records synced from the FPST Inventory System for your FPST subjects.</p>
   </div>
   <hr class="thin-line" style="margin-bottom:25px;">

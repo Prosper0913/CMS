@@ -387,7 +387,7 @@ $active_nav = 'import';
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-file-import" style="color:var(--accent)"></i> Import Students</h1>
+    <h1><i class="ti ti-file-import text-accent"></i> Import Students</h1>
     <p>Bulk-enroll students from a CSV or Excel file instead of adding them one at a time.</p>
   </div>
   <hr class="thin-line" style="margin-bottom: 25px;">
@@ -408,7 +408,7 @@ $active_nav = 'import';
         </p>
         <form method="POST" enctype="multipart/form-data">
           <div class="form-group">
-            <label>File <span style="color:var(--red)">*</span></label>
+            <label>File <span class="text-red">*</span></label>
             <input type="file" name="import_file" class="form-control"
                    accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
           </div>

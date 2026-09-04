@@ -174,7 +174,7 @@ $pass = $fg >= 75;
         </div>
         <div class="grade-label">Final Grade</div>
         <?php else: ?>
-        <div class="grade-big" style="color:var(--text7);">—</div>
+        <div class="grade-big text-muted">—</div>
         <div class="grade-label">No grade yet</div>
         <?php endif; ?>
       </div>
@@ -287,7 +287,7 @@ $pass = $fg >= 75;
     <p class="card-title"><i class="ti ti-calendar-check" style="color:var(--purple);"></i> Attendance Summary</p>
     <div class="att-summary">
       <div class="att-chip" style="border-top:2px solid var(--green);">
-        <div class="att-chip-val" style="color:var(--green);"><?php echo $att_present; ?></div>
+        <div class="att-chip-val text-green"><?php echo $att_present; ?></div>
         <div class="att-chip-lbl">Present</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--yellow);">
@@ -295,7 +295,7 @@ $pass = $fg >= 75;
         <div class="att-chip-lbl">Late</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--red);">
-        <div class="att-chip-val" style="color:var(--red);"><?php echo $att_absent; ?></div>
+        <div class="att-chip-val text-red"><?php echo $att_absent; ?></div>
         <div class="att-chip-lbl">Absent</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--border2);">
@@ -349,8 +349,8 @@ $pass = $fg >= 75;
 
     <?php if (empty($comp_scores)): ?>
     <div class="empty-state">
-      <i class="ti <?php echo $comp_icon; ?>"  style="color: var(--text7);"></i>
-      <p  style="color: var(--text7);">No <?php echo strtolower($comp_name); ?> scores recorded yet.</p>
+      <i class="ti <?php echo $comp_icon; ?> text-muted"></i>
+      <p  class="text-muted">No <?php echo strtolower($comp_name); ?> scores recorded yet.</p>
     </div>
     <?php else: ?>
     <div class="table-wrap">
@@ -416,15 +416,15 @@ $pass = $fg >= 75;
 
     <?php if ($att_total === 0): ?>
     <div class="empty-state">
-      <i class="ti ti-calendar-off"  style="color: var(--text7);"></i>
-      <p  style="color: var(--text7);">No attendance records yet.</p>
+      <i class="ti ti-calendar-off text-muted"></i>
+      <p  class="text-muted">No attendance records yet.</p>
     </div>
     <?php else: ?>
 
     <!-- Summary chips -->
     <div class="att-summary">
       <div class="att-chip" style="border-top:2px solid var(--green);">
-        <div class="att-chip-val" style="color:var(--green);"><?php echo $att_present; ?></div>
+        <div class="att-chip-val text-green"><?php echo $att_present; ?></div>
         <div class="att-chip-lbl">Present</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--yellow);">
@@ -432,7 +432,7 @@ $pass = $fg >= 75;
         <div class="att-chip-lbl">Late</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--red);">
-        <div class="att-chip-val" style="color:var(--red);"><?php echo $att_absent; ?></div>
+        <div class="att-chip-val text-red"><?php echo $att_absent; ?></div>
         <div class="att-chip-lbl">Absent</div>
       </div>
       <div class="att-chip" style="border-top:2px solid var(--border2);">
@@ -487,8 +487,8 @@ $pass = $fg >= 75;
 
     <?php if (empty($announcements)): ?>
     <div class="empty-state">
-      <i class="ti ti-speakerphone-off" style="color:var(--text7);"></i>
-      <p style="color:var(--text7);">No announcements posted for this subject yet.</p>
+      <i class="ti ti-speakerphone-off text-muted"></i>
+      <p class="text-muted">No announcements posted for this subject yet.</p>
     </div>
     <?php else: foreach ($announcements as $ann): ?>
     <div style="padding:14px 0;border-top:1px solid var(--border);">

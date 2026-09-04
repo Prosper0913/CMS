@@ -367,7 +367,7 @@ $active_nav = 'sections';
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-building-community" style="color:var(--accent)"></i> Manage Sections</h1>
+    <h1><i class="ti ti-building-community text-accent"></i> Manage Sections</h1>
     <p>Create sections and manage their rosters. Teachers request a section be enrolled into their subject — approve those requests below.</p>
   </div>
 
@@ -526,10 +526,10 @@ $active_nav = 'sections';
 <!-- Create Modal -->
 <div class="modal-overlay" id="createModal">
   <div class="modal">
-    <h3><i class="ti ti-plus" style="color:var(--accent);"></i> Create Section</h3>
+    <h3><i class="ti ti-plus text-accent"></i> Create Section</h3>
     <form method="POST">
       <div class="form-group">
-        <label>Section Name <span style="color:var(--red)">*</span></label>
+        <label>Section Name <span class="text-red">*</span></label>
         <input type="text" name="section_name" class="form-control" required placeholder="e.g. BSIT 3A">
       </div>
       <div class="form-group">
@@ -554,7 +554,7 @@ $active_nav = 'sections';
         <input type="text" name="section_desc" class="form-control">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="create_section" class="btn btn-primary" style="flex:1;justify-content:center;"><i class="ti ti-check"></i> Create</button>
+        <button type="submit" name="create_section" class="btn btn-primary btn-fill"><i class="ti ti-check"></i> Create</button>
         <button type="button" class="btn btn-outline" onclick="closeCreateModal()">Cancel</button>
       </div>
     </form>
@@ -564,11 +564,11 @@ $active_nav = 'sections';
 <!-- Edit Modal -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
-    <h3><i class="ti ti-edit" style="color:var(--accent);"></i> Edit Section</h3>
+    <h3><i class="ti ti-edit text-accent"></i> Edit Section</h3>
     <form method="POST">
       <input type="hidden" name="sec_id" value="<?php echo $active_sec_id; ?>">
       <div class="form-group">
-        <label>Section Name <span style="color:var(--red)">*</span></label>
+        <label>Section Name <span class="text-red">*</span></label>
         <input type="text" name="section_name" class="form-control" required
           value="<?php echo htmlspecialchars($active_section['section_name'] ?? ''); ?>">
       </div>
@@ -595,7 +595,7 @@ $active_nav = 'sections';
         <input type="text" name="section_desc" class="form-control" value="<?php echo htmlspecialchars($active_section['description'] ?? ''); ?>">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="update_section" class="btn btn-primary" style="flex:1;justify-content:center;"><i class="ti ti-check"></i> Save</button>
+        <button type="submit" name="update_section" class="btn btn-primary btn-fill"><i class="ti ti-check"></i> Save</button>
         <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
       </div>
     </form>
@@ -605,12 +605,12 @@ $active_nav = 'sections';
 <!-- Delete Modal -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal">
-    <h3><i class="ti ti-alert-triangle" style="color:var(--red);"></i> Delete Section</h3>
+    <h3><i class="ti ti-alert-triangle text-red"></i> Delete Section</h3>
     <p class="modal-sub" id="deleteModalMsg">Students will not be deleted — only the section itself and its roster link.</p>
     <form method="POST">
       <input type="hidden" name="sec_id" id="deleteSectionId">
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="delete_section" class="btn btn-danger" style="flex:1;justify-content:center;"><i class="ti ti-trash"></i> Yes, Delete</button>
+        <button type="submit" name="delete_section" class="btn btn-danger btn-fill"><i class="ti ti-trash"></i> Yes, Delete</button>
         <button type="button" class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
       </div>
     </form>
@@ -620,7 +620,7 @@ $active_nav = 'sections';
 <!-- Add Student Modal -->
 <div class="modal-overlay" id="addStudentModal">
   <div class="modal">
-    <h3><i class="ti ti-user-plus" style="color:var(--accent);"></i> Add Student to Section</h3>
+    <h3><i class="ti ti-user-plus text-accent"></i> Add Student to Section</h3>
     <?php if (!empty($active_section['course'])): ?>
     <p style="font-size:12px;color:var(--text7);margin-top:-6px;">
       Showing students in <strong><?php echo htmlspecialchars($active_section['course']); ?></strong> (plus students with no course set).
@@ -643,7 +643,7 @@ $active_nav = 'sections';
         </select>
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="add_to_section" class="btn btn-primary" style="flex:1;justify-content:center;"><i class="ti ti-user-plus"></i> Add</button>
+        <button type="submit" name="add_to_section" class="btn btn-primary btn-fill"><i class="ti ti-user-plus"></i> Add</button>
         <button type="button" class="btn btn-outline" onclick="closeAddStudentModal()">Cancel</button>
       </div>
     </form>

@@ -212,7 +212,7 @@ $active_nav = 'section_requests';
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-hand-stop" style="color:var(--accent)"></i> Section Requests</h1>
+    <h1><i class="ti ti-hand-stop text-accent"></i> Section Requests</h1>
     <p>Approve teacher requests for sections in your pool, or grant a section directly.</p>
   </div>
   <hr class="thin-line" style="margin-bottom: 25px;">
@@ -318,9 +318,9 @@ $active_nav = 'section_requests';
         <ul style="font-size:12.5px;line-height:1.9;padding-left:0;margin:0;list-style:none;">
           <?php foreach ($recent_grants as $g): ?>
           <li style="padding:8px 0;border-bottom:1px solid var(--border);">
-            <?php if ($g['status'] === 'approved'): ?><i class="ti ti-check" style="color:var(--green);"></i><?php else: ?><i class="ti ti-x" style="color:var(--red);"></i><?php endif; ?>
+            <?php if ($g['status'] === 'approved'): ?><i class="ti ti-check text-green"></i><?php else: ?><i class="ti ti-x text-red"></i><?php endif; ?>
             <b><?php echo htmlspecialchars($g['teacher_username']); ?></b> &middot; <?php echo htmlspecialchars($g['section_name']); ?>
-            &middot; <span style="color:var(--text7);"><?php echo ucfirst($g['status']); ?></span>
+            &middot; <span class="text-muted"><?php echo ucfirst($g['status']); ?></span>
             <br>
             <span style="color:var(--text7);font-size:11.5px;"><?php echo htmlspecialchars($g['responded_at']); ?><?php if ($g['message']) echo ' — '.htmlspecialchars($g['message']); ?></span>
           </li>

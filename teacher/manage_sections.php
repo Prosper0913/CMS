@@ -702,7 +702,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <!-- Incoming: requests other teachers sent me -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-inbox" style="color:var(--accent);"></i>
+        <i class="ti ti-inbox text-accent"></i>
         Incoming Requests
         <?php if ($pending_incoming_count > 0): ?>
           <span class="card-title-right" style="font-family:var(--font-mono);font-size:11px;color:var(--text7);">
@@ -750,7 +750,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <!-- Outgoing: requests I've sent -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-send" style="color:var(--accent);"></i>
+        <i class="ti ti-send text-accent"></i>
         My Requests
       </p>
       <?php if (empty($outgoing_requests)): ?>
@@ -1033,12 +1033,12 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 <!-- Edit Section Modal -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
-    <h3><i class="ti ti-edit" style="color:var(--accent);"></i> Edit Section</h3>
+    <h3><i class="ti ti-edit text-accent"></i> Edit Section</h3>
     <p class="modal-sub">Update the section name or description.</p>
     <form method="POST">
       <input type="hidden" name="sec_id" value="<?php echo $active_sec_id; ?>">
       <div class="form-group">
-        <label>Section Name <span style="color:var(--red)">*</span></label>
+        <label>Section Name <span class="text-red">*</span></label>
         <input type="text" name="new_name" class="form-control" id="editNameInput"
           value="<?php echo htmlspecialchars($active_section['section_name'] ?? ''); ?>" required>
       </div>
@@ -1048,7 +1048,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
           value="<?php echo htmlspecialchars($active_section['description'] ?? ''); ?>">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="rename_section" class="btn btn-primary" style="flex:1;justify-content:center;">
+        <button type="submit" name="rename_section" class="btn btn-primary btn-fill">
           <i class="ti ti-check"></i> Save Changes
         </button>
         <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
@@ -1060,12 +1060,12 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 <!-- Delete Confirm Modal -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal">
-    <h3><i class="ti ti-alert-triangle" style="color:var(--red);"></i> Delete Section</h3>
+    <h3><i class="ti ti-alert-triangle text-red"></i> Delete Section</h3>
     <p class="modal-sub" id="deleteModalMsg">Are you sure? Students in this section will not be deleted — they will remain enrolled in any subjects they were added to.</p>
     <form method="POST">
       <input type="hidden" name="sec_id" id="deleteSectionId">
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="delete_section" class="btn btn-danger" style="flex:1;justify-content:center;">
+        <button type="submit" name="delete_section" class="btn btn-danger btn-fill">
           <i class="ti ti-trash"></i> Yes, Delete Section
         </button>
         <button type="button" class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
@@ -1100,7 +1100,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
           placeholder="e.g. I'd like to use this section for my Fil 2 class">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="send_section_request" class="btn btn-primary" style="flex:1;justify-content:center;">
+        <button type="submit" name="send_section_request" class="btn btn-primary btn-fill">
           <i class="ti ti-send"></i> Send Request
         </button>
         <button type="button" class="btn btn-outline" onclick="closeRequestModal()">Cancel</button>
@@ -1140,7 +1140,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
           placeholder="e.g. I'd like to use this section for my Fil 2 class">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="send_admin_section_request" class="btn btn-primary" style="flex:1;justify-content:center;">
+        <button type="submit" name="send_admin_section_request" class="btn btn-primary btn-fill">
           <i class="ti ti-send"></i> Send Request
         </button>
         <button type="button" class="btn btn-outline" onclick="closeAdminRequestModal()">Cancel</button>
@@ -1181,7 +1181,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         </select>
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="add_to_section" class="btn btn-primary" style="flex:1;justify-content:center;">
+        <button type="submit" name="add_to_section" class="btn btn-primary btn-fill">
           <i class="ti ti-user-plus"></i> Add to Section
         </button>
         <button type="button" class="btn btn-outline" onclick="closeAddStudentModal()">Cancel</button>

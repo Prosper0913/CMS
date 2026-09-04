@@ -100,7 +100,7 @@ $type_icons = [
   <?php if (empty($notifications)): ?>
   <div class="empty-state">
     <i class="ti ti-bell-off" style="color:var(--yellow2);"></i>
-    <p style="color: var(--text7);">No notifications yet.</p>
+    <p class="text-muted">No notifications yet.</p>
   </div>
   <?php else: ?>
   <div class="card">

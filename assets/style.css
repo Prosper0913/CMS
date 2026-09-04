@@ -5063,3 +5063,14 @@ color:var(--text7);
   font-size: 9.5px;
   color: var(--text3);
 }
+
+
+/* ============================================================
+   UTILITY CLASSES — extracted from the most-repeated inline
+   styles across the codebase, to reduce style="..." clutter.
+   ============================================================ */
+.text-red    { color: var(--red); }
+.text-green  { color: var(--green); }
+.text-accent { color: var(--accent); }
+.text-muted  { color: var(--text7); }
+.btn-fill    { flex: 1; justify-content: center; }

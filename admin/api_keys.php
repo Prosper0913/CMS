@@ -103,7 +103,7 @@ $active_nav = 'api_keys';
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-key" style="color:var(--accent)"></i> API Keys</h1>
+    <h1><i class="ti ti-key text-accent"></i> API Keys</h1>
     <p>Manage access for any external system that connects to this CMS — each key is scoped to one course.</p>
   </div>
   <hr class="thin-line" style="margin-bottom: 25px;">
@@ -217,10 +217,10 @@ $active_nav = 'api_keys';
           <ul style="font-size:12.5px;line-height:1.9;padding-left:0;margin:0;list-style:none;">
             <?php foreach ($recent_log as $l): ?>
             <li style="padding:8px 0;border-bottom:1px solid var(--border);">
-              <?php if ($l['success']): ?><i class="ti ti-check" style="color:var(--green);"></i><?php else: ?><i class="ti ti-x" style="color:var(--red);"></i><?php endif; ?>
+              <?php if ($l['success']): ?><i class="ti ti-check text-green"></i><?php else: ?><i class="ti ti-x text-red"></i><?php endif; ?>
               <b><?php echo htmlspecialchars($l['client_name'] ?? 'Unknown key'); ?></b>
               &middot; <code style="font-size:11px;"><?php echo htmlspecialchars($l['endpoint']); ?></code>
-              &middot; <span style="color:var(--text7);"><?php echo htmlspecialchars($l['ip_address']); ?></span>
+              &middot; <span class="text-muted"><?php echo htmlspecialchars($l['ip_address']); ?></span>
               <br>
               <span style="color:var(--text7);font-size:11.5px;"><?php echo htmlspecialchars($l['created_at']); ?><?php if (!$l['success']) echo ' — ' . htmlspecialchars($l['message']); ?></span>
             </li>

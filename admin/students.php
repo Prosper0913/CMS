@@ -285,7 +285,7 @@ $active_nav = 'students';
 <div class="page-wrap">
   <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div>
-      <h1><i class="ti ti-users" style="color:var(--accent)"></i> Manage Students</h1>
+      <h1><i class="ti ti-users text-accent"></i> Manage Students</h1>
       <p>Every student in the system. <?php echo (int)$total_students; ?> total.</p>
     </div>
     <a href="import_students.php" class="btn btn-outline btn-sm">
@@ -311,12 +311,12 @@ $active_nav = 'students';
         <form method="POST">
           <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($edit_data['student_id']); ?>">
           <div class="form-group">
-            <label>Last Name <span style="color:var(--red)">*</span></label>
+            <label>Last Name <span class="text-red">*</span></label>
             <input type="text" name="last_name" class="form-control"
               value="<?php echo htmlspecialchars($edit_data['last_name']); ?>" required>
           </div>
           <div class="form-group">
-            <label>First Name <span style="color:var(--red)">*</span></label>
+            <label>First Name <span class="text-red">*</span></label>
             <input type="text" name="first_name" class="form-control"
               value="<?php echo htmlspecialchars($edit_data['first_name']); ?>" required>
           </div>
@@ -331,7 +331,7 @@ $active_nav = 'students';
               value="<?php echo htmlspecialchars($edit_data['email'] ?? ''); ?>">
           </div>
           <div class="form-group">
-            <label>Course <span style="color:var(--red)">*</span></label>
+            <label>Course <span class="text-red">*</span></label>
             <select name="course" class="form-control" required>
               <option value="">Select course</option>
               <?php foreach (['BSIT','LAED','BSBA','BSN','FPST','BSA'] as $c): ?>
@@ -340,7 +340,7 @@ $active_nav = 'students';
             </select>
           </div>
           <div class="form-group">
-            <label>Username <span style="color:var(--red)">*</span></label>
+            <label>Username <span class="text-red">*</span></label>
             <input type="text" name="username" class="form-control"
               value="<?php echo htmlspecialchars($edit_data['username']); ?>" required autocomplete="off">
           </div>
@@ -356,7 +356,7 @@ $active_nav = 'students';
               <p style="font-size:12px;color:var(--text7);margin:0;">Not in any section yet.</p>
             <?php endif; ?>
             <p style="font-size:11px;color:var(--text7);margin-top:6px;">
-              Section membership is managed from <a href="sections.php" style="color:var(--accent)">Manage Sections</a>.
+              Section membership is managed from <a href="sections.php" class="text-accent">Manage Sections</a>.
             </p>
           </div>
           <div style="display:flex;gap:8px;">
@@ -370,15 +370,15 @@ $active_nav = 'students';
         <p class="card-title"><i class="ti ti-user-plus"></i> Add Student</p>
         <form method="POST">
           <div class="form-group">
-            <label>Student ID <span style="color:var(--red)">*</span></label>
+            <label>Student ID <span class="text-red">*</span></label>
             <input type="text" name="student_id" class="form-control" placeholder="Enter student ID" required>
           </div>
           <div class="form-group">
-            <label>Last Name <span style="color:var(--red)">*</span></label>
+            <label>Last Name <span class="text-red">*</span></label>
             <input type="text" name="last_name" class="form-control" placeholder="Enter last name" required>
           </div>
           <div class="form-group">
-            <label>First Name <span style="color:var(--red)">*</span></label>
+            <label>First Name <span class="text-red">*</span></label>
             <input type="text" name="first_name" class="form-control" placeholder="Enter first name" required>
           </div>
           <div class="form-group">
@@ -390,7 +390,7 @@ $active_nav = 'students';
             <input type="email" name="email" class="form-control" placeholder="Enter email">
           </div>
           <div class="form-group">
-            <label>Course <span style="color:var(--red)">*</span></label>
+            <label>Course <span class="text-red">*</span></label>
             <select name="course" class="form-control" required>
               <option value="">Select course</option>
               <?php foreach (['BSIT','LAED','BSBA','BSN','FPST','BSA'] as $c): ?>
@@ -402,11 +402,11 @@ $active_nav = 'students';
             </p>
           </div>
           <div class="form-group">
-            <label>Username <span style="color:var(--red)">*</span></label>
+            <label>Username <span class="text-red">*</span></label>
             <input type="text" name="username" class="form-control" placeholder="Enter username" required autocomplete="off">
           </div>
           <div class="form-group">
-            <label>Password <span style="color:var(--red)">*</span></label>
+            <label>Password <span class="text-red">*</span></label>
             <input type="password" name="password" class="form-control" placeholder="Enter password" required autocomplete="new-password">
           </div>
           <div class="form-group">
@@ -476,7 +476,7 @@ $active_nav = 'students';
           <tbody>
             <?php if ($students->num_rows === 0): ?>
             <tr><td colspan="7">
-              <div class="empty-state" style="color: var(--text7);">
+              <div class="empty-state text-muted">
                 <i class="ti ti-users-off"></i>
                 <p><?php echo $search ? "No students matched \"$search\"" : "No students found."; ?></p>
               </div>
@@ -493,7 +493,7 @@ $active_nav = 'students';
                     <div style="font-weight:500;">
                       <?php echo htmlspecialchars($s['last_name'].', '.$s['first_name']); ?>
                       <?php if ($s['middle_initial']): ?>
-                        <span style="color:var(--text7)"><?php echo htmlspecialchars($s['middle_initial']); ?></span>
+                        <span class="text-muted"><?php echo htmlspecialchars($s['middle_initial']); ?></span>
                       <?php endif; ?>
                       <?php if (!empty($s['has_active_referral'])): ?>
                         <span style="display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;background:rgba(234,88,12,.12);color:#c2410c;border:1px solid rgba(234,88,12,.25);margin-left:6px;vertical-align:middle;" title="This student has an active referral in the Guidance Appointment System. Last synced: <?php echo htmlspecialchars($s['referral_flag_synced_at'] ?? 'unknown'); ?>">
@@ -518,7 +518,7 @@ $active_nav = 'students';
                 <?php if ($s['section_names']): ?>
                   <?php echo htmlspecialchars($s['section_names']); ?>
                 <?php else: ?>
-                  <span style="color:var(--text7);">Unassigned</span>
+                  <span class="text-muted">Unassigned</span>
                 <?php endif; ?>
               </td>
               <td>
@@ -570,7 +570,7 @@ $active_nav = 'students';
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="reset_password" class="btn btn-sm btn-yellow" style="flex:1;justify-content:center;">
+        <button type="submit" name="reset_password" class="btn btn-sm btn-yellow btn-fill">
           <i class="ti ti-check"></i> Reset Password
         </button>
         <button type="button" class="btn btn-sm btn-outline" onclick="closeResetModal()">Cancel</button>

@@ -221,7 +221,7 @@ $active_nav = "students";
         </p>
         <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:10px;">
           To add or remove which students are in your classes, use
-          <a href="manage_sections.php" style="color:var(--accent)">Manage Sections</a>.
+          <a href="manage_sections.php" class="text-accent">Manage Sections</a>.
         </p>
       </div>
     </div>
@@ -358,7 +358,7 @@ $active_nav = "students";
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="reset_password" class="btn btn-sm btn-yellow" style="flex:1;justify-content:center;">
+        <button type="submit" name="reset_password" class="btn btn-sm btn-yellow btn-fill">
           <i class="ti ti-check"></i> Reset Password
         </button>
         <button type="button" class="btn btn-sm btn-outline" onclick="closeResetModal()">

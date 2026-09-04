@@ -930,11 +930,11 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
       <div class="hstat-lbl">Class Avg</div>
     </div>
     <div class="hstat">
-      <div class="hstat-val" style="color:var(--green)"><?php echo $st['passing'] ?? 0; ?></div>
+      <div class="hstat-val text-green"><?php echo $st['passing'] ?? 0; ?></div>
       <div class="hstat-lbl">Passing</div>
     </div>
     <div class="hstat">
-      <div class="hstat-val" style="color:var(--red)"><?php echo $st['failing'] ?? 0; ?></div>
+      <div class="hstat-val text-red"><?php echo $st['failing'] ?? 0; ?></div>
       <div class="hstat-lbl">Failing</div>
     </div>
     <div class="hstat">
@@ -1096,7 +1096,7 @@ $sv_comp_colors = [
   <!-- At-risk students -->
   <div class="card">
     <p class="card-title">
-      <i class="ti ti-alert-triangle" style="color:var(--red);"></i>
+      <i class="ti ti-alert-triangle text-red"></i>
       At-Risk Students
       <?php if ($sv_risk->num_rows > 0): ?>
         <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--red);">
@@ -1128,7 +1128,7 @@ $sv_comp_colors = [
   <!-- Top & Lowest performers (latest activity in this subject) -->
   <div class="card">
     <p class="card-title">
-      <i class="ti ti-trophy" style="color:var(--text7);"></i>
+      <i class="ti ti-trophy text-muted"></i>
       Top &amp; Lowest Performers
     </p>
     <?php if (!$sv_latest_activity): ?>
@@ -1138,11 +1138,11 @@ $sv_comp_colors = [
       </div>
     <?php else: ?>
       <div style="font-size:11px;color:var(--text7);margin-bottom:10px;">
-        Based on: <strong style="color:var(--text7);"><?php echo htmlspecialchars($sv_latest_activity['entry_name']); ?></strong>
+        Based on: <strong class="text-muted"><?php echo htmlspecialchars($sv_latest_activity['entry_name']); ?></strong>
         &nbsp;·&nbsp; <?php echo date('M d', strtotime($sv_latest_activity['date_given'])); ?>
       </div>
 
-      <div class="perf-subhead" style="color:var(--green);">
+      <div class="perf-subhead text-green">
         <i class="ti ti-arrow-up"></i> Top Performers
       </div>
       <?php if (empty($sv_perf_top)): ?>
@@ -1160,7 +1160,7 @@ $sv_comp_colors = [
             <div class="perf-name"><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></div>
             <div class="perf-sub"><?php echo (int)$r['score'].'/'.(int)$r['total_items']; ?></div>
           </div>
-          <div class="perf-score" style="color:var(--green);"><?php echo $sv_pct; ?>%</div>
+          <div class="perf-score text-green"><?php echo $sv_pct; ?>%</div>
         </div>
         <?php endforeach; ?>
       <?php endif; ?>
@@ -1183,7 +1183,7 @@ $sv_comp_colors = [
             <div class="perf-name"><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></div>
             <div class="perf-sub"><?php echo (int)$r['score'].'/'.(int)$r['total_items']; ?></div>
           </div>
-          <div class="perf-score" style="color:var(--red);"><?php echo $sv_pct; ?>%</div>
+          <div class="perf-score text-red"><?php echo $sv_pct; ?>%</div>
         </div>
         <?php endforeach; ?>
       <?php endif; ?>
@@ -1193,7 +1193,7 @@ $sv_comp_colors = [
   <!-- Recent score entries -->
   <div class="card">
     <p class="card-title">
-      <i class="ti ti-activity" style="color:var(--green);"></i>
+      <i class="ti ti-activity text-green"></i>
       Recent Entries
     </p>
     <?php if ($sv_recent->num_rows === 0): ?>
@@ -1380,7 +1380,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
     <div class="card">
       <div class="empty-state">
         <i class="ti <?php echo $comp_icon; ?>" style="color:<?php echo $comp_color; ?>"></i>
-        <p style="color:var(--text7);">No <?php echo $comp_label; ?> entries yet.</p>
+        <p class="text-muted">No <?php echo $comp_label; ?> entries yet.</p>
         <p style="font-size:12px;margin-top:6px;color:var(--text7);">Use the form on the left to add scores.</p>
       </div>
     </div>
@@ -1405,8 +1405,8 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
             </p>
             <div style="display:flex;gap:10px;font-size:12px;color:var(--text7);flex-wrap:wrap;">
               <span><i class="ti ti-calendar" style="font-size:12px;"></i> <?php echo $date; ?></span>
-              <span>Total items: <strong style="color:var(--text7)"><?php echo $total; ?></strong></span>
-              <span>Students: <strong style="color:var(--text7)"><?php echo count($rows); ?></strong></span>
+              <span>Total items: <strong class="text-muted"><?php echo $total; ?></strong></span>
+              <span>Students: <strong class="text-muted"><?php echo count($rows); ?></strong></span>
               <span>Class avg:
                 <strong style="color:<?php echo $avg_pct >= 75 ? 'var(--green)' : 'var(--red)'; ?>">
                   <?php echo number_format($avg_pct, 1); ?>%
@@ -1683,8 +1683,8 @@ elseif ($active_tab === 'attendance'):
 
       <?php if (empty($att_dates)): ?>
       <div class="empty-state">
-        <i class="ti ti-calendar-off" style="color:var(--text7)"></i>
-        <p style="color:var(--text7)">No attendance records yet.</p>
+        <i class="ti ti-calendar-off text-muted"></i>
+        <p class="text-muted">No attendance records yet.</p>
       </div>
       <?php else: ?>
 
@@ -1711,9 +1711,9 @@ elseif ($active_tab === 'attendance'):
                 <?php endif; ?>
               </p>
               <div style="display:flex;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap;">
-                <span style="color:var(--green);"><?php echo $day_counts['Present']; ?> Present</span>
-                <span style="color:var(--text7);"><?php echo $day_counts['Late']; ?> Late</span>
-                <span style="color:var(--red);"><?php echo $day_counts['Absent']; ?> Absent</span>
+                <span class="text-green"><?php echo $day_counts['Present']; ?> Present</span>
+                <span class="text-muted"><?php echo $day_counts['Late']; ?> Late</span>
+                <span class="text-red"><?php echo $day_counts['Absent']; ?> Absent</span>
               </div>
             </div>
           </div>
@@ -1825,7 +1825,7 @@ elseif ($active_tab === 'attendance'):
                     </td>-->
                     <td style="font-size:11px;color:var(--text7);">
                       <?php if ($ar['source'] === 'Biometric'): ?>
-                        <span style="color:var(--accent);"><i class="ti ti-fingerprint" style="font-size:12px;"></i> Bio</span>
+                        <span class="text-accent"><i class="ti ti-fingerprint" style="font-size:12px;"></i> Bio</span>
                       <?php elseif ($ar['source']): ?>
                         <?php echo htmlspecialchars($ar['source']); ?>
                       <?php else: ?>
@@ -1936,7 +1936,7 @@ elseif ($active_tab === 'biometric'):
       <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);
                   border-radius:var(--radius);padding:14px;margin-bottom:14px;">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px;">
-          <i class="ti ti-cpu" style="color:var(--green);"></i>
+          <i class="ti ti-cpu text-green"></i>
           <?php echo htmlspecialchars($active_bio_session['device_label']); ?>
         </div>
         <div style="font-size:12px;color:var(--text2);display:flex;flex-direction:column;gap:4px;">
@@ -1967,9 +1967,9 @@ elseif ($active_tab === 'biometric'):
 
       <?php elseif (empty($bio_devices)): ?>
       <div class="empty-state" style="padding:20px;">
-        <i class="ti ti-cpu-off" style="color: var(--text7);"></i>
-        <p style="color: var(--text7);">No devices assigned to this subject.<br>
-          <a href="/classroomv2/teacher/biometric.php" style="color:var(--accent);">
+        <i class="ti ti-cpu-off text-muted"></i>
+        <p class="text-muted">No devices assigned to this subject.<br>
+          <a href="/classroomv2/teacher/biometric.php" class="text-accent">
             Biometric Setup →
           </a>
         </p>
@@ -2425,7 +2425,7 @@ elseif ($active_tab === 'settings'):
       <input type="hidden" name="update_subject_meta">
       <div class="form-row">
         <div class="form-group">
-          <label>Subject Code <span style="color:var(--red)">*</span></label>
+          <label>Subject Code <span class="text-red">*</span></label>
           <input type="text" name="subject_code" class="form-control"
             value="<?php echo htmlspecialchars($subject['subject_code']); ?>" required>
         </div>
@@ -2436,7 +2436,7 @@ elseif ($active_tab === 'settings'):
         </div>
       </div>
       <div class="form-group">
-        <label>Subject Name <span style="color:var(--red)">*</span></label>
+        <label>Subject Name <span class="text-red">*</span></label>
         <input type="text" name="subject_name" class="form-control"
           value="<?php echo htmlspecialchars($subject['subject_name']); ?>" required>
       </div>
@@ -2468,7 +2468,7 @@ elseif ($active_tab === 'settings'):
         </select>
       </div>
       <div class="form-group">
-        <label>Class Schedule — Days <span style="color:var(--red)">*</span></label>
+        <label>Class Schedule — Days <span class="text-red">*</span></label>
         <div style="display:flex;flex-wrap:wrap;gap:10px;">
           <?php
           $current_days = array_filter(explode(',', $subject['schedule_days'] ?? ''));
@@ -2583,7 +2583,7 @@ elseif ($active_tab === 'settings'):
     <?php if ($not_enrolled_list): ?>
     <div class="enroll-block" style="margin-bottom:16px;">
       <p style="font-size:12px;font-weight:600;color:var(--text6);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">
-        <i class="ti ti-user-plus" style="color:var(--accent);"></i> Add Individual Student
+        <i class="ti ti-user-plus text-accent"></i> Add Individual Student
       </p>
       <form method="POST" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input type="hidden" name="enroll_single">
@@ -2629,7 +2629,7 @@ elseif ($active_tab === 'settings'):
         <div class="enrollee-name">
           <?php echo htmlspecialchars($en['last_name'] . ', ' . $en['first_name']); ?>
           <?php if ($en['middle_initial']): ?>
-          <span style="color:var(--text7);"><?php echo htmlspecialchars($en['middle_initial']); ?></span>
+          <span class="text-muted"><?php echo htmlspecialchars($en['middle_initial']); ?></span>
           <?php endif; ?>
         </div>
         <div class="enrollee-id">

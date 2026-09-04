@@ -214,7 +214,7 @@ $comp_colors = [
     <!-- At-risk students -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-alert-triangle" style="color:var(--red);"></i>
+        <i class="ti ti-alert-triangle text-red"></i>
         At-Risk Students
         <?php if ($risk_result->num_rows > 0): ?>
           <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--red);">
@@ -259,7 +259,7 @@ $comp_colors = [
 
       <?php if (empty($subject_perf)): ?>
         <div class="empty-state" style="padding:24px;">
-          <i class="ti ti-pencil-off" style="color: var(--text7);"></i>
+          <i class="ti ti-pencil-off text-muted"></i>
           <p class="grey-font">No score entries yet.</p>
         </div>
       <?php else: ?>
@@ -314,7 +314,7 @@ $comp_colors = [
                 <div class="perf-name"><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></div>
                 <div class="perf-sub"><?php echo (int)$r['score'].'/'.(int)$r['total_items']; ?></div>
               </div>
-              <div class="perf-score" style="color:var(--green);"><?php echo $pct; ?>%</div>
+              <div class="perf-score text-green"><?php echo $pct; ?>%</div>
             </div>
             <?php endforeach; ?>
 
@@ -336,7 +336,7 @@ $comp_colors = [
                   <div class="perf-name"><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></div>
                   <div class="perf-sub"><?php echo (int)$r['score'].'/'.(int)$r['total_items']; ?></div>
                 </div>
-                <div class="perf-score" style="color:var(--red);"><?php echo $pct; ?>%</div>
+                <div class="perf-score text-red"><?php echo $pct; ?>%</div>
               </div>
               <?php endforeach; ?>
             <?php endif; ?>
@@ -350,12 +350,12 @@ $comp_colors = [
     <!-- Recent score entries -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-activity" style="color: var(--green);"></i>
+        <i class="ti ti-activity text-green"></i>
         Recent Entries
       </p>
       <?php if ($recent->num_rows === 0): ?>
         <div class="empty-state" style="padding:24px;">
-          <i class="ti ti-pencil-off" style="color: var(--text7);"></i>
+          <i class="ti ti-pencil-off text-muted"></i>
           <p class="grey-font">No score entries yet.</p>
         </div>
       <?php else: ?>

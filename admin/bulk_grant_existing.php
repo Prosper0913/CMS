@@ -130,7 +130,7 @@ $pending_count = count(array_filter($pairs, fn($p) => !$p['already_granted']));
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-shield-check" style="color:var(--accent)"></i> Bulk Grant Existing Sections</h1>
+    <h1><i class="ti ti-shield-check text-accent"></i> Bulk Grant Existing Sections</h1>
     <p>One-time helper: find teachers actively using an admin-owned section, and grant each of them their own copy before section-gating locks them out.</p>
   </div>
   <hr class="thin-line" style="margin-bottom:25px;">

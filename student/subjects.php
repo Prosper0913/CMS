@@ -60,7 +60,7 @@ $type_colors = [
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-books" style="color:var(--accent)"></i> My Subjects</h1>
+    <h1><i class="ti ti-books text-accent"></i> My Subjects</h1>
     <p>Your enrolled subjects and grade breakdown for the current semester.</p>
   </div>
 
@@ -108,7 +108,7 @@ $type_colors = [
                   <div class="td-mono"><?php echo htmlspecialchars($sub['subject_code']); ?> · <?php echo htmlspecialchars($sub['section']); ?></div>
                   <?php $sched = formatSchedule($sub['schedule_days'] ?? '', $sub['schedule_start_time'] ?? '', $sub['schedule_end_time'] ?? ''); ?>
                   <?php if ($sched): ?>
-                  <div class="td-mono" style="color:var(--text7);"><i class="ti ti-clock" style="font-size:10px;"></i> <?php echo $sched; ?></div>
+                  <div class="td-mono text-muted"><i class="ti ti-clock" style="font-size:10px;"></i> <?php echo $sched; ?></div>
                   <?php endif; ?>
                 </div>
               </div>

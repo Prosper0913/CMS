@@ -173,7 +173,7 @@ $active_nav = 'teachers';
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-user-star" style="color:var(--accent)"></i> Manage Teachers</h1>
+    <h1><i class="ti ti-user-star text-accent"></i> Manage Teachers</h1>
     <p>Create, edit, and remove teacher accounts across the whole system.</p>
   </div>
 <hr class="thin-line" style="margin-bottom: 25px;">
@@ -195,12 +195,12 @@ $active_nav = 'teachers';
         <form method="POST">
           <input type="hidden" name="teacher_id" value="<?php echo (int)$edit_data['id']; ?>">
           <div class="form-group">
-            <label>Display Name <span style="color:var(--red)">*</span></label>
+            <label>Display Name <span class="text-red">*</span></label>
             <input type="text" name="display_name" class="form-control"
               value="<?php echo htmlspecialchars($edit_data['display_name'] ?? ''); ?>" required>
           </div>
           <div class="form-group">
-            <label>Username <span style="color:var(--red)">*</span></label>
+            <label>Username <span class="text-red">*</span></label>
             <input type="text" name="username" class="form-control"
               value="<?php echo htmlspecialchars($edit_data['username']); ?>" required autocomplete="off">
           </div>
@@ -215,25 +215,25 @@ $active_nav = 'teachers';
         <p class="card-title"><i class="ti ti-user-plus"></i> Add New Teacher</p>
         <form method="POST">
           <div class="form-group">
-            <label>Display Name <span style="color:var(--red)">*</span></label>
+            <label>Display Name <span class="text-red">*</span></label>
             <input type="text" name="display_name" class="form-control"
               placeholder="e.g. Prof. Anthony Dances"
               value="<?php echo htmlspecialchars($_POST['display_name'] ?? ''); ?>" required>
           </div>
           <div class="form-group">
-            <label>Username <span style="color:var(--red)">*</span></label>
+            <label>Username <span class="text-red">*</span></label>
             <input type="text" name="username" class="form-control"
               placeholder="e.g. prof_reyes"
               value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>" required
               autocomplete="off">
           </div>
           <div class="form-group">
-            <label>Password <span style="color:var(--red)">*</span></label>
+            <label>Password <span class="text-red">*</span></label>
             <input type="password" name="password" class="form-control"
               placeholder="Minimum 6 characters" required autocomplete="new-password">
           </div>
           <div class="form-group">
-            <label>Confirm Password <span style="color:var(--red)">*</span></label>
+            <label>Confirm Password <span class="text-red">*</span></label>
             <input type="password" name="confirm_password" class="form-control"
               placeholder="Repeat password" required autocomplete="new-password">
           </div>
@@ -324,7 +324,7 @@ $active_nav = 'teachers';
           placeholder="Minimum 6 characters" required minlength="6">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="reset_password" class="btn btn-sm btn-yellow" style="flex:1;justify-content:center;">
+        <button type="submit" name="reset_password" class="btn btn-sm btn-yellow btn-fill">
           <i class="ti ti-check"></i> Set Password
         </button>
         <button type="button" class="btn btn-sm btn-outline" onclick="closeReset()">Cancel</button>

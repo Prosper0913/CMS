@@ -219,13 +219,13 @@ $type_cfg = [
         <p class="card-title"><i class="ti ti-info-circle"></i> Subject Information</p>
         <div class="form-row">
           <div class="form-group">
-            <label>Subject Code <span style="color:var(--red)">*</span></label>
+            <label>Subject Code <span class="text-red">*</span></label>
             <input type="text" name="subject_code" class="form-control"
               placeholder="e.g. CC201"
               value="<?= htmlspecialchars($_POST['subject_code']??'') ?>" required>
           </div>
           <div class="form-group">
-            <label>Section <span style="color:var(--red)">*</span></label>
+            <label>Section <span class="text-red">*</span></label>
             <select name="section_id" class="form-control" required>
               <option value="">Select section</option>
               <?php
@@ -240,13 +240,13 @@ $type_cfg = [
             <p style="font-size:11px;color:var(--text7);margin-top:4px;">
               Every student currently in this section will be enrolled automatically.
               <?php if (empty($sections_list)): ?>
-                You don't have any sections yet — create one first in <a href="manage_sections.php" style="color:var(--accent)">Manage Sections</a>.
+                You don't have any sections yet — create one first in <a href="manage_sections.php" class="text-accent">Manage Sections</a>.
               <?php endif; ?>
             </p>
           </div>
         </div>
         <div class="form-group">
-          <label>Subject Name <span style="color:var(--red)">*</span></label>
+          <label>Subject Name <span class="text-red">*</span></label>
           <input type="text" name="subject_name" class="form-control"
             placeholder="e.g. Data Structures and Algorithms"
             value="<?= htmlspecialchars($_POST['subject_name']??'') ?>" required>
@@ -273,7 +273,7 @@ $type_cfg = [
 
       <!-- Class Schedule -->
       <div class="card" style="margin-bottom:20px;">
-        <p class="card-title"><i class="ti ti-calendar-time"></i> Class Schedule <span style="color:var(--red)">*</span></p>
+        <p class="card-title"><i class="ti ti-calendar-time"></i> Class Schedule <span class="text-red">*</span></p>
         <div class="form-group">
           <label>Days</label>
           <div style="display:flex;flex-wrap:wrap;gap:10px;">

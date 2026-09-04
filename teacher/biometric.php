@@ -402,7 +402,7 @@ $type_cfg  = [
   <!-- PAGE HEADER -->
   <div class="page-header with-actions">
     <div>
-      <h1><i class="ti ti-fingerprint" style="color:var(--accent);"></i> Biometric Attendance</h1>
+      <h1><i class="ti ti-fingerprint text-accent"></i> Biometric Attendance</h1>
       <p>Register devices, enroll student fingerprints, and monitor live attendance.</p>
     </div>
     <button class="btn btn-primary" onclick="openModal('registerModal')">
@@ -477,8 +477,8 @@ $type_cfg  = [
         <p class="card-title"><i class="ti ti-cpu"></i> Registered Devices</p>
         <?php if (empty($devices)): ?>
         <div class="empty-state" style="padding:24px;">
-          <i class="ti ti-cpu-off" style="color: var(--text7);"></i>
-          <p style="color: var(--text7);">No devices registered yet.<br>Click "Register Device" to add one.</p>
+          <i class="ti ti-cpu-off text-muted"></i>
+          <p class="text-muted">No devices registered yet.<br>Click "Register Device" to add one.</p>
         </div>
         <?php else: ?>
         <?php foreach ($devices as $dev):
@@ -520,7 +520,7 @@ $type_cfg  = [
               <?php echo htmlspecialchars($dev['subject_code'].' '.$dev['section']); ?>
             </span>
             <?php else: ?>
-            <span class="device-pill" style="color:var(--red);">
+            <span class="device-pill text-red">
               <i class="ti ti-alert-triangle" style="font-size:11px;"></i>
               No subject assigned
             </span>
@@ -533,7 +533,7 @@ $type_cfg  = [
 
       <!-- ── ENROLL FINGERPRINT ── -->
       <div class="card">
-        <p class="card-title"><i class="ti ti-fingerprint" style="color:var(--green);"></i> Enroll Fingerprint</p>
+        <p class="card-title"><i class="ti ti-fingerprint text-green"></i> Enroll Fingerprint</p>
 
         <?php if (empty($devices)): ?>
         <div class="alert alert-info" style="margin-bottom:0;">
@@ -559,7 +559,7 @@ $type_cfg  = [
         <div id="enrollSinglePanel">
           <form method="POST">
             <div class="form-group">
-              <label>Device <span style="color:var(--red);">*</span></label>
+              <label>Device <span class="text-red">*</span></label>
               <select name="dev_id" class="form-control" required>
                 <option value="">— Choose device —</option>
                 <?php foreach ($devices as $dev): ?>
@@ -571,7 +571,7 @@ $type_cfg  = [
               </select>
             </div>
             <div class="form-group">
-              <label>Student <span style="color:var(--red);">*</span></label>
+              <label>Student <span class="text-red">*</span></label>
               <input type="text" id="enrollSearch" class="form-control"
                 placeholder="Type to filter…" oninput="filterEnrollList()" style="margin-bottom:6px;">
               <select name="student_id" id="enrollSelect" class="form-control" size="5"
@@ -584,7 +584,7 @@ $type_cfg  = [
                 </option>
                 <?php endforeach; ?>
               </select>
-              <small style="color:var(--text7);">✓ = already has a template (will be overwritten)</small>
+              <small class="text-muted">✓ = already has a template (will be overwritten)</small>
             </div>
             <button type="submit" name="queue_enroll" class="btn btn-primary btn-full">
               <i class="ti ti-fingerprint"></i> Queue Enrollment
@@ -615,7 +615,7 @@ $type_cfg  = [
           <?php else: ?>
           <form method="POST">
             <div class="form-group">
-              <label>Device <span style="color:var(--red);">*</span></label>
+              <label>Device <span class="text-red">*</span></label>
               <select name="dev_id" class="form-control" required>
                 <option value="">— Choose device —</option>
                 <?php foreach ($devices as $dev): ?>
@@ -627,7 +627,7 @@ $type_cfg  = [
               </select>
             </div>
             <div class="form-group">
-              <label>Section <span style="color:var(--red);">*</span></label>
+              <label>Section <span class="text-red">*</span></label>
               <select name="section_id" id="sectionSelect" class="form-control" required onchange="loadSectionStudents(this.value)">
                 <option value="">— Choose section —</option>
                 <?php foreach ($sections_list as $sec): ?>
@@ -681,7 +681,7 @@ $type_cfg  = [
 
       <!-- ── SESSION CONTROL ── -->
       <div class="card">
-        <p class="card-title"><i class="ti ti-player-play" style="color:var(--green);"></i> Session Control</p>
+        <p class="card-title"><i class="ti ti-player-play text-green"></i> Session Control</p>
         <?php if (empty($devices)): ?>
         <div class="alert alert-info" style="margin-bottom:0;">
           <i class="ti ti-info-circle"></i> Register a device first.
@@ -881,7 +881,7 @@ $type_cfg  = [
             $sc = 'st-' . $lg['status'];
             $student_name = $lg['last_name']
                 ? htmlspecialchars($lg['last_name'].', '.$lg['first_name'])
-                : '<span style="color:var(--text7);">Unknown</span>';
+                : '<span class="text-muted">Unknown</span>';
           ?>
           <tr>
             <td class="td-mono"><?php echo date('M d H:i:s', strtotime($lg['scanned_at'])); ?></td>
@@ -909,17 +909,17 @@ $type_cfg  = [
 <!-- Register Device -->
 <div class="modal-overlay" id="registerModal">
   <div class="modal">
-    <h3><i class="ti ti-cpu" style="color:var(--accent);"></i> Register Device</h3>
+    <h3><i class="ti ti-cpu text-accent"></i> Register Device</h3>
     <p class="modal-sub">Enter the DEVICE_KEY you flashed into the Arduino sketch.</p>
     <form method="POST">
       <div class="form-group">
-        <label>Device Key <span style="color:var(--red);">*</span></label>
+        <label>Device Key <span class="text-red">*</span></label>
         <input type="text" name="device_key" class="form-control"
           placeholder="e.g. rm201-scanner-a3f9" required autofocus>
-        <small style="color:var(--text7)">Must match DEVICE_KEY in the .ino sketch exactly.</small>
+        <small class="text-muted">Must match DEVICE_KEY in the .ino sketch exactly.</small>
       </div>
       <div class="form-group">
-        <label>Label <span style="color:var(--red);">*</span></label>
+        <label>Label <span class="text-red">*</span></label>
         <input type="text" name="device_label" class="form-control"
           placeholder="e.g. Room 201 Scanner" required>
       </div>
@@ -933,10 +933,10 @@ $type_cfg  = [
           </option>
           <?php endforeach; ?>
         </select>
-        <small style="color: var(--text7);">You can change this later without reflashing the device.</small>
+        <small class="text-muted">You can change this later without reflashing the device.</small>
       </div>
       <div style="display:flex;gap:8px;">
-        <button type="submit" name="register_device" class="btn btn-primary" style="flex:1;justify-content:center;">
+        <button type="submit" name="register_device" class="btn btn-primary btn-fill">
           <i class="ti ti-check"></i> Register
         </button>
         <button type="button" class="btn btn-outline" onclick="closeModal('registerModal')">Cancel</button>
@@ -948,7 +948,7 @@ $type_cfg  = [
 <!-- Edit Device -->
 <div class="modal-overlay" id="editDeviceModal">
   <div class="modal">
-    <h3><i class="ti ti-edit" style="color:var(--accent);"></i> Edit Device</h3>
+    <h3><i class="ti ti-edit text-accent"></i> Edit Device</h3>
     <p class="modal-sub">Reassign subject without reflashing.</p>
     <form method="POST">
       <input type="hidden" name="dev_id" id="editDevId">
@@ -968,7 +968,7 @@ $type_cfg  = [
         </select>
       </div>
       <div style="display:flex;gap:8px;">
-        <button type="submit" name="update_device" class="btn btn-primary" style="flex:1;justify-content:center;">
+        <button type="submit" name="update_device" class="btn btn-primary btn-fill">
           <i class="ti ti-check"></i> Save
         </button>
         <button type="button" class="btn btn-outline" onclick="closeModal('editDeviceModal')">Cancel</button>
@@ -1055,7 +1055,7 @@ function loadSectionStudents(secId) {
       ).join('');
       note.innerHTML = `<span style="color:var(--text3);">${enrolled} / ${data.length} already have templates — they will be <strong>re-enrolled</strong> (overwritten).</span>`;
     })
-    .catch(() => { list.innerHTML='<span style="color:var(--red);">Failed to load.</span>'; });
+    .catch(() => { list.innerHTML='<span class="text-red">Failed to load.</span>'; });
 }
 
 // Spinner keyframe

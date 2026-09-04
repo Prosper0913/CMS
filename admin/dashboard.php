@@ -61,7 +61,7 @@ $recent_students = $conn->query(
 
 <div class="page-wrap">
   <div class="page-header">
-    <h1><i class="ti ti-shield-lock" style="color:var(--accent)"></i> Admin Dashboard</h1>
+    <h1><i class="ti ti-shield-lock text-accent"></i> Admin Dashboard</h1>
     <p>System-wide overview across every teacher account.</p>
   </div>
 
@@ -131,7 +131,7 @@ $recent_students = $conn->query(
             <tr>
               <td><?php echo htmlspecialchars($r['last_name'].', '.$r['first_name']); ?></td>
               <td>
-                <?php echo $r['section_names'] ? htmlspecialchars($r['section_names']) : '<span style="color:var(--text7)">Unassigned</span>'; ?>
+                <?php echo $r['section_names'] ? htmlspecialchars($r['section_names']) : '<span class="text-muted">Unassigned</span>'; ?>
               </td>
               <td><?php echo date('M j, Y', strtotime($r['created_at'])); ?></td>
             </tr>
