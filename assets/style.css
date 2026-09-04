@@ -151,7 +151,7 @@ body {
 }
 
 .nav-links > a:hover, .nav-links > a.active {
-  background: var(--bg3);
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -177,7 +177,7 @@ body {
 }
 
 .nav-dropdown-btn:hover, .nav-dropdown-btn.active, .nav-dropdown-btn.open {
-  background: var(--bg3);
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -196,7 +196,7 @@ body {
   top: calc(100% + 8px);
   left: 0;
   min-width: 260px;
-  background: var(--bg2);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 6px;
@@ -222,7 +222,7 @@ body {
 }
 
 .dropdown-item:hover, .dropdown-item.active {
-  background: var(--bg3);
+  background: var(--bg);
 }
 
 .dropdown-item .dot {
@@ -268,7 +268,7 @@ body {
   font-weight: 500;
   padding: 3px 10px;
   border-radius: 50px;
-  background:var(--bg2);
+  background:var(--bg);
   color: var(--text);
   border: 1px solid var(--bg5);
   text-transform: uppercase;
@@ -298,11 +298,7 @@ body {
   color: var(--red);
 }
 
-/* ── LAYOUT ───────────────────────────────────────────────  .page-wrap {
-  max-width: 1140px;
-  margin: 0 auto;
-  padding: 32px 24px;
-}------------------------------DUPLICATE-----------------------------*/
+
 
 .page-header {
   margin-bottom: 28px;
@@ -349,10 +345,9 @@ body {
 /* ── CARDS ─────────────────────────────────────────────── */ .card {
   background: var(--bg5);
   border: 1px solid var(--border2);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  margin-bottom: 25px;
-   box-shadow:0px 0px 5px rgba(31, 30, 30, 0.295);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
 }
 
 .mini-card{
@@ -449,7 +444,7 @@ body {
   border-radius: 99px;
   border: 1px solid var(--border);
   color: var(--text2);
-  background: var(--bg3);
+  background: var(--bg);
 }
 
 .weight-chip.exam {
@@ -640,7 +635,7 @@ filter:brightness(120%);
     align-items: center;
     justify-content: center;
     font-size: 10px;
-    color: var(--text2);
+    color: var(--text7);
     box-shadow: -10px 0 14px -4px var(--bg5);
   }
   .tabs, .tab-strip { position: relative; }
@@ -1205,18 +1200,7 @@ tbody td {
 
 /* ── STUDENT DASHBOARD — page-specific rules ── */
 
-/* NAVBAR  .navbar {
-  height:56px;
-  background:var(--bg2);
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  padding:0 28px;
-  gap:4px;
-  position:sticky;
-  top:0;
-  z-index:100;
-}---------------------------DUPLICATE-----------------*/
+
 
 .nav-link {
   font-size:13px;
@@ -1232,7 +1216,7 @@ tbody td {
 }
 
 .nav-link:hover, .nav-link.active {
-  background:var(--bg3);
+  background:var(--bg);
   color:var(--text);
 }
 
@@ -1250,14 +1234,10 @@ tbody td {
   gap:10px;
 }
 
-/* LAYOUT  .page-wrap {
-  max-width:1200px;
-  margin:0 auto;
-  padding:32px 28px;
-}--------------------------DUPLICATE--------------------------*/
+
 
 /* WELCOME BANNER  .welcome-banner {
-  background:linear-gradient(135deg, var(--bg) 0%, var(--bg4) 100%);
+  background:linear-gradient(135deg, var(--bg) 0%, var(--bg) 100%);
   border:1px solid rgba(91,141,238,.2);
   border-radius:20px;
   padding:28px 32px;
@@ -1416,7 +1396,7 @@ tbody td {
 .comp-bar-track {
   flex:1;
   height:3px;
-  background:var(--bg3);
+  background:var(--bg);
   border-radius:99px;
   overflow:hidden;
 }
@@ -1466,31 +1446,11 @@ tbody td {
 
 /* ── STUDENT SUBJECTS LIST — page-specific rules ── */
 
-/*.navbar {
-  height:56px;
-  background:var(--bg2);
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  padding:0 28px;
-  gap:4px;
-  position:sticky;
-  top:0;
-  z-index:100;
-}----------------------------DUPLICATE-------------------------------*/
 
-/*.page-wrap {
-  max-width:1200px;
-  margin:0 auto;
-  padding:32px 28px;
-}----------------------DUPLICATE--------------------------*/
 
-/* Subject table card  .card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-lg);
-  padding:24px;
-}------------------DUPLICATE----------------*/
+
+
+
 
 /* Score bar */ .score-bar-wrap {
   display:flex;
@@ -1538,24 +1498,9 @@ tbody td {
 
 /* ── STUDENT SUBJECT DETAIL — page-specific rules ── */
 
-/* ── NAVBAR ──  .navbar {
-  height:56px;
-  background:var(--bg2);
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  padding:0 28px;
-  gap:4px;
-  position:sticky;
-  top:0;
-  z-index:100;
-}-----------------DUPLICATE-------------------------------*/
 
-/* ── LAYOUT ──  .page-wrap {
-  max-width:1100px;
-  margin:0 auto;
-  padding:32px 28px;
-}-------------------------DUPLICATE------------------------------*/
+
+
 
 /* ── SUBJECT HERO ── */ .subject-hero {
   border-radius:var(--radius-lg);
@@ -1669,13 +1614,7 @@ tbody td {
   color:#fff;
 }
 
-/* ── CARDS ──  .card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-lg);
-  padding:22px 24px;
-  margin-bottom:18px;
-}---------------------------DUPLICATE-----------------------------*/
+
 
 /* ── STAT GRID ── */ .stat-grid {
   display:grid;
@@ -1726,7 +1665,7 @@ tbody td {
 .weight-bar-track {
   flex:1;
   height:6px;
-  background:var(--bg3);
+  background:var(--bg);
   border-radius:99px;
   overflow:hidden;
 }
@@ -1765,7 +1704,7 @@ tbody td {
 .inline-track {
   width:80px;
   height:4px;
-  background:var(--bg3);
+  background:var(--bg);
   border-radius:99px;
   overflow:hidden;
   flex-shrink:0;
@@ -1897,35 +1836,12 @@ tbody td {
 
 /* ── TEACHER: ADD SUBJECT — page-specific rules ── */
 
-/* Navbar  .navbar {
-  height:56px;
-  background:var(--bg2);
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  padding:0 28px;
-  gap:4px;
-  position:sticky;
-  top:0;
-  z-index:100;
-}-----------------------DUPLICATE-------------------------*/
-
-/* Layout  .page-wrap {
-  max-width:1160px;
-  margin:0 auto;
-  padding:32px 28px;
-}-------------------------DUPLICATE----------------------------*/
 
 
-/* Alerts  .alert {
-  padding:12px 16px;
-  border-radius:var(--radius);
-  font-size:13px;
-  margin-bottom:20px;
-  display:flex;
-  align-items:flex-start;
-  gap:10px;
-}--------------------------------DUPLICATE-----------------------------*/
+
+
+
+
 
 .alert i {
   flex-shrink:0;
@@ -1943,30 +1859,13 @@ tbody td {
   font-size:13px;
   font-weight:600;
   background:var(--green);
-  color:var(--bg2);
+  color:var(--bg);
   text-decoration:none;
 }
 
-/* Two col  .two-col {
-  display:grid;
-  grid-template-columns:440px 1fr;
-  gap:24px;
-  align-items:start;
-}---------------------------DUPLICATE-------------------
 
-@media(max-width:960px) {
-  .two-col {
-    grid-template-columns:1fr;
-  }
-}-------------------------------------DUPLICATE---------------*/
 
-/* Cards  .card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-lg);
-  padding:24px;
-  margin-bottom:20px;
-}------------------------DUPLICATE----------------------------------*/
+
 
 /* .card:last-child { 
   margin-bottom:0;
@@ -2099,10 +1998,7 @@ tbody td {
   white-space:nowrap;
 }-------------------------DUPLCIATE-------------------------*/
 
-/*.btn-primary:disabled {
-  opacity:.5;
-  cursor:not-allowed;
-}---------------DUPLICATE----------------------*/
+
 
 .divider {
   border:none;
@@ -2347,7 +2243,7 @@ transform: scale(1.05);
 }
 
 .nav-dd-btn:hover, .nav-dd-btn.open {
-  background:var(--bg3);
+  background:var(--bg);
   color:var(--text);
 }
 
@@ -2357,7 +2253,7 @@ transform: scale(1.05);
   top:calc(100% + 6px);
   left:0;
   min-width:250px;
-  background:var(--bg2);
+  background:var(--bg);
   border:1px solid var(--border2);
   border-radius:var(--radius-lg);
   padding:5px;
@@ -2382,7 +2278,7 @@ transform: scale(1.05);
 }
 
 .dd-item:hover {
-  background:var(--bg3);
+  background:var(--bg);
 }
 
 .dd-dot {
@@ -2457,40 +2353,15 @@ transform: scale(1.05);
   border-top:2px solid var(--purple);
 }
 
-/* ALERTS  .alert {
-  padding:11px 16px;
-  border-radius:var(--radius);
-  font-size:13px;
-  margin-bottom:20px;
-  display:flex;
-  align-items:center;
-  gap:8px;
-}--------------------------DUPLICATE-------------------------*/
 
-/* CARDS  .card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-lg);
-  padding:22px 24px;
-  margin-bottom:20px;
-}---------------------DUPLICATE--------------------------*/
+
+
 
 .card-title-right {
   margin-left:auto;
 }
 
-/* GRID  .two-col {
-  display:grid;
-  grid-template-columns:380px 1fr;
-  gap:20px;
-  align-items:start;
-}
 
-@media(max-width:900px) {
-  .two-col {
-    grid-template-columns:1fr;
-  }
-}-------------------------DUPLICATE---------------------*/
 
 .form-group small {
   display:block;
@@ -2499,21 +2370,7 @@ transform: scale(1.05);
   margin-top:4px;
 }
 
-/* BUTTONS  .btn {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:8px 16px;
-  border-radius:var(--radius);
-  font-family:var(--font-body);
-  font-size:13px;
-  font-weight:500;
-  cursor:pointer;
-  border:none;
-  transition:all .15s;
-  text-decoration:none;
-  white-space:nowrap;
-}---------------------------DUPLICATE-----------------------*/
+
 
 .btn-full {
   width:100%;
@@ -2554,13 +2411,13 @@ transform: scale(1.05);
 }
 
 .badge-gray {
-  background:var(--bg3);
+  background:var(--bg);
   color:var(--text3);
   border:1px solid var(--border);
 }
 
 /* DEVICE CARD */ .device-card {
-  background:var(--bg3);
+  background:var(--bg);
   border:1px solid var(--border2);
   border-radius:var(--radius-lg);
   padding:16px;
@@ -2746,7 +2603,7 @@ transform: scale(1.05);
 }
 
 .dd-item:hover, .dd-item.active {
-  background:var(--bg3);
+  background:var(--bg);
 }
 
 /* ── WELCOME BANNER ── */ .welcome-banner {
@@ -2782,21 +2639,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   flex-shrink:0;
 }
 
-/*.btn {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:9px 18px;
-  border-radius:var(--radius);
-  font-family:var(--font-body);
-  font-size:13px;
-  font-weight:500;
-  cursor:pointer;
-  border:none;
-  transition:all .15s;
-  text-decoration:none;
-  white-space:nowrap;
-}---------------------------DUPLICATE------------------------------------*/
+
 
 /* ── STATS ROW ── */ .stats-row {
   display:grid;
@@ -2959,12 +2802,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   flex-shrink:0;
 }
 
-/* ── CARD .card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:var(--radius-lg);
-  padding:22px 24px;
-}---------------------DUPLICATE--------------*/
+
 
 /* ── AT-RISK LIST ── */ .risk-item {
   display:flex;
@@ -3095,23 +2933,10 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 
 /* ── TEACHER: MANAGE SECTIONS — page-specific rules ── */
 
-/* ── NAVBAR ─────────────────────────────────────────────  .navbar {
-  height: 56px;
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 28px;
-  gap: 4px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}------------------------DUPLICATE--------------------------*/
+
 
 /* ── LAYOUT ───────────────────────────────────────────── */ .page-wrap {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 32px 28px;
+  padding: 50px;
 }
 
 /* ── PAGE HEADER ──────────────────────────────────────── */ .page-header {
@@ -3146,15 +2971,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   margin-bottom: 28px;
 }
 
-/* ── ALERTS ─────────────────────────────────────────────  .alert {
-  padding: 11px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}-----------------------------------------DUPLICATE----------------------------*/
+
 
 /* ── THREE-PANEL LAYOUT ───────────────────────────────── */ .sections-layout {
   display: grid;
@@ -3295,28 +3112,9 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   gap: 18px;
 }
 
-/* ── CARDS ──────────────────────────────────────────────  .card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 22px 24px;
-}---------------------DUPLICATE-----------------*/
 
-/* ── BUTTONS ────────────────────────────────────────────  .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius);
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all .15s;
-  text-decoration: none;
-  white-space: nowrap;
-}------------------------DUPLICATE-------------------------*/
+
+
 
 .btn-ghost {
   background: transparent;
@@ -3554,29 +3352,11 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 
 /* ── TEACHER: MANAGE TEACHERS — page-specific rules ── */
 
-/*@media (max-width: 860px) {
-  .two-col {
-    grid-template-columns: 1fr;
-  }
-}-------------------------DUPLICATE----------------------------*/
 
-/*.card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 22px;
-  margin-bottom: 20px;
-}----------------------DUPLICATE-----------------------*/
 
-/*.alert {
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}---------------------------------------------DUPLICATE-----------------------------------*/
+
+
+
 
 /* Teacher list */ .teacher-row {
   display: flex;
@@ -3585,7 +3365,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: var(--bg3);
+  background: var(--bg);
   margin-bottom: 8px;
 }
 
@@ -3684,12 +3464,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 
 /* ── TEACHER: STUDENTS — page-specific rules ── */
 
-/* ── TWO COL ──  .two-col {
-  display:grid;
-  grid-template-columns:380px 1fr;
-  gap:24px;
-  align-items:start;
-}----------------------------DUPLICATE------------------------------*/
+
 
 .input-wrap>i {
   position:absolute;
@@ -3731,15 +3506,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   color:var(--red);
 }
 
-/* ── ALERTS ──  .alert {
-  padding:11px 16px;
-  border-radius:var(--radius);
-  font-size:13px;
-  margin-bottom:20px;
-  display:flex;
-  align-items:center;
-  gap:8px;
-}----------------------------DUPLICATE--------------------*/
+
 
 /* ── SEARCH BAR ── */ .search-bar {
   display:flex;
@@ -3777,12 +3544,12 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 /* ── TEACHER: SUBJECT VIEW — page-specific rules ── */
 
 .nav-link:hover {
-  background: var(--bg3);
+  background: var(--bg);
   color: var(--text);
 }
 
 .nav-link.active {
-  background: var(--bg3);
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -3790,13 +3557,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   position: relative;
 }
 
-/* ── SUBJECT HERO HEADER ───────────────────────────────  .subject-hero {
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  padding: 28px 32px 0;
-  position: relative;
-  overflow: hidden;
-}----------------DUPLICATE-----------------*/
+
 
 .subject-hero::before {
   content: '';
@@ -3842,7 +3603,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   padding: 4px 10px;
   border-radius: 99px;
   border: 1px solid var(--border2);
-  background: var(--bg3);
+  background: var(--bg);
   color: var(--text2);
   display: flex;
   align-items: center;
@@ -3914,7 +3675,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 99px;
-  background: var(--bg3);
+  background: var(--bg);
   color: var(--text2);
   font-weight: 600;
 }
@@ -3926,30 +3687,11 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   /* padding: 20px 32px; */
 }
 
-/* ── ALERTS ────────────────────────────────────────────  .alert {
-  padding: 11px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}------------------------------DUPLICATE----------------------------*/
 
-/* ── CARDS ─────────────────────────────────────────────  .card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 22px 24px;
-  margin-bottom: 20px;
-}------------------------DUPLICATE-------------------------*/
 
-/* ── TWO COL ───────────────────────────────────────────  .two-col {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 20px;
-  align-items: start;
-}----------------------DUPLICATE---------------*/
+
+
+
 
 /* ── BUTTONS ───────────────────────────────────────────  .btn {
   display: inline-flex;
@@ -3984,14 +3726,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   gap: 8px;
 }
 
-/* ── ENROLLEE LIST ─────────────────────────────────────  .enrollee-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  transition: background .1s;
-}-------------------------------------------DUPLICATE----------------------------------*/
+
 
 .enrollee-avatar {
   width: 34px;
@@ -4232,7 +3967,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 }
 
 .bio-card {
-  background:var(--bg2);
+  background:var(--bg);
   border:1px solid var(--border2);
   border-radius:14px;
   padding:20px;
@@ -4265,7 +4000,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 }
 
 .bio-stat {
-  background:var(--bg3);
+  background:var(--bg);
   border:1px solid var(--border2);
   border-radius:10px;
   padding:12px 10px;
@@ -4336,7 +4071,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 .bio-input {
   width:100%;
   padding:7px 10px;
-  background:var(--bg3);
+  background:var(--bg);
   border:1px solid var(--border2);
   border-radius:8px;
   color:var(--text);
@@ -4417,7 +4152,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 }
 
 .bio-badge-gray {
-  background:var(--bg3);
+  background:var(--bg);
   color:var(--text3);
   border:1px solid var(--border2);
 }
@@ -4471,7 +4206,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 }
 
 .bio-table tbody tr:hover {
-  background:var(--bg3);
+  background:var(--bg);
 }
 
 .bio-table tbody td {
@@ -4537,7 +4272,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   font-size:11px;
   padding:3px 9px;
   border-radius:99px;
-  background:var(--bg3);
+  background:var(--bg);
   color:var(--text2);
   border:1px solid var(--border2);
   display:inline-flex;
@@ -4634,7 +4369,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
    ══════════════════════════════════════════════════════════════ */
 .app-navbar {
   height: 56px;
-  background: var(--bg2);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -4682,7 +4417,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
   color: var(--text2);
 }
 .app-navbar .app-nav-link.current {
-  background: var(--bg3);
+  background: var(--bg);
   color: var(--text);
 }
 .app-navbar .nav-right {
@@ -4725,7 +4460,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
    ══════════════════════════════════════════════════════════════ 
 
 .section-list-item.active {
-  background: var(--bg3);
+  background: var(--bg);
   border-color: var(--accent);
 }
 .section-list-item .section-list-name {
@@ -4958,7 +4693,7 @@ color:var(--text7);
 .sidebar {
   width: 232px;
   flex-shrink: 0;
-  background: var(--bg3);
+  background: var(--bg);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -5006,7 +4741,7 @@ color:var(--text7);
   position: relative;
 }
 .sidebar-link i { font-size: 17px; flex-shrink: 0; width: 18px; text-align: center; }
-.sidebar-link:hover { background: var(--bg4); color: var(--text); }
+.sidebar-link:hover { background: var(--bg); color: var(--text); }
 .sidebar-link.active { background: var(--bg); color: var(--text); }
 
 .sidebar-link .badge-count {
@@ -5070,7 +4805,7 @@ color:var(--text7);
   justify-content: center;
   transition: background .15s ease;
 }
-.sidebar-logout:hover { background: var(--bg4); color: var(--text); }
+.sidebar-logout:hover { background: var(--bg); color: var(--text); }
 
 .main-content {
   flex: 1;
@@ -5124,7 +4859,7 @@ color:var(--text7);
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    background: var(--bg3);
+    background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
     font-size: 19px;
@@ -5197,7 +4932,7 @@ color:var(--text7);
   display: block;
   text-decoration: none;
   color: inherit;
-  background: var(--bg2);
+  background: var(--bg);
   border-left: 3px solid var(--accent);
   border-radius: 6px;
   padding: 8px 10px;
@@ -5213,19 +4948,118 @@ color:var(--text7);
 .schedule-item-time {
   font-family: var(--font-mono);
   font-size: 10.5px;
-  color: var(--text7);
+  color: var(--text3);
   margin-bottom: 3px;
 }
 
 .schedule-item-name {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text6);
+  color: var(--text);
   line-height: 1.3;
   margin-bottom: 2px;
 }
 
 .schedule-item-meta {
   font-size: 10.5px;
+  color: var(--text3);
+}
+
+
+/* ============================================================
+   TEACHER TIMETABLE (teacher/all_subjects.php)
+   ============================================================ */
+
+.timetable-wrap {
+  display: flex;
+  gap: 8px;
+  background: var(--bg5);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  overflow-x: auto;
+  padding: 16px;
+}
+
+.timetable-times {
+  position: relative;
+  width: 60px;
+  flex-shrink: 0;
+  padding-top: 32px;
+}
+
+.timetable-time-label {
+  position: absolute;
+  right: 8px;
+  font-size: 10.5px;
   color: var(--text7);
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.timetable-grid {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 700px;
+}
+
+.timetable-day-col {
+  flex: 1;
+  min-width: 110px;
+}
+
+.timetable-day-label {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text6);
+}
+
+.timetable-day-body {
+  position: relative;
+  background-color: var(--bg6);
+  background-image: linear-gradient(var(--border2) 1px, transparent 1px);
+  background-repeat: repeat-y;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+}
+
+.timetable-block {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  background: var(--bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 6px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.timetable-block:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow);
+  z-index: 5;
+}
+.timetable-block.is-inactive { opacity: .5; }
+
+.tt-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+}
+.tt-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+  margin: 2px 0;
+}
+.tt-meta {
+  font-size: 9.5px;
+  color: var(--text3);
 }

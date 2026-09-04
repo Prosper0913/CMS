@@ -110,6 +110,36 @@ $type_cfg = [
     'Major Subject'          => ['color'=>'#1e5f4e','bg'=>'rgba(251,191,36,.1)',  'label'=>'MAJ'],
 ];
 
+// ── Group subjects by day for the timetable, and work out the
+//    time range to render. Defaults to a typical instructor day,
+//    7:30 AM–5:30 PM, but widens automatically if any class falls
+//    outside that window rather than clipping it. ──
+$day_order = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+$day_full  = ['Mon'=>'Monday','Tue'=>'Tuesday','Wed'=>'Wednesday','Thu'=>'Thursday','Fri'=>'Friday','Sat'=>'Saturday','Sun'=>'Sunday'];
+$by_day = array_fill_keys($day_order, []);
+$range_start = 7*60 + 30;   // 7:30 AM in minutes-since-midnight
+$range_end   = 17*60 + 30;  // 5:30 PM
+
+$all_subjects_rows = [];
+$subjects->data_seek(0);
+while ($sub = $subjects->fetch_assoc()) {
+    $all_subjects_rows[] = $sub;
+    if (!empty($sub['schedule_start_time']) && !empty($sub['schedule_end_time'])) {
+        $sm = (int)date('H', strtotime($sub['schedule_start_time'])) * 60 + (int)date('i', strtotime($sub['schedule_start_time']));
+        $em = (int)date('H', strtotime($sub['schedule_end_time']))   * 60 + (int)date('i', strtotime($sub['schedule_end_time']));
+        if ($sm < $range_start) $range_start = $sm;
+        if ($em > $range_end)   $range_end   = $em;
+
+        $sub_days = array_filter(explode(',', $sub['schedule_days'] ?? ''));
+        foreach ($sub_days as $d) {
+            if (isset($by_day[$d])) $by_day[$d][] = $sub;
+        }
+    }
+}
+$total_range = max(1, $range_end - $range_start);
+$px_per_min  = 1.2;
+$grid_height = round($total_range * $px_per_min);
+
 // helper to keep other filters when a filter link is clicked
 function qs($overrides = []) {
     $params = array_merge($_GET, $overrides);
@@ -246,92 +276,60 @@ function qs($overrides = []) {
     </a>
   </div>
 
-  <div class="subject-grid">
-    <?php while ($sub = $subjects->fetch_assoc()):
-      $cfg   = $type_cfg[$sub['subject_type']] ?? $type_cfg['General Education'];
-      $avg   = (float)($sub['class_avg'] ?? 0);
-      $count = (int)$sub['enrollee_count'];
-      $days  = (int)$sub['class_days'];
-    ?>
-    <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $sub['id']; ?>" class="subject-card"
-       style="<?php echo $sub['is_active'] ? '' : 'opacity:.6;'; ?>">
-      <div class="sc-bar" style="background:<?php echo $cfg['color']; ?>;"></div>
+  <div class="timetable-wrap">
+    <div class="timetable-times" style="height:<?php echo $grid_height; ?>px;">
+      <?php
+      // Hour labels down the left edge, matching the grid's scale
+      for ($m = $range_start; $m <= $range_end; $m += 60):
+        $top = round(($m - $range_start) * $px_per_min);
+      ?>
+      <div class="timetable-time-label" style="top:<?php echo $top; ?>px;"><?php echo date('g:i A', strtotime('1970-01-01 ' . floor($m/60) . ':' . ($m%60))); ?></div>
+      <?php endfor; ?>
+    </div>
 
-      <div class="sc-top">
-        <div>
-          <div class="sc-code"><?php echo htmlspecialchars($sub['subject_code']); ?></div>
-          <div class="sc-name"><?php echo htmlspecialchars($sub['subject_name']); ?></div>
-        </div>
-        <span class="sc-type-pill"
-          style="background:<?php echo $cfg['bg']; ?>;color:<?php echo $cfg['color']; ?>;border:1px solid <?php echo $cfg['color'].'33'; ?>;">
-          <?php echo $cfg['label']; ?>
-        </span>
-      </div>
-
-      <?php if (!$sub['is_active']): ?>
-      <div style="margin-bottom:8px;">
-        <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg2);
-                     border:1px solid var(--border);border-radius:99px;padding:2px 8px;">
-          <i class="ti ti-archive"></i> INACTIVE
-        </span>
-      </div>
-      <?php endif; ?>
-
-      <div class="sc-meta">
-        <span><i class="ti ti-users"></i> <?php echo $count; ?> students</span>
-        <span><i class="ti ti-school"></i> <?php echo htmlspecialchars($sub['section']); ?></span>
-        <span><i class="ti ti-calendar"></i> <?php echo $sub['semester']; ?> — <?php echo htmlspecialchars($sub['school_year']); ?></span>
-        <?php if ($days > 0): ?>
-        <span><i class="ti ti-calendar-check"></i> <?php echo $days; ?> class day<?php echo $days!=1?'s':''; ?></span>
-        <?php endif; ?>
-        <?php $sched = formatSchedule($sub['schedule_days'] ?? '', $sub['schedule_start_time'] ?? '', $sub['schedule_end_time'] ?? ''); ?>
-        <?php if ($sched): ?>
-        <span><i class="ti ti-clock"></i> <?php echo $sched; ?></span>
-        <?php endif; ?>
-      </div>
-
-      <div class="sc-weights">
-        <span class="wc exam"><i class="ti ti-file-certificate" style="font-size:10px;"></i> Exam <?php echo (int)$sub['exam_pct']; ?>%</span>
-        <span class="wc written"><i class="ti ti-pencil" style="font-size:10px;"></i> Written <?php echo (int)$sub['written_pct']; ?>%</span>
-        <span class="wc perf"><i class="ti ti-star" style="font-size:10px;"></i> Perf <?php echo (int)$sub['performance_pct']; ?>%</span>
-      </div>
-
-      <?php if ($avg > 0): ?>
-      <div class="sc-grade-row">
-        <span>Class Average</span>
-        <span style="font-weight:700;color:<?php echo $avg>=75?'var(--green)':'var(--red)'; ?>">
-          <?php echo $avg; ?>%
-        </span>
-      </div>
-      <div class="score-bar-track">
-        <div class="score-bar-fill"
-          style="width:<?php echo min($avg,100); ?>%;
-                 background:<?php echo $avg>=75?'var(--green)':'var(--red)'; ?>;">
+    <div class="timetable-grid">
+      <?php foreach ($day_order as $d): ?>
+      <div class="timetable-day-col">
+        <div class="timetable-day-label"><?php echo $day_full[$d]; ?></div>
+        <div class="timetable-day-body" style="height:<?php echo $grid_height; ?>px;background-size:100% <?php echo round(60*$px_per_min); ?>px;">
+          <?php foreach ($by_day[$d] as $sub):
+            $cfg = $type_cfg[$sub['subject_type']] ?? $type_cfg['General Education'];
+            $sm  = (int)date('H', strtotime($sub['schedule_start_time'])) * 60 + (int)date('i', strtotime($sub['schedule_start_time']));
+            $em  = (int)date('H', strtotime($sub['schedule_end_time']))   * 60 + (int)date('i', strtotime($sub['schedule_end_time']));
+            $top    = round(($sm - $range_start) * $px_per_min);
+            $height = max(28, round(($em - $sm) * $px_per_min));
+          ?>
+          <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $sub['id']; ?>"
+             class="timetable-block <?php echo $sub['is_active'] ? '' : 'is-inactive'; ?>"
+             style="top:<?php echo $top; ?>px;height:<?php echo $height; ?>px;border-left-color:<?php echo $cfg['color']; ?>;">
+            <div class="tt-time"><?php echo date('g:i A', strtotime($sub['schedule_start_time'])); ?>&ndash;<?php echo date('g:i A', strtotime($sub['schedule_end_time'])); ?></div>
+            <div class="tt-name"><?php echo htmlspecialchars($sub['subject_code']); ?> &middot; <?php echo htmlspecialchars($sub['subject_name']); ?></div>
+            <div class="tt-meta"><?php echo htmlspecialchars($sub['section']); ?> &middot; <?php echo (int)$sub['enrollee_count']; ?> students</div>
+          </a>
+          <?php endforeach; ?>
         </div>
       </div>
-      <div class="sc-pass-row">
-        <span style="color:var(--green);">
-          <i class="ti ti-check"></i> <?php echo (int)($sub['passing']??0); ?> passing
-        </span>
-        <span style="color:var(--red);">
-          <i class="ti ti-x"></i> <?php echo (int)($sub['failing']??0); ?> failing
-        </span>
-      </div>
-      <?php else: ?>
-      <div>
-        <i class="ti ti-clock"></i> No grades recorded yet — click to start
-      </div>
-      <?php endif; ?>
-
-    </a>
-    <?php endwhile; ?>
+      <?php endforeach; ?>
+    </div>
   </div>
 
-  <!-- <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#7aa3ff;"></div>General Education (30/30/40)</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#34d399;"></div>Professional Education (25/25/50)</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div>Major Subject (40/20/40)</div>
-  </div> -->
+  <?php
+  // Subjects with no schedule set yet still need to be reachable
+  $unscheduled = array_filter($all_subjects_rows, fn($s) => empty($s['schedule_days']) || empty($s['schedule_start_time']));
+  if ($unscheduled):
+  ?>
+  <div class="card" style="margin-top:20px;">
+    <p class="card-title"><i class="ti ti-calendar-off"></i> No Schedule Set</p>
+    <p style="font-size:12px;color:var(--text7);margin-bottom:12px;">
+      These subjects don't have a class schedule yet — edit each one's Settings tab to add one.
+    </p>
+    <?php foreach ($unscheduled as $sub): ?>
+    <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $sub['id']; ?>" style="display:block;padding:8px 0;border-top:1px solid var(--border);color:inherit;text-decoration:none;">
+      <?php echo htmlspecialchars($sub['subject_code']); ?> &middot; <?php echo htmlspecialchars($sub['subject_name']); ?>
+    </a>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
 
   <?php endif; ?>
 
