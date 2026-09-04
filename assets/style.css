@@ -4700,9 +4700,11 @@ color:var(--text7);
   position: sticky;
   top: 0;
   height: 100vh;
-  height: 100dvh; /* accounts for mobile browser toolbar showing/hiding — 100vh alone can push footer content below the visible fold on phones */
-  overflow-y: auto;
-}
+  height: 100dvh; /* accounts for mobile browser toolbar showing/hiding */
+  overflow: hidden; /* the sidebar box itself never scrolls as a unit — */
+}                    /* only .sidebar-links does, so the footer/logout
+                        below it is always visible, never pushed off
+                        the bottom by a long nav list. */
 
 .sidebar-brand {
   display: flex;
@@ -4725,6 +4727,8 @@ color:var(--text7);
   gap: 2px;
   padding: 14px 12px;
   flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* required for a flex child to actually be allowed to shrink/scroll instead of forcing the parent taller */
 }
 
 .sidebar-link {
