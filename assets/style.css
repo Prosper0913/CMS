@@ -4840,6 +4840,19 @@ color:var(--text7);
     transform: translateX(-100%);
     transition: transform .25s ease;
     box-shadow: 4px 0 24px rgba(0,0,0,.3);
+    /* Don't force the drawer to span the full screen height — that
+       relies on vh/dvh math that can render inconsistently here
+       (the page has a global zoom on <body>, and zoom + fixed +
+       100dvh together isn't reliable across mobile browsers, which
+       was cutting off the footer). Instead let the drawer size
+       itself to its actual content (brand + links + footer), capped
+       so it can't overflow a very short screen. This way the
+       logout button is always the last thing you see, never pushed
+       off-screen, on any device height. */
+    height: auto;
+    max-height: 85vh;
+    max-height: 85dvh;
+    overflow-y: auto;
   }
   .sidebar.is-open { transform: translateX(0); }
 
