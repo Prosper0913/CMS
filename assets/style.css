@@ -44,7 +44,7 @@
 
   /* ── Shape / misc ── */
   --radius:    10px;
-  --radius-lg: 16px;
+  --radius-lg: 5px;
   --shadow:    0 4px 24px rgba(0,0,0,.35);
 
   /* ── Typography ── */
@@ -2608,9 +2608,9 @@ transform: scale(1.05);
 
 /* ── WELCOME BANNER ── */ .welcome-banner {
   background: var(--bg5);
-  border-radius:20px;
+  border-radius:5px;
   padding:24px 32px;
-  margin-bottom:28px;
+  margin-bottom:5px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -2936,7 +2936,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 
 
 /* ── LAYOUT ───────────────────────────────────────────── */ .page-wrap {
-  padding: 50px;
+  padding: 15px;
 }
 
 /* ── PAGE HEADER ──────────────────────────────────────── */ .page-header {
@@ -4907,7 +4907,7 @@ color:var(--text7);
   background: var(--bg5);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 12px;
+  padding: 10px;
   min-height: 90px;
 }
 
@@ -5002,6 +5002,7 @@ color:var(--text7);
   width: 60px;
   flex-shrink: 0;
   padding-top: 32px;
+  margin-top: 50px; /*timetable-times inaccurate*/
 }
 
 .timetable-time-label {

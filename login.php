@@ -86,7 +86,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       align-items:stretch;
       justify-content:center;
     }
-
     .auth-shell{
       width:100%;
       min-height:100vh;
@@ -114,15 +113,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .bg-layer[data-role="default"]{
       --layer-color:var(--role-default);
       opacity:1;
-      background:
+      background-image: url('assets/images/tcm\ burning\ logo.jpeg');
+      background-position: center;
+      background-size: cover;
+      /* background:
         radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--layer-color) 55%, transparent) 0%, transparent 42%),
-        radial-gradient(circle at 85% 88%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%);
+        radial-gradient(circle at 85% 88%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%); */
     }
     .bg-layer[data-role="student"]{
       --layer-color:var(--role-student);
       background:
-        radial-gradient(circle at 12% 85%, color-mix(in srgb, var(--layer-color) 55%, transparent) 0%, transparent 42%),
-        radial-gradient(circle at 78% 15%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%);
+        radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--layer-color) 55%, transparent) 0%, transparent 42%),
+        radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%);
     }
     .bg-layer[data-role="instructor"]{
       --layer-color:var(--role-instructor);
@@ -168,10 +170,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .idle-title{
       font-family:'Syne',sans-serif;
       font-weight:800;
-      font-size:clamp(26px,2.7vw,36px);
+      font-size:clamp(5px,2.7vw,15px);
       line-height:1.24;
-      max-width:340px;
-      letter-spacing:.005em;
+      /* max-width:340px; */
+      letter-spacing:.003em;
+      justify-content: left;
     }
 
     .showcase-idle > *{
@@ -424,7 +427,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       .auth-shell{grid-template-columns:1fr;}
       .showcase-panel{min-height:280px;padding:32px 28px;}
       .idle-logo{width:72px;margin-bottom:14px;}
-      .idle-title{font-size:20px;max-width:260px;}
+      .idle-title{font-size:15px;max-width:260px;}
       .showcase-stage{padding-top:6%;}
       .showcase-slide h1{font-size:24px;}
       .feature-list{display:none;}
@@ -455,12 +458,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="showcase-inner">
       <div class="showcase-idle is-active" id="showcaseIdle">
-        <img class="idle-logo" src="assets/images/TCM logo (2).png" alt="TCM Logo">
-        <div class="idle-title">TCM Classroom<br>Management System</div>
+        <!-- <img class="idle-logo" src="assets/images/TCM logo (2).png" alt="TCM Logo"> -->
+        <div class="idle-title" style="position: fixed; bottom: 25px;white-space: nowrap; width: 100%; color: white;">TCM Classroom Management System</div>
       </div>
-
       <div class="showcase-stage" id="showcaseStage">
-
         <div class="showcase-slide" data-role="student">
           <span class="eyebrow"><i class="ti ti-backpack"></i> For Students</span>
           <h1>Track your progress<br>at a glance.</h1>
@@ -501,8 +502,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <!-- RIGHT: auth panel -->
   <div class="auth-panel">
     <div class="auth-card">
-      <div class="kicker">Welcome back</div>
-      <h2>Sign in to your account</h2>
+      <div style="align-items: center;">
+        <img src="assets/images/TCM logo (2).png" alt="TCM Logo" width="120" height="120" justify-content="center" style="display: block; margin: 0 auto 16px;">
+      </div>
+    <div class="kicker">Welcome back</div>
+  <h2>Sign in to your account</h2>
   
       
       <?php if ($error): ?>

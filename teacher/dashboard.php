@@ -183,7 +183,7 @@ $comp_colors = [
   <!-- ── WELCOME BANNER ── -->
   <div class="welcome-banner">
     <div class="welcome-text">
-      <h1>Welcome back, <?php echo htmlspecialchars($_SESSION['username']); ?> 👋</h1>
+      <h1><?php echo htmlspecialchars($_SESSION['username']); ?></h1>
       <p><?php echo date('l, F d Y'); ?> &nbsp;·&nbsp; <?php echo (int)($t['total_subjects']??0); ?> active subject<?php echo ($t['total_subjects']??0)!=1?'s':''; ?> this semester</p>
     </div>
   </div>
@@ -205,7 +205,6 @@ $comp_colors = [
   ?>
   <?php endif; ?>
 
-  <hr class="thin-line">
 
   <!-- ── BOTTOM: At-risk + Recent activity ── -->
   <?php if (($t['total_subjects']??0) > 0): ?>
@@ -214,7 +213,6 @@ $comp_colors = [
     <!-- At-risk students -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-alert-triangle text-red"></i>
         At-Risk Students
         <?php if ($risk_result->num_rows > 0): ?>
           <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--red);">
@@ -239,7 +237,7 @@ $comp_colors = [
               <?php echo htmlspecialchars($r['subject_code']); ?> — <?php echo htmlspecialchars($r['section']); ?>
             </div>
           </div>
-          <div class="risk-grade"><?php echo number_format($r['final_grade'],1); ?>%</div>
+          <div class="risk-grade"><?php echo number_format($r['letter_grade'],1); ?></div>
         </div>
         <?php endwhile; ?>
       <?php endif; ?>
@@ -248,7 +246,6 @@ $comp_colors = [
     <!-- Top & Lowest performers (each subject's own most recent activity) -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-trophy" style="color: var(--yellow2);"></i>
         Top &amp; Lowest Performers
         <?php if (!empty($subject_perf)): ?>
           <span class="tlp-sub-count">
@@ -350,7 +347,6 @@ $comp_colors = [
     <!-- Recent score entries -->
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-activity text-green"></i>
         Recent Entries
       </p>
       <?php if ($recent->num_rows === 0): ?>

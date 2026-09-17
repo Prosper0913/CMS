@@ -62,6 +62,9 @@ $recent_students = $conn->query(
 <div class="page-wrap">
   <div class="page-header">
     <h1><i class="ti ti-shield-lock text-accent"></i> Admin Dashboard</h1>
+    <?php
+echo date("l, F j, Y"); 
+?>
     <p>System-wide overview across every teacher account.</p>
   </div>
 

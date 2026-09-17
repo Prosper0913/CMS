@@ -185,12 +185,12 @@ $pass = $fg >= 75;
   <div class="tabs">
     <?php
     $tabs = [
-      'overview'    => ['ti ti-chart-pie',    'Overview'],
-      'exam'        => ['ti ti-file-text',     'Major Exams'],
-      'written'     => ['ti ti-pencil',        'Written Works'],
-      'performance' => ['ti ti-star',          'Performance'],
-      'attendance'  => ['ti ti-calendar-check','Attendance'],
-      'announcements' => ['ti ti-speakerphone','Announcements'],
+      'overview'    => [' ',    'Overview'],
+      'exam'        => [' ',    'Major Exams'],
+      'written'     => [' ',    'Written Works'],
+      'performance' => [' ',    'Performance'],
+      'attendance'  => [' ',    'Attendance'],
+      'announcements' => [' ',  'Announcements'],
     ];
     foreach ($tabs as $key => [$icon, $label]):
     ?>
@@ -243,7 +243,7 @@ $pass = $fg >= 75;
 
   <!-- Grade weights breakdown -->
   <div class="card">
-    <p class="card-title"><i class="ti ti-percentage" style="color:var(--subject-color);"></i> Grade Composition</p>
+    <p class="card-title"></i> Grade Composition</p>
       <hr class="thin-line">
 
     <?php
@@ -321,9 +321,9 @@ $pass = $fg >= 75;
   ════════════════════════════════════════════ -->
   <?php else:
     $comp_map = [
-      'exam'        => ['Major Exam',       '#7aa3ff', 'ti-file-text'],
-      'written'     => ['Written Work',     '#34d399', 'ti-pencil'],
-      'performance' => ['Performance Task', '#fbbf24', 'ti-star'],
+      'exam'        => ['Major Exam',       '#7aa3ff', ' '],
+      'written'     => ['Written Work',     '#34d399', ' '],
+      'performance' => ['Performance Task', '#fbbf24', ' '],
     ];
 
     if (isset($comp_map[$active_tab])):
@@ -412,7 +412,7 @@ $pass = $fg >= 75;
   <?php elseif ($active_tab === 'attendance'): ?>
 
   <div class="card">
-    <p class="card-title"><i class="ti ti-calendar-check" style="color:var(--purple);"></i> Attendance Log</p>
+    <p class="card-title"></i> Attendance Log</p>
 
     <?php if ($att_total === 0): ?>
     <div class="empty-state">
@@ -483,7 +483,7 @@ $pass = $fg >= 75;
   <?php elseif ($active_tab === 'announcements'): ?>
 
   <div class="card">
-    <p class="card-title"><i class="ti ti-speakerphone" style="color:var(--subject-color);"></i> Announcements</p>
+    <p class="card-title"></i> Announcements</p>
 
     <?php if (empty($announcements)): ?>
     <div class="empty-state">

@@ -80,7 +80,7 @@ $type_colors = [
   <div class="welcome-banner">
     <div>
       <div class="welcome-name">
-        Hello, <?php echo htmlspecialchars($student['first_name']); ?> 👋
+        <?php echo htmlspecialchars($student['first_name'] . ' ' . $student['middle_initial'] . ' ' . $student['last_name']); ?>
       </div>
       <div class="welcome-sub"><?php echo date('l, F d Y'); ?></div>
       <div class="welcome-id"><?php echo htmlspecialchars($student['student_id']); ?></div>
@@ -93,9 +93,6 @@ $type_colors = [
     </div>
   </div>
 
-  <p class="bottom-margin">
-    My Weekly Schedule
-  </p>
 
   <?php if ($total_subjects === 0): ?>
   <div class="empty-state">

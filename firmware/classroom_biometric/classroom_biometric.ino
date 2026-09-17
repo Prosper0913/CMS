@@ -74,8 +74,19 @@ const char* DEVICE_KEY    = "-------------";
 #define SCAN_COOLDOWN_MS    3000
 #define LCD_HOLD_MS         2800
 #define WIFI_RETRY_MS       30000
-#define HTTP_TIMEOUT_MS     8000    // match + record calls can take ~3s for 40 students
+#define HTTP_TIMEOUT_MS     20000   // raised from 8000 — server now runs mindtct+bozorth3
+                                     // per request, which takes longer than the old
+                                     // on-device match, especially against a full class
 #define ENROLL_POLL_MS      4000    // how often to check for queued enrollments
+
+// Raw fingerprint image size, matching the server's expectations in
+// api/bio_enroll.php / api/bio_match.php (IMG_WIDTH x IMG_HEIGHT, sent
+// 4-bit packed = 2 pixels per byte, which is the AS608's native UpImage
+// transfer format — no packing/conversion needed on our end, we just
+// forward exactly what the sensor sends).
+#define IMG_WIDTH        256
+#define IMG_HEIGHT       288
+#define IMG_PACKED_SIZE  (IMG_WIDTH * IMG_HEIGHT / 2)   // 36864 bytes
 
 // ── SD log ────────────────────────────────────────────────────
 #define SD_LOG_FILE  "/bio_offline.csv"
@@ -97,6 +108,12 @@ String  subjectName     = "";
 String  teacherName     = "";
 String  lateCutoff      = "08:15:00";
 
+// Raw fingerprint image buffer — global/static rather than a stack
+// local, since 36KB is a lot to put on the stack of a function also
+// juggling WiFiClientSecure/HTTPClient (which have their own sizable
+// stack needs) on an ESP32.
+uint8_t imgBuf[IMG_PACKED_SIZE];
+
 uint32_t lastScanMs     = 0;
 int      lastScanResult = -1;   // student fingerprint match cooldown
 uint32_t lastWifiRetry  = 0;
@@ -116,8 +133,8 @@ bool     loadConfig();
 void     checkEnrollQueue();
 void     attendanceMode();
 void     enrollmentMode();
-bool     captureFeature(uint8_t slot);
-bool     captureAndUploadTemplate();
+bool     captureImage();
+bool     uploadImage(uint8_t* dst, int dstLen);
 String   fetchTemplatesAndMatch(const String& dateStr, const String& timeStr);
 bool     recordAttendance(const String& studentId, const String& dateStr,
                           const String& timeStr, const String& status);
@@ -263,12 +280,12 @@ attendanceMode();
 
 // ============================================================
 //  ATTENDANCE MODE
-//  Scans a finger, fetches templates from server,
-//  runs 1:N match on-device, records attendance.
+//  Scans a finger, uploads the raw image, server runs
+//  mindtct/bozorth3 and returns the match result.
 // ============================================================
 void attendanceMode() {
-    // Step 1: Capture image and extract feature into CharBuffer1
-    if (!captureFeature(1)) return;   // no finger or bad image
+    // Step 1: Capture a raw image into the sensor's image buffer
+    if (!captureImage()) return;   // no finger or bad image
 
     // Cooldown guard — don't re-process the same scan immediately
     // (AS608 getImage can fire multiple times per finger press)
@@ -356,48 +373,42 @@ void attendanceMode() {
 }
 
 // ============================================================
-//  FETCH TEMPLATES + 1:N MATCH ON-SENSOR
+//  UPLOAD RAW IMAGE + SERVER-SIDE MATCH
 //
-//  Protocol:
-//    1. POST probe feature (CharBuffer1, 256 bytes) to bio_match.php
-//    2. Server returns JSON: { templates: [{student_id, name, template_b64}, ...] }
-//    3. For each template:
-//         a. base64 decode to 512-byte raw template
-//         b. DownChar: write template into AS608 CharBuffer2
-//            (we match probe in CB1 against each stored template in CB2)
-//         c. Call finger.fingerFastSearch() — WAIT, that's 1:N on sensor.
-//            AS608 Match command (0x03) compares CB1 vs CB2 only (1:1).
-//            We use that for each iteration.
-//    4. Return result string on first match
-//
-//  AS608 Match Command (0x03):
-//    Adafruit library: finger.fingerFastSearch() does 1:N against stored templates.
-//    For host-driven 1:1, we use the raw Match packet directly since the
-//    Adafruit library doesn't expose it. We send the packet manually.
+//  Protocol (matches api/bio_match.php exactly):
+//    1. Capture a fingerprint image into the sensor's internal
+//       image buffer (finger.getImage(), done by caller via
+//       captureImage() before this function is called).
+//    2. Upload the RAW image from the sensor to the ESP32 via
+//       the UpImage command (0x0A) — this is the sensor's native
+//       raw-image transfer, already 4-bit packed (2 pixels per
+//       byte), which is exactly the format the server expects.
+//       No on-device feature extraction or matching happens here
+//       at all — the server runs mindtct to extract minutiae and
+//       bozorth3 to compare against every enrolled student.
+//    3. POST image_b64 (+ device_key, date, time) to bio_match.php.
+//    4. Server responds { "status":"ok", "result":"MATCH:id:name:status" }
+//       or { "status":"ok", "result":"NO_MATCH" }
+//       or { "status":"error", "message":"..." }
+//    5. Return the "result" string as-is — callers (attendanceMode())
+//       already parse "MATCH:"/"NO_MATCH"/anything-else exactly the
+//       same way regardless of how the result was computed.
 // ============================================================
 String fetchTemplatesAndMatch(const String& dateStr, const String& timeStr) {
-    // ── Upload probe feature (CharBuffer1) to ESP32 memory ────
-    // We use UpChar to read the 256-byte feature from the sensor
-    // so we can re-load it as CharBuffer1 for each comparison.
-    uint8_t probeTemplate[512];   // AS608 UpChar returns 512 bytes even for features
-    memset(probeTemplate, 0, sizeof(probeTemplate));
-
-    // UpChar(1): upload CharBuffer1 from sensor → ESP32
-    // We'll call it via direct packet since Adafruit library
-    // doesn't expose UpChar. See uploadCharBuffer() helper below.
-    if (!uploadCharBuffer(1, probeTemplate, 512)) {
-        Serial.println("[MATCH] Failed to upload probe from sensor");
-        return "ERROR:Probe upload failed";
+    // ── Upload the raw probe image from the sensor ─────────────
+    if (!uploadImage(imgBuf, IMG_PACKED_SIZE)) {
+        Serial.println("[MATCH] Failed to upload image from sensor");
+        return "ERROR:Image upload failed";
     }
 
     // ── POST to bio_match.php ─────────────────────────────────
-    String probe_b64 = base64Encode(probeTemplate, 512);
+    String image_b64 = base64Encode(imgBuf, IMG_PACKED_SIZE);
 
     String url  = String(SERVER_BASE) + "/classroom/api/bio_match.php";
     String body = "device_key=" + urlencode(String(DEVICE_KEY))
-                + "&probe_b64=" + urlencode(probe_b64)
-                + "&date="      + dateStr
-                + "&time="      + timeStr;
+                + "&image_b64="  + urlencode(image_b64)
+                + "&date="       + dateStr
+                + "&time="       + timeStr;
 
     HTTPClient http;
     http.setTimeout(HTTP_TIMEOUT_MS);
@@ -410,101 +421,29 @@ String fetchTemplatesAndMatch(const String& dateStr, const String& timeStr) {
         return "ERROR:HTTP " + String(httpCode);
     }
 
-    // Quick check
     if (response.indexOf("\"status\":\"error\"") >= 0) {
         String msg = jsonExtract(response, "message");
         return "ERROR:" + msg;
     }
 
-    // ── Extract late_cutoff ───────────────────────────────────
-    String cutoff = jsonExtract(response, "late_cutoff");
-    if (cutoff == "") cutoff = "08:15:00";
-
-    // ── Parse templates array ─────────────────────────────────
-    // JSON format: "templates":[{"student_id":"...","name":"...","template_b64":"..."},...]
-    // We parse manually since no ArduinoJson.
-    int arrStart = response.indexOf("\"templates\":[");
-    if (arrStart < 0) return "ERROR:No templates key";
-
-    arrStart += 13;   // skip past  "templates":[
-    int arrEnd = response.lastIndexOf(']');
-    if (arrEnd < 0) return "ERROR:Bad JSON";
-
-    String arrStr = response.substring(arrStart, arrEnd);
-
-    // ── Reload probe into CharBuffer1 before matching loop ────
-    if (!downloadCharBuffer(1, probeTemplate, 512)) {
-        return "ERROR:Probe reload failed";
-    }
-
-    // ── Iterate templates: DownChar → Match ───────────────────
-    int pos = 0;
-    while (pos < (int)arrStr.length()) {
-        int objStart = arrStr.indexOf('{', pos);
-        if (objStart < 0) break;
-        int objEnd = arrStr.indexOf('}', objStart);
-        if (objEnd < 0) break;
-
-        String obj = arrStr.substring(objStart + 1, objEnd);
-        pos = objEnd + 1;
-
-        String student_id   = jsonExtract("{" + obj + "}", "student_id");
-        String name         = jsonExtract("{" + obj + "}", "name");
-        String template_b64 = jsonExtract("{" + obj + "}", "template_b64");
-
-        if (student_id == "" || template_b64 == "") continue;
-
-        // Decode base64 template (512 bytes)
-        uint8_t tplBuf[512];
-        int tplLen = base64Decode(template_b64, tplBuf, 512);
-        if (tplLen != 512) {
-            Serial.printf("[MATCH] Bad template size %d for %s\n", tplLen, student_id.c_str());
-            continue;
-        }
-
-        // DownChar(2): load stored template into CharBuffer2
-        if (!downloadCharBuffer(2, tplBuf, 512)) {
-            Serial.println("[MATCH] DownChar failed, skipping");
-            continue;
-        }
-
-        // Match CharBuffer1 (probe) vs CharBuffer2 (stored) — 1:1
-        uint16_t score = 0;
-        if (matchBuffers(score)) {
-            Serial.printf("[MATCH] Match! student=%s score=%d\n",
-                          student_id.c_str(), score);
-
-            // Determine status based on RTC time vs late cutoff
-            String att_status = "Present";
-            if (timeStr >= cutoff) att_status = "Late";
-
-            return "MATCH:" + student_id + ":" + name + ":" + att_status;
-        }
-
-        // No match — reload probe into CB1 (DownChar overwrites CB2 but
-        // some AS608 variants corrupt CB1 too on failed match, so reload)
-        downloadCharBuffer(1, probeTemplate, 512);
-    }
-
-    return "NO_MATCH";
+    String result = jsonExtract(response, "result");
+    if (result == "") return "ERROR:Bad server response";
+    return result;
 }
 
 // ============================================================
-//  CAPTURE FEATURE from sensor into CharBuffer (slot 1 or 2)
-//  Returns true if image captured and converted OK.
+//  CAPTURE a raw image from the sensor into its internal image
+//  buffer. Returns true if a good image was captured — does NOT
+//  do any on-device feature extraction (image2Tz); we upload the
+//  raw image itself via uploadImage() and let the server run
+//  mindtct/bozorth3 on it instead.
 // ============================================================
-bool captureFeature(uint8_t slot) {
+bool captureImage() {
     uint8_t p = finger.getImage();
     if (p == FINGERPRINT_NOFINGER) return false;
     if (p != FINGERPRINT_OK) {
         if (p != FINGERPRINT_IMAGEMESS)   // suppress idle noise
             Serial.printf("[FP] getImage error %d\n", p);
-        return false;
-    }
-    p = finger.image2Tz(slot);
-    if (p != FINGERPRINT_OK) {
-        if (p != FINGERPRINT_IMAGEMESS)
-            Serial.printf("[FP] image2Tz(%d) error %d\n", slot, p);
         return false;
     }
     return true;
@@ -564,9 +503,19 @@ void reportEnrollDone(bool success) {
 
 // ============================================================
 //  ENROLLMENT MODE
-//  Captures 2 images, creates model, uploads to server.
+//  Captures 4 raw images — top, left, right, bottom edges of the
+//  same finger — uploading each separately to bio_enroll.php as
+//  slot 1-4. Having 4 variants per student improves match
+//  reliability later, since a scan at attendance time rarely
+//  lands at the exact same angle as any single enrollment capture.
+//  If any of the 4 fails, the whole enrollment is aborted rather
+//  than silently leaving a partial set — same "abort whole save on
+//  failure" philosophy already used on the server side (see the
+//  comments in teacher/add_subject.php's enrollment validation).
 // ============================================================
 void enrollmentMode() {
+    const char* slotLabel[4] = { "top", "left", "right", "bottom" };
+
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Enroll:");
@@ -574,90 +523,80 @@ void enrollmentMode() {
                        ? enrollStudentName.substring(0,9)
                        : enrollStudentName;
     lcd.print(shortName);
-    lcd.setCursor(0,1);
-    lcd.print("Place finger 1  ");
 
-    Serial.println("[ENROLL] Waiting for finger 1...");
+    String url = String(SERVER_BASE) + "/classroom/api/bio_enroll.php";
 
-    // First scan
-    while (!captureFeature(1)) delay(50);
-    lcd.setCursor(0,1); lcd.print("Remove finger   ");
-    beep(1, true);
-    delay(1000);
-    while (finger.getImage() != FINGERPRINT_NOFINGER) delay(50);
+    for (int slot = 1; slot <= 4; slot++) {
+        lcd.setCursor(0,1);
+        lcd.print("Place (");
+        lcd.print(slotLabel[slot-1]);
+        lcd.print(")   ");
 
-    lcd.setCursor(0,1); lcd.print("Place finger 2  ");
-    Serial.println("[ENROLL] Waiting for finger 2...");
+        Serial.printf("[ENROLL] Waiting for finger, slot %d (%s)...\n", slot, slotLabel[slot-1]);
 
-    // Second scan
-    while (!captureFeature(2)) delay(50);
-    beep(1, true);
+        // Wait for a good finger image
+        while (!captureImage()) delay(50);
+        beep(1, true);
 
-    // Create model (merge CB1 + CB2 → CB1)
-    uint8_t p = finger.createModel();
-    if (p != FINGERPRINT_OK) {
-        showResult("Mismatch!", "Try again", false);
-        beep(3, false);
-        reportEnrollDone(false);
-        delay(LCD_HOLD_MS);
-        enrollMode = false;
-        showIdle();
-        return;
+        // Upload the raw image from the sensor
+        lcd.setCursor(0,1); lcd.print("Uploading...    ");
+        if (!uploadImage(imgBuf, IMG_PACKED_SIZE)) {
+            showResult("Upload failed", "Sensor error", false);
+            beep(3, false);
+            reportEnrollDone(false);
+            delay(LCD_HOLD_MS);
+            enrollMode = false;
+            showIdle();
+            return;
+        }
+
+        String image_b64 = base64Encode(imgBuf, IMG_PACKED_SIZE);
+
+        String body = "device_key=" + urlencode(String(DEVICE_KEY))
+                    + "&student_id=" + urlencode(enrollStudentId)
+                    + "&slot="       + String(slot)
+                    + "&image_b64="  + image_b64;   // already URL-safe
+
+        HTTPClient http;
+        http.setTimeout(HTTP_TIMEOUT_MS);
+        http.begin(url);
+        http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+        http.addHeader("Content-Length", String(body.length()));
+
+        int    httpCode = http.POST(body);
+        String response = (httpCode > 0) ? http.getString() : "";
+        http.end();
+
+        Serial.printf("[ENROLL] slot %d POST -> HTTP %d\n", slot, httpCode);
+        Serial.println("[ENROLL] Response: " + response.substring(0, 200));
+
+        if (!(httpCode == 200 && response.indexOf("\"status\":\"ok\"") >= 0)) {
+            String msg = jsonExtract(response, "message");
+            if (msg.length() > 16) msg = msg.substring(0,16);
+            showResult("Enroll Failed", msg, false);
+            beep(3, false);
+            reportEnrollDone(false);
+            Serial.printf("[ENROLL] Failed at slot %d: %d %s\n", slot, httpCode, response.c_str());
+            delay(LCD_HOLD_MS);
+            enrollMode = false;
+            showIdle();
+            return;
+        }
+
+        // Between captures, wait for the finger to be lifted so the
+        // next slot's placement is a genuinely new image, not the
+        // same one read twice.
+        if (slot < 4) {
+            lcd.setCursor(0,1); lcd.print("Remove finger   ");
+            delay(600);
+            while (finger.getImage() != FINGERPRINT_NOFINGER) delay(50);
+        }
     }
 
-    lcd.setCursor(0,1); lcd.print("Uploading...    ");
-
-    // Upload CharBuffer1 (512-byte merged template) from sensor → ESP32
-    uint8_t tplBuf[512];
-    if (!uploadCharBuffer(1, tplBuf, 512)) {
-        showResult("Upload failed", "Sensor error", false);
-        beep(3, false);
-        reportEnrollDone(false);
-        delay(LCD_HOLD_MS);
-        enrollMode = false;
-        showIdle();
-        return;
-    }
-
-    // Base64 encode
-    String tpl_b64 = base64Encode(tplBuf, 512);
-
-    // POST to bio_enroll.php
-    // The base64 template is ~700 chars. We build the body in parts and
-    // send with explicit Content-Length to avoid buffer issues.
-    String url   = String(SERVER_BASE) + "/classroom/api/bio_enroll.php";
-    String bodyPrefix = "device_key="   + urlencode(String(DEVICE_KEY))
-                      + "&student_id="  + urlencode(enrollStudentId)
-                      + "&template_b64=";
-    String bodySuffix = tpl_b64;  // already URL-safe (base64 chars are all safe)
-    String body   = bodyPrefix + bodySuffix;
-
-    HTTPClient http;
-    http.setTimeout(HTTP_TIMEOUT_MS);
-    http.begin(url);
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    http.addHeader("Content-Length", String(body.length()));
-
-    int    httpCode = http.POST(body);
-    String response = (httpCode > 0) ? http.getString() : "";
-    http.end();
-
-    Serial.printf("[ENROLL] POST → HTTP %d\n", httpCode);
-    Serial.println("[ENROLL] Response: " + response.substring(0, 200));
-
-    if (httpCode == 200 && response.indexOf("\"status\":\"ok\"") >= 0) {
-        showResult("Enrolled!", shortName, true);
-        beep(2, true);
-        reportEnrollDone(true);
-        Serial.printf("[ENROLL] OK for %s\n", enrollStudentId.c_str());
-    } else {
-        String msg = jsonExtract(response, "message");
-        if (msg.length() > 16) msg = msg.substring(0,16);
-        showResult("Enroll Failed", msg, false);
-        beep(3, false);
-        reportEnrollDone(false);
-        Serial.printf("[ENROLL] Failed: %d %s\n", httpCode, response.c_str());
-    }
+    showResult("Enrolled!", shortName, true);
+    beep(2, true);
+    reportEnrollDone(true);
+    Serial.printf("[ENROLL] OK for %s (all 4 sides)\n", enrollStudentId.c_str());
 
     delay(LCD_HOLD_MS);
     enrollMode = false;
@@ -818,43 +757,37 @@ bool sendCmd(uint8_t* payload, int payLen, uint8_t* ackBuf, int ackLen) {
     return (rIdx >= ackLen);
 }
 
-// UpChar: sensor → ESP32  (upload CharBuffer bufId into dst, dstLen bytes)
-// The sensor sends the template in multiple data packets (PID=0x02) followed
-// by one end-of-data packet (PID=0x08).
-bool uploadCharBuffer(uint8_t bufId, uint8_t* dst, int dstLen) {
-    // Send UpChar command (0x08) with buffer ID
-    uint8_t cmd[] = { 0x08, bufId };
+// UpImage: sensor → ESP32  (upload the raw fingerprint image from
+// the sensor's internal image buffer, populated by finger.getImage()).
+// Same multi-packet transfer as UpChar, just a different command byte
+// (0x0A, no buffer-ID parameter) and much more data — a full 256x288
+// image, 4-bit packed (2 pixels/byte) = 36864 bytes, sent as many
+// data packets (PID=0x02) followed by one end-of-data packet (PID=0x08).
+bool uploadImage(uint8_t* dst, int dstLen) {
+    uint8_t cmd[] = { 0x0A };
     uint8_t ack[12];
-    if (!sendCmd(cmd, 2, ack, 12)) {
-        Serial.println("[UPCHAR] sendCmd timeout");
+    if (!sendCmd(cmd, 1, ack, 12)) {
+        Serial.println("[UPIMAGE] sendCmd timeout");
         return false;
     }
     if (ack[9] != 0x00) {
-        Serial.printf("[UPCHAR] Sensor error code: 0x%02X\n", ack[9]);
+        Serial.printf("[UPIMAGE] Sensor error code: 0x%02X\n", ack[9]);
         return false;
     }
 
-    // Read data packets. Each packet:
-    //   0xEF 0x01  (header)
-    //   0xFF 0xFF 0xFF 0xFF  (address)
-    //   PID  (0x02=data, 0x08=end-of-data)
-    //   LEN_HIGH LEN_LOW  (payload + 2 checksum bytes)
-    //   [payload bytes]
-    //   CS_HIGH CS_LOW
     int received = 0;
     uint32_t timeout = millis();
 
-    while (millis() - timeout < 6000) {
+    while (millis() - timeout < 20000) {
         // Wait for 0xEF 0x01 sync
         uint8_t b;
         bool synced = false;
-        while (millis() - timeout < 6000) {
+        while (millis() - timeout < 20000) {
             if (fpSerial.available()) {
                 b = fpSerial.read();
                 if (b == 0xEF) {
-                    // wait for 0x01
                     uint32_t t2 = millis();
-                    while (!fpSerial.available() && millis()-t2 < 200);
+                    while (!fpSerial.available() && millis()-t2 < 500);
                     if (fpSerial.available() && fpSerial.read() == 0x01) {
                         synced = true;
                         break;
@@ -886,9 +819,9 @@ bool uploadCharBuffer(uint8_t bufId, uint8_t* dst, int dstLen) {
         ll = fpSerial.available() ? fpSerial.read() : 0;
 
         uint16_t pktLen = ((uint16_t)lh << 8) | ll;
-        int dataLen = (int)pktLen - 2;  // exclude 2-byte checksum
+        int dataLen = (int)pktLen - 2;
         if (dataLen <= 0 || dataLen > 256) {
-            Serial.printf("[UPCHAR] Unexpected dataLen=%d pid=0x%02X\n", dataLen, pid);
+            Serial.printf("[UPIMAGE] Unexpected dataLen=%d pid=0x%02X\n", dataLen, pid);
             break;
         }
 
@@ -907,70 +840,14 @@ bool uploadCharBuffer(uint8_t bufId, uint8_t* dst, int dstLen) {
             if (fpSerial.available()) fpSerial.read();
         }
 
-        Serial.printf("[UPCHAR] pid=0x%02X dataLen=%d received=%d\n", pid, dataLen, received);
+        if (received % 2048 < dataLen)  // log occasionally, not every packet
+            Serial.printf("[UPIMAGE] received=%d/%d\n", received, dstLen);
 
         if (pid == 0x08) break;  // end-of-data packet
     }
 
-    Serial.printf("[UPCHAR] Total received: %d bytes\n", received);
-    return (received >= 256);
-}
-
-// DownChar: ESP32 → sensor  (download src into CharBuffer bufId)
-// Sends 512 bytes in 4 data packets + 1 end packet.
-bool downloadCharBuffer(uint8_t bufId, uint8_t* src, int srcLen) {
-    // Command: DownChar (0x09) bufId
-    uint8_t cmd[] = { 0x09, bufId };
-    uint8_t ack[12];
-    if (!sendCmd(cmd, 2, ack, 12)) return false;
-    if (ack[9] != 0x00) return false;
-
-    // Send 4 data packets of 128 bytes each
-    int offset = 0;
-    int total  = (srcLen == 512) ? 512 : 256;
-    int chunkSize = 128;
-    int chunks = total / chunkSize;
-
-    for (int c = 0; c < chunks; c++) {
-        bool isLast = (c == chunks - 1);
-        uint8_t pid  = isLast ? 0x08 : 0x02;
-        uint16_t len = chunkSize + 2;
-        uint8_t pkt[140];
-        int idx = 0;
-
-        pkt[idx++] = 0xEF; pkt[idx++] = 0x01;
-        pkt[idx++] = 0xFF; pkt[idx++] = 0xFF;
-        pkt[idx++] = 0xFF; pkt[idx++] = 0xFF;
-        pkt[idx++] = pid;
-        pkt[idx++] = len >> 8; pkt[idx++] = len & 0xFF;
-
-        uint16_t cs = pid + (len >> 8) + (len & 0xFF);
-        for (int i = 0; i < chunkSize; i++) {
-            uint8_t b = (offset + i < srcLen) ? src[offset + i] : 0;
-            pkt[idx++] = b;
-            cs += b;
-        }
-        pkt[idx++] = cs >> 8; pkt[idx++] = cs & 0xFF;
-
-        fpSerial.write(pkt, idx);
-        fpSerial.flush();
-        offset += chunkSize;
-        delay(10);   // give sensor time to process each packet
-    }
-
-    return true;
-}
-
-// Match: compare CharBuffer1 vs CharBuffer2 on-sensor (1:1)
-// Returns true if match, sets score.
-bool matchBuffers(uint16_t& score) {
-    uint8_t cmd[] = { 0x03 };
-    uint8_t ack[14];
-    if (!sendCmd(cmd, 1, ack, 14)) return false;
-    // ack[9] = confirmation code: 0x00 = match, 0x08 = no match
-    if (ack[9] != 0x00) return false;
-    score = ((uint16_t)ack[10] << 8) | ack[11];
-    return (score > 0);
+    Serial.printf("[UPIMAGE] Total received: %d bytes (expected %d)\n", received, dstLen);
+    return (received >= dstLen - 256);  // allow a little slack for the last partial packet
 }
 
 // ============================================================

@@ -134,12 +134,22 @@ if (isset($_POST['queue_section_enroll'])) {
         if (empty($sec_students)) {
             $error_msg = "No students found in that section.";
         } else {
-            // Store the full queue in session so bio_enroll_done can chain them
-            $_SESSION['bulk_enroll_queue'] = [
-                'device_id' => $dev_id,
-                'students'  => array_column($sec_students, 'student_id'),
-                'index'     => 1,   // 0 will be queued now; start chaining from 1
-            ];
+            // Store the remaining queue in bio_devices (keyed by device_id),
+            // NOT in $_SESSION — this used to be a real bug: bio_enroll_done.php
+            // is called by the ESP32 device itself over its own HTTP request,
+            // which never carries the teacher's browser session cookie, so
+            // $_SESSION['bulk_enroll_queue'] was never actually visible there
+            // and the "chain to next student" step silently never fired.
+            // The device already authenticates via device_key -> device_id,
+            // so storing this on the bio_devices row it can persist across
+            // both the browser's request (this one) and the device's later
+            // "done" callback.
+            $remaining_json = json_encode(array_slice(array_column($sec_students, 'student_id'), 1));
+            $bset = $conn->prepare(
+                "UPDATE bio_devices SET bulk_enroll_students = ?, bulk_enroll_index = 0 WHERE id = ?"
+            );
+            $bset->bind_param('si', $remaining_json, $dev_id);
+            $bset->execute();
             // Clear stale rows for this device before queuing first student
             $clr = $conn->prepare(
                 "DELETE FROM bio_enroll_queue WHERE device_id=? AND status IN ('done','failed')"

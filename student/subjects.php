@@ -59,10 +59,6 @@ $type_colors = [
 <main class="main-content">
 
 <div class="page-wrap">
-  <div class="page-header">
-    <h1><i class="ti ti-books text-accent"></i> My Subjects</h1>
-    <p>Your enrolled subjects and grade breakdown for the current semester.</p>
-  </div>
 
   <div class="card">
     <div class="table-wrap">
@@ -75,7 +71,7 @@ $type_colors = [
             <th>Written Avg</th>
             <th>Performance</th>
             <th>Attendance</th>
-            <th>Final Grade</th>
+            <!-- <th>Final Grade</th> -->
             <th>Letter</th>
             <th></th>
           </tr>
@@ -139,11 +135,11 @@ $type_colors = [
               </div>
             </td>
             <?php endforeach; ?>
-            <td>
+            <!-- <td>
               <span style="font-family:var(--font-head);font-size:17px;font-weight:700;color:<?php echo $fg>=75?'var(--green)':($fg>0?'var(--red)':'var(--text7)');?>;">
-                <?php echo $fg>0?number_format($fg,2).'%':'—'; ?>
+                <?php echo $fg>0?number_format($fg,2).'':'—'; ?>
               </span>
-            </td>
+            </td> -->
             <td>
               <?php if ($fg>0): ?>
               <span class="badge <?php echo $letter_badge;?>" style="font-size:12px;padding:3px 10px;">
