@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['password'] ?? '');
     if ($username===''||$password==='') {
-        $error = "Please enter both username and password.";
+        $error = "Please enter both your Student ID / username and password.";
     } else {
         $stmt = $conn->prepare("SELECT id,username,password,role,student_id FROM users WHERE username=?");
         $stmt->bind_param("s",$username);
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
             exit;
         } else {
-            $error = "Invalid username or password.";
+            $error = "Invalid Student ID / username or password.";
         }
     }
 }
@@ -527,10 +527,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <form method="POST" autocomplete="off">
         <div class="form-group">
-          <label>Username</label>
+          <label>Student ID / Username</label>
           <div class="input-wrap">
             <i class="ti ti-user"></i>
-            <input type="text" name="username" placeholder="Enter your username"
+            <input type="text" name="username" placeholder="Students: enter your Student ID"
               value="<?php echo htmlspecialchars($_POST['username']??''); ?>"
               required autofocus>
           </div>

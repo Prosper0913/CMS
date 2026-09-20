@@ -1,15 +1,15 @@
 <?php
 // ============================================================
 //  teacher/students.php
-//  Add, edit, delete student accounts.
+//  Read-only list of students enrolled in the teacher's subjects.
+//  Teachers cannot add, edit, reset passwords for, or delete student
+//  accounts — that is handled by Admin → Students.
 //  NOTE: The students table no longer has a 'section' column.
 //  Section is handled at the subject level (subject_enrollments).
 // ============================================================
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
-require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
-require_once __DIR__ . '/../includes/sync_to_guidance.php';
 
 $teacher_id = $_SESSION['user_id'];
 $success_msg = '';
@@ -49,29 +49,11 @@ if (isset($_POST['add_student'])) {
     $error_msg = "Adding students is now handled by an administrator.";
 }
 
-// ── DELETE student ───────────────────────────────────────────
+// ── DELETE student — disabled. Teachers can no longer delete student
+//    accounts; this is handled by Admin → Students. Server-side block
+//    kept as defense in depth even though the delete button is gone. ──
 if (isset($_GET['delete'])) {
-    $del_id = trim($_GET['delete']);
-    if (!teacherOwnsStudent($conn, $teacher_id, $del_id)) {
-        $error_msg = "You can only delete students enrolled in one of your own subjects.";
-    } else {
-        $conn->begin_transaction();
-        try {
-            $d1 = $conn->prepare("DELETE FROM users WHERE student_id=?");
-            $d1->bind_param("s",$del_id); $d1->execute();
-            $d2 = $conn->prepare("DELETE FROM students WHERE student_id=?");
-            $d2->bind_param("s",$del_id); $d2->execute();
-            $conn->commit();
-            // Keep Tooltrack/Guidance in sync — same as admin/students.php.
-            // Failures never break the delete.
-            push_student_deletion_to_tooltrack($del_id);
-            push_student_deletion_to_guidance($del_id);
-            header("Location: students.php?msg=deleted"); exit;
-        } catch (Exception $e) {
-            $conn->rollback();
-            $error_msg = "Could not delete: ".$e->getMessage();
-        }
-    }
+    $error_msg = "Deleting student accounts is handled by an administrator.";
 }
 
 // ── Editing student info — disabled. Teachers can no longer edit
@@ -81,23 +63,11 @@ if (isset($_GET['edit']) || isset($_POST['update_student'])) {
     $error_msg = "Editing student information is now handled by an administrator.";
 }
 
-// ── RESET password ───────────────────────────────────────────
+// ── RESET password — disabled. Teachers can no longer reset student
+//    passwords; this is handled by Admin → Students. Server-side block
+//    kept as defense in depth even though the reset button is gone. ──
 if (isset($_POST['reset_password'])) {
-    $student_id  = trim($_POST['student_id']);
-    $new_password= trim($_POST['new_password']);
-
-    if (!teacherOwnsStudent($conn, $teacher_id, $student_id)) {
-        $error_msg = "You can only reset passwords for students enrolled in one of your own subjects.";
-    } elseif (strlen($new_password) < 6) {
-        $error_msg = "Password must be at least 6 characters.";
-    } else {
-        $hashed = password_hash($new_password, PASSWORD_DEFAULT);
-        $p1 = $conn->prepare("UPDATE students SET password=? WHERE student_id=?");
-        $p1->bind_param("ss",$hashed,$student_id); $p1->execute();
-        $p2 = $conn->prepare("UPDATE users SET password=? WHERE student_id=?");
-        $p2->bind_param("ss",$hashed,$student_id); $p2->execute();
-        $success_msg = "Password reset successfully.";
-    }
+    $error_msg = "Resetting student passwords is handled by an administrator.";
 }
 
 $nav_subs = getTeacherSubjects($conn, $teacher_id);
@@ -124,10 +94,10 @@ if ($search !== '') {
          JOIN subject_enrollments se ON se.student_id = s.student_id
          JOIN subjects sub ON sub.id = se.subject_id
          WHERE sub.teacher_id = ?
-           AND (s.last_name LIKE ? OR s.first_name LIKE ? OR s.student_id LIKE ? OR s.username LIKE ?)
+           AND (s.last_name LIKE ? OR s.first_name LIKE ? OR s.student_id LIKE ?)
          ORDER BY s.last_name ASC"
     );
-    $res->bind_param("issss",$teacher_id,$like,$like,$like,$like);
+    $res->bind_param("isss",$teacher_id,$like,$like,$like);
     $res->execute();
     $students = $res->get_result();
 } else {
@@ -211,7 +181,7 @@ $active_nav = "students";
 
   <div class="two-col" style="justify-content: center;">
 
-    <!-- ── FORM PANEL (read-only info — teachers can no longer add/edit students) ── -->
+    <!-- ── FORM PANEL (read-only info — teachers can no longer add/edit students) ──
     <div>
       <div class="card">
         <p class="card-title"><i class="ti ti-info-circle"></i> Student Records</p>
@@ -224,7 +194,7 @@ $active_nav = "students";
           <a href="manage_sections.php" class="text-accent">Manage Sections</a>.
         </p>
       </div>
-    </div>
+    </div> -->
 
       <!-- Info box -->
       <!-- <div class="card"> 
@@ -253,7 +223,7 @@ $active_nav = "students";
           <div class="input-wrap" style="flex:1;">
             <i class="ti ti-search"></i>
             <input type="text" name="search" class="form-control"
-              placeholder="Search by name, ID, or username…"
+              placeholder="Search by name or ID…"
               value="<?php echo htmlspecialchars($search); ?>">
           </div>
           <button type="submit" class="btn btn-outline btn-sm">Search</button>
@@ -269,14 +239,12 @@ $active_nav = "students";
             <tr>
               <th>Student</th>
               <th>Student ID</th>
-              <th>Username</th>
               <th>Subjects</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <?php if ($students->num_rows === 0): ?>
-            <tr><td colspan="5">
+            <tr><td colspan="3">
               <div class="empty-state">
                 <i class="ti ti-users-off"></i>
                 <p><?php echo $search ? "No students matched \"$search\"" : "No students yet. Add one using the form."; ?></p>
@@ -306,30 +274,11 @@ $active_nav = "students";
               </td>
               <td class="td-mono"><?php echo htmlspecialchars($s['student_id']); ?></td>
               <td>
-                <span>
-                  <?php echo htmlspecialchars($s['username']); ?>
-                </span>
-              </td>
-              <td>
                 <?php if ($s['subject_count'] > 0): ?>
                   <span class="badge badge-green"><?php echo $s['subject_count']; ?> subject<?php echo $s['subject_count']>1?'s':''; ?></span>
                 <?php else: ?>
                   <span style="font-size:11px;color:var(--text7);">Not enrolled</span>
                 <?php endif; ?>
-              </td>
-              <td>
-                <div class="td-actions">
-                  <button type="button"
-                    class="btn btn-sm btn-yellow"
-                    onclick="openResetModal('<?php echo htmlspecialchars($s['student_id'],ENT_QUOTES); ?>','<?php echo htmlspecialchars($s['last_name'].', '.$s['first_name'],ENT_QUOTES); ?>')">
-                    <i class="ti ti-key" style="color: var(--yellow2);"></i>
-                  </button>
-                  <a href="students.php?delete=<?php echo urlencode($s['student_id']); ?>"
-                     class="btn btn-sm btn-delete"
-                     onclick="return confirm('Delete <?php echo htmlspecialchars(addslashes($s['first_name'])); ?>? This also removes their scores and attendance.')">
-                    <i class="ti ti-trash"></i>
-                  </a>
-                </div>
               </td>
             </tr>
             <?php endwhile; ?>
@@ -341,34 +290,6 @@ $active_nav = "students";
   </div><!-- end two-col -->
 </div><!-- end page-wrap -->
 
-<!-- ── PASSWORD RESET MODAL ── -->
-<div class="modal-overlay" id="resetModal">
-  <div class="modal">
-    <h3><i class="ti ti-key" style="color:var(--yellow);"></i> Reset Password</h3>
-    <p id="resetModalName" style="margin-bottom:4px;"></p>
-    <p>Enter a new password for this student.</p>
-    <form method="POST">
-      <input type="hidden" name="student_id" id="resetStudentId">
-      <div class="form-group">
-        <label>New Password</label>
-        <div class="input-wrap">
-          <i class="ti ti-lock"></i>
-          <input type="password" name="new_password" id="resetPw" class="form-control"
-            placeholder="Min. 6 characters" required minlength="6">
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="reset_password" class="btn btn-sm btn-yellow btn-fill">
-          <i class="ti ti-check"></i> Reset Password
-        </button>
-        <button type="button" class="btn btn-sm btn-outline" onclick="closeResetModal()">
-          Cancel
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <script>
 function togglePw(){
   const pw=document.getElementById('pw-input');
@@ -377,19 +298,6 @@ function togglePw(){
   if(pw.type==='password'){pw.type='text';ic.className='ti ti-eye-off';}
   else{pw.type='password';ic.className='ti ti-eye';}
 }
-function openResetModal(sid,name){
-  document.getElementById('resetStudentId').value=sid;
-  document.getElementById('resetModalName').textContent='Student: '+name;
-  document.getElementById('resetPw').value='';
-  document.getElementById('resetModal').classList.add('open');
-}
-function closeResetModal(){
-  document.getElementById('resetModal').classList.remove('open');
-}
-// Close on backdrop click
-document.getElementById('resetModal').addEventListener('click',function(e){
-  if(e.target===this) closeResetModal();
-});
 </script>
 <script>
 function toggleDD(){

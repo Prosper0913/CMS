@@ -35,22 +35,25 @@ if (isset($_POST['add_student'])) {
     $middle_initial = trim($_POST['middle_initial']);
     $email          = trim($_POST['email']);
     $course         = trim($_POST['course'] ?? '');
-    $username       = trim($_POST['username']);
+    $username       = $student_id;   // Students log in with their Student ID
     $password       = trim($_POST['password']);
     $section_id     = ($_POST['section_id'] !== '') ? (int)$_POST['section_id'] : null;
 
-    if ($student_id===''||$last_name===''||$first_name===''||$username===''||$password==='') {
-        $error_msg = "Student ID, name, username, and password are all required.";
+    if ($student_id===''||$last_name===''||$first_name===''||$password==='') {
+        $error_msg = "Student ID, name, and password are all required.";
     } elseif (!in_array($course, ['BSIT','LAED','BSBA','BSN','FPST','BSA'], true)) {
         $error_msg = "Please select a valid course.";
     } else {
-        $chk = $conn->prepare("SELECT id FROM students WHERE student_id=? OR username=? LIMIT 1");
-        $chk->bind_param("ss",$student_id,$username);
+        $chk = $conn->prepare(
+            "SELECT id FROM students WHERE student_id=? OR username=?
+             UNION SELECT id FROM users WHERE username=? LIMIT 1"
+        );
+        $chk->bind_param("sss",$student_id,$username,$username);
         $chk->execute();
         $chk->store_result();
 
         if ($chk->num_rows > 0) {
-            $error_msg = "Student ID or username already exists. Please use a unique value.";
+            $error_msg = "That Student ID already exists (or is already used as a login). Please use a unique ID.";
         } else {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $conn->begin_transaction();
@@ -96,7 +99,7 @@ if (isset($_POST['add_student'])) {
                 push_student_to_guidance($conn, $student_id);
                 $success_msg = "Student <strong>"
                     .htmlspecialchars($last_name.', '.$first_name)
-                    ."</strong> added. They can now log in as <code>{$username}</code>.";
+                    ."</strong> added. They can now log in with Student ID <code>".htmlspecialchars($username)."</code>.";
             } catch (Exception $e) {
                 $conn->rollback();
                 $error_msg = "Database error: ".$e->getMessage();
@@ -136,7 +139,6 @@ if (isset($_POST['update_student'])) {
     $middle_initial = trim($_POST['middle_initial']);
     $email          = trim($_POST['email']);
     $course         = trim($_POST['course'] ?? '');
-    $username       = trim($_POST['username']);
 
     if (!in_array($course, ['BSIT','LAED','BSBA','BSN','FPST','BSA'], true)) {
         $error_msg = "Please select a valid course.";
@@ -144,17 +146,13 @@ if (isset($_POST['update_student'])) {
 
     $upd = $conn->prepare(
         "UPDATE students SET
-            last_name=?,first_name=?,middle_initial=?,email=?,course=?,username=?
+            last_name=?,first_name=?,middle_initial=?,email=?,course=?
          WHERE student_id=?"
     );
-    $upd->bind_param("sssssss",
-        $last_name,$first_name,$middle_initial,$email,$course,$username,$student_id
+    $upd->bind_param("ssssss",
+        $last_name,$first_name,$middle_initial,$email,$course,$student_id
     );
     $upd->execute();
-
-    $upd2 = $conn->prepare("UPDATE users SET username=? WHERE student_id=?");
-    $upd2->bind_param("ss",$username,$student_id);
-    $upd2->execute();
 
     // ── Push to tooltrack: re-sync every FPST subject this student is
     // currently enrolled in, so tooltrack sees the updated name. Non-FPST
@@ -228,10 +226,10 @@ $types  = '';
 $params = [];
 
 if ($search !== '') {
-    $where[] = "(s.last_name LIKE ? OR s.first_name LIKE ? OR s.student_id LIKE ? OR s.username LIKE ?)";
+    $where[] = "(s.last_name LIKE ? OR s.first_name LIKE ? OR s.student_id LIKE ?)";
     $like = "%{$search}%";
-    $types .= 'ssss';
-    array_push($params, $like, $like, $like, $like);
+    $types .= 'sss';
+    array_push($params, $like, $like, $like);
 }
 if ($filter_section === 'unassigned') {
     $where[] = "NOT EXISTS (SELECT 1 FROM section_students ss WHERE ss.student_id = s.student_id)";
@@ -340,11 +338,6 @@ $active_nav = 'students';
             </select>
           </div>
           <div class="form-group">
-            <label>Username <span class="text-red">*</span></label>
-            <input type="text" name="username" class="form-control"
-              value="<?php echo htmlspecialchars($edit_data['username']); ?>" required autocomplete="off">
-          </div>
-          <div class="form-group">
             <label>Section(s)</label>
             <?php if (!empty($edit_sections)): ?>
               <div style="display:flex;flex-wrap:wrap;gap:6px;">
@@ -372,6 +365,9 @@ $active_nav = 'students';
           <div class="form-group">
             <label>Student ID <span class="text-red">*</span></label>
             <input type="text" name="student_id" class="form-control" placeholder="Enter student ID" required>
+            <p style="font-size:11px;color:var(--text7);margin-top:4px;">
+              Students log in with their Student ID.
+            </p>
           </div>
           <div class="form-group">
             <label>Last Name <span class="text-red">*</span></label>
@@ -402,10 +398,6 @@ $active_nav = 'students';
             </p>
           </div>
           <div class="form-group">
-            <label>Username <span class="text-red">*</span></label>
-            <input type="text" name="username" class="form-control" placeholder="Enter username" required autocomplete="off">
-          </div>
-          <div class="form-group">
             <label>Password <span class="text-red">*</span></label>
             <input type="password" name="password" class="form-control" placeholder="Enter password" required autocomplete="new-password">
           </div>
@@ -429,7 +421,7 @@ $active_nav = 'students';
     </div>
 
     <!-- ── STUDENT LIST PANEL ── -->
-    <div class="card">
+    <div class="card" style="width: 80%;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <p class="card-title" style="margin:0;"><i class="ti ti-list"></i> All Students</p>
         <span style="font-size:12px;color:var(--text7);"><?php echo $students->num_rows; ?> shown</span>
@@ -441,7 +433,7 @@ $active_nav = 'students';
           <div class="input-wrap" style="flex:1;min-width:160px;">
             <i class="ti ti-search"></i>
             <input type="text" name="search" class="form-control"
-              placeholder="Search by name, ID, or username…"
+              placeholder="Search by name or ID…"
               value="<?php echo htmlspecialchars($search); ?>">
           </div>
           <select name="section" class="form-control" style="max-width:220px;">
@@ -467,7 +459,6 @@ $active_nav = 'students';
               <th>Student</th>
               <th>Student ID</th>
               <th>Course</th>
-              <th>Username</th>
               <th>Section(s)</th>
               <th>Subjects</th>
               <th>Actions</th>
@@ -475,7 +466,7 @@ $active_nav = 'students';
           </thead>
           <tbody>
             <?php if ($students->num_rows === 0): ?>
-            <tr><td colspan="7">
+            <tr><td colspan="6">
               <div class="empty-state text-muted">
                 <i class="ti ti-users-off"></i>
                 <p><?php echo $search ? "No students matched \"$search\"" : "No students found."; ?></p>
@@ -509,11 +500,6 @@ $active_nav = 'students';
               </td>
               <td class="td-mono"><?php echo htmlspecialchars($s['student_id']); ?></td>
               <td style="font-size:12px;color:var(--text7);"><?php echo htmlspecialchars($s['course'] ?: '—'); ?></td>
-              <td>
-                <span style="font-family:var(--font-mono);font-size:12px;background:var(--bg5);padding:2px 8px;border-radius:5px;color:var(--text7);border:1px solid var(--text7)">
-                  <?php echo htmlspecialchars($s['username']); ?>
-                </span>
-              </td>
               <td style="font-size:12px;">
                 <?php if ($s['section_names']): ?>
                   <?php echo htmlspecialchars($s['section_names']); ?>

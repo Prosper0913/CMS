@@ -450,7 +450,7 @@ $active_nav = 'sections';
           </select>
         </form>
         <?php if (empty($all_sections)): ?>
-        <div class="empty-state"><i class="ti ti-building-community"></i><p>No sections yet. Create your first one.</p></div>
+        <div class="empty-state" style="color: var(--text7);"><i class="ti ti-building-community"></i><p>No sections yet. Create your first one.</p></div>
         <?php else: ?>
         <?php foreach ($all_sections as $s): ?>
         <a href="sections.php?sec=<?php echo (int)$s['id']; ?>"
@@ -470,8 +470,9 @@ $active_nav = 'sections';
 
     <!-- ── Active section roster ── -->
     <div class="card">
+    
       <?php if (!$active_section): ?>
-      <div class="empty-state"><i class="ti ti-building-community"></i><p>Select or create a section to manage its roster.</p></div>
+      <div class="empty-state"style="color:var(--text7);"><i class="ti ti-building-community"></i><p>Select or create a section to manage its roster.</p></div>
       <?php else: ?>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
         <p class="card-title" style="margin:0;"><i class="ti ti-users"></i> <?php echo htmlspecialchars($active_section['section_name']); ?></p>

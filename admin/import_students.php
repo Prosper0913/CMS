@@ -33,8 +33,8 @@ if (isset($_GET['template'])) {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="student_import_template.csv"');
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['student_id','last_name','first_name','middle_name','email','course','section','username','password']);
-    fputcsv($out, ['2023-00123','Dela Cruz','Juan','P','juan.delacruz@example.com','BSIT','BSIT 3A','jdelacruz','ChangeMe123']);
+    fputcsv($out, ['student_id','last_name','first_name','middle_name','email','course','section','password']);
+    fputcsv($out, ['2023-00123','Dela Cruz','Juan','P','juan.delacruz@example.com','BSIT','BSIT 3A','ChangeMe123']);
     fclose($out);
     exit;
 }
@@ -58,7 +58,6 @@ $HEADER_ALIASES = [
     'program'        => 'course',
     'section'        => 'section',
     'sectionname'    => 'section',
-    'username'       => 'username',
     'password'       => 'password',
 ];
 function normalize_header($h) {
@@ -246,7 +245,7 @@ if (isset($_POST['import_csv'])) {
                     $norm = normalize_header($h);
                     $col_map[$i] = $HEADER_ALIASES[$norm] ?? null;
                 }
-                $required     = ['student_id', 'last_name', 'first_name', 'username', 'password'];
+                $required     = ['student_id', 'last_name', 'first_name', 'password'];
                 $missing_cols = array_diff($required, array_filter($col_map));
 
                 if (!empty($missing_cols)) {
@@ -254,13 +253,12 @@ if (isset($_POST['import_csv'])) {
                         . ". Download the template below for the expected headers.";
                 } else {
                     $seen_ids = [];
-                    $seen_usernames = [];
 
                     foreach ($row_keys as $row_num) {
                         $row = $all_rows[$row_num];
 
                         $data = ['student_id'=>'','last_name'=>'','first_name'=>'','middle_name'=>'',
-                                 'email'=>'','course'=>'','section'=>'','username'=>'','password'=>''];
+                                 'email'=>'','course'=>'','section'=>'','password'=>''];
                         foreach ($col_map as $i => $field) {
                             if ($field !== null && isset($row[$i])) {
                                 $data[$field] = trim((string)$row[$i]);
@@ -274,21 +272,21 @@ if (isset($_POST['import_csv'])) {
                         $email          = $data['email'];
                             $course         = $data['course'];
                         $section_name   = $data['section'];
-                        $username       = $data['username'];
+                        $username       = $student_id;   // Students log in with their Student ID
                         $password       = $data['password'];
 
                         $label = "Row {$row_num} ({$last_name}, {$first_name})";
 
-                        if ($student_id===''||$last_name===''||$first_name===''||$username===''||$password==='') {
-                            $results['errors'][] = "$label: missing a required field (ID, name, username, or password).";
+                        if ($student_id===''||$last_name===''||$first_name===''||$password==='') {
+                            $results['errors'][] = "$label: missing a required field (ID, name, or password).";
                             continue;
                         }
                         if (strlen($password) < 6) {
                             $results['errors'][] = "$label: password must be at least 6 characters.";
                             continue;
                         }
-                        if (isset($seen_ids[$student_id]) || isset($seen_usernames[$username])) {
-                            $results['skipped'][] = "$label: duplicate student ID or username elsewhere in this file.";
+                        if (isset($seen_ids[$student_id])) {
+                            $results['skipped'][] = "$label: duplicate student ID elsewhere in this file.";
                             continue;
                         }
 
@@ -298,7 +296,7 @@ if (isset($_POST['import_csv'])) {
                             $chk->execute();
                             $chk->store_result();
                             if ($chk->num_rows > 0) {
-                                $results['skipped'][] = "$label: student ID or username already exists in the system.";
+                                $results['skipped'][] = "$label: student ID already exists in the system.";
                                 continue;
                             }
 
@@ -351,7 +349,6 @@ if (isset($_POST['import_csv'])) {
 
                             $conn->commit();
                             $seen_ids[$student_id] = true;
-                            $seen_usernames[$username] = true;
                             $results['created'][] = "$label: enrolled as <code>" . htmlspecialchars($username) . "</code>{$section_note}.";
                         } catch (Throwable $e) {
                             if ($conn->errno || true) { $conn->rollback(); }
@@ -397,7 +394,7 @@ $active_nav = 'import';
       <div class="card">
         <p class="card-title"><i class="ti ti-upload"></i> Upload File</p>
         <p style="font-size:12px;color:var(--text7);margin-top:-6px;margin-bottom:14px;">
-          Accepts <code>.csv</code> or <code>.xlsx</code>. Required columns: <code>student_id, last_name, first_name, username, password</code>.
+          Accepts <code>.csv</code> or <code>.xlsx</code>. Required columns: <code>student_id, last_name, first_name, password</code> (students log in with their student ID).
           Optional: <code>middle_name, email, course, section</code>. Column order doesn't matter, and
           a few common header spellings (e.g. "ID Number", "Last Name") are recognized automatically.
           If a section name doesn't exist yet, it will be created automatically.
@@ -432,7 +429,7 @@ $active_nav = 'import';
           <ul style="font-size:13px;color:var(--text7);line-height:1.9;padding-left:18px;margin:0;">
             <li>Each row becomes one student, added exactly like the "Add Student" form.</li>
             <li>Rows missing required fields, or with a password under 6 characters, are skipped and reported — the rest of the file still imports.</li>
-            <li>Rows whose student ID or username already exists (in the file or the system) are skipped, not overwritten.</li>
+            <li>Rows whose student ID already exists (in the file or the system) are skipped, not overwritten.</li>
             <li>Section names that don't exist yet are created automatically and reused for later rows with the same name.</li>
             <li>Every insert is verified — if a row doesn't actually save, it now shows up as an error instead of silently disappearing.</li>
           </ul>
