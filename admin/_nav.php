@@ -3,9 +3,20 @@
 //  admin/_nav.php  —  Shared admin sidebar
 //  Included by every admin/*.php page. Expects $active_nav to
 //  be set beforehand ('dashboard' | 'teachers' | 'sections' |
-//  'students' | 'import' | 'api_keys' | 'section_requests').
+//  'students' | 'import' | 'api_keys' | 'section_requests' |
+//  'audit_log' | 'password_requests').
 // ============================================================
 $active_nav = $active_nav ?? '';
+
+// Pending "Forgot password?" requests — shown as a badge on the nav link.
+// Silently 0 if the table hasn't been created yet.
+$pending_pw_requests = 0;
+if (isset($conn) && $conn instanceof mysqli) {
+    try {
+        $__r = $conn->query("SELECT COUNT(*) AS c FROM password_reset_requests WHERE status = 'pending'");
+        $pending_pw_requests = (int)($__r->fetch_assoc()['c'] ?? 0);
+    } catch (Throwable $e) { /* table not created yet */ }
+}
 function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ? ' active' : ''); }
 ?>
 <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('is-open'); document.querySelector('.sidebar-overlay').classList.toggle('is-open');" aria-label="Toggle menu">
@@ -25,6 +36,8 @@ function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ?
     <a href="/classroomv2/admin/import_students.php" class="<?php echo _nav_class('import', $active_nav); ?>"><i class="ti ti-file-import"></i><span>Import</span></a>
     <a href="/classroomv2/admin/api_keys.php" class="<?php echo _nav_class('api_keys', $active_nav); ?>"><i class="ti ti-key"></i><span>API Keys</span></a>
     <a href="/classroomv2/admin/section_requests.php" class="<?php echo _nav_class('section_requests', $active_nav); ?>"><i class="ti ti-hand-stop"></i><span>Section Requests</span></a>
+    <a href="/classroomv2/admin/password_requests.php" class="<?php echo _nav_class('password_requests', $active_nav); ?>"><i class="ti ti-lock-open"></i><span>Password Requests</span><?php if ($pending_pw_requests > 0): ?><span class="nav-badge"><?php echo $pending_pw_requests; ?></span><?php endif; ?></a>
+    <a href="/classroomv2/admin/audit_log.php" class="<?php echo _nav_class('audit_log', $active_nav); ?>"><i class="ti ti-history"></i><span>Audit Log</span></a>
   </nav>
   <div class="sidebar-footer">
     <span class="sidebar-role role-admin">Admin</span>

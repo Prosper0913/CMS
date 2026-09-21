@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'config/db.php';
+require_once 'includes/audit.php';
 
 if (isset($_SESSION['role'])) {
     header("Location: " . match ($_SESSION['role']) {
@@ -12,6 +13,7 @@ if (isset($_SESSION['role'])) {
 }
 
 $error = '';
+$notice = isset($_GET['reset']) ? "Your password was updated. Please sign in with your new password." : '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['password'] ?? '');
@@ -27,6 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['username']  = $user['username'];
             $_SESSION['role']      = $user['role'];
             $_SESSION['student_id']= $user['student_id'];
+            audit_log($conn, 'login', 'success', [
+                'user_id' => $user['id'], 'username' => $user['username'], 'role' => $user['role'],
+            ]);
             header("Location: " . match ($user['role']) {
                 'teacher' => '/classroomv2/teacher/dashboard.php',
                 'admin'   => '/classroomv2/admin/dashboard.php',
@@ -34,6 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
             exit;
         } else {
+            audit_log($conn, 'login', 'failure', [
+                'user_id'  => $user['id']   ?? null,
+                'username' => $username,
+                'role'     => $user['role'] ?? null,
+                'reason'   => $user ? 'wrong_password' : 'unknown_user',
+            ]);
             $error = "Invalid Student ID / username or password.";
         }
     }
@@ -420,6 +431,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       margin-bottom:20px;
     }
 
+    .alert.ok{
+      background:rgba(30,95,78,.1);
+      border-color:rgba(30,95,78,.35);
+      color:#175040;
+    }
+    .forgot-row{text-align:right;margin-top:-6px;}
+    .forgot-row a{font-size:12.5px;color:var(--school-text7);text-decoration:none;}
+    .forgot-row a:hover{color:var(--school-bg);text-decoration:underline;}
+
     .auth-footer{margin-top:28px;font-size:12px;color:var(--school-text7);text-align:center;}
 
     /* ---------- RESPONSIVE ---------- */
@@ -512,6 +532,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php if ($error): ?>
       <div class="alert"><i class="ti ti-alert-circle"></i> <?php echo htmlspecialchars($error); ?></div>
       <?php endif; ?>
+      <?php if ($notice): ?>
+      <div class="alert ok"><i class="ti ti-circle-check"></i> <?php echo htmlspecialchars($notice); ?></div>
+      <?php endif; ?>
 
       <div class="role-strip" id="roleStrip">
         <button type="button" class="role-pill" data-role="student">
@@ -545,6 +568,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </button>
           </div>
         </div>
+        <div class="forgot-row"><a href="forgot_password.php">Forgot password?</a></div>
         <button type="submit" class="btn-login">
           <i class="ti ti-login"></i> Sign In
         </button>
