@@ -105,152 +105,166 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     /* ---------- LEFT SHOWCASE PANEL ---------- */
-   .showcase-panel{
+    .showcase-panel{
+      /* colours tuned for a dark background (the role pills on the right keep their own) */
+      --accent-default:#8fe0c0;
+      --role-default:var(--accent-default);
+      --role-student:#4be27a;
+      --role-instructor:#f2bd6b;
+      --role-admin:#ff7d88;
+      --role-accent:var(--accent-default);
+
       position:relative;
       overflow:hidden;
-      background:var(--school-bg);
+      isolation:isolate;
       display:flex;
       flex-direction:column;
-      padding:56px 56px 64px;
-      transition:box-shadow .6s ease;
+      padding:44px 56px 40px;
+      color:#fff;
+      background:linear-gradient(155deg,#17614e 0%,#0f4437 48%,#082a21 100%);
     }
- 
+
+    /* soft coloured glows — the active role tints them */
     .showcase-bg{position:absolute;inset:0;z-index:0;}
     .bg-layer{
-      position:absolute;inset:-10%;
+      position:absolute;inset:0;
       opacity:0;
       transition:opacity .75s cubic-bezier(.4,0,.2,1);
     }
     .bg-layer[data-role="default"]{
-      --layer-color:var(--role-default);
-      opacity:1;
-      background-image: url('assets/images/tcm\ burning\ logo.jpeg');
-      background-position: center;
-      background-size: cover;
-      /* background:
-        radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--layer-color) 55%, transparent) 0%, transparent 42%),
-        radial-gradient(circle at 85% 88%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%); */
+      background:
+        radial-gradient(60% 55% at 12% 0%, rgba(143,224,192,.22) 0%, transparent 70%),
+        radial-gradient(55% 50% at 100% 100%, rgba(242,189,107,.14) 0%, transparent 70%);
     }
     .bg-layer[data-role="student"]{
-      --layer-color:var(--role-student);
       background:
-        radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--layer-color) 55%, transparent) 0%, transparent 42%),
-        radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%);
+        radial-gradient(60% 55% at 92% 94%, color-mix(in srgb, var(--role-student) 30%, transparent) 0%, transparent 70%),
+        radial-gradient(50% 45% at 8% 6%,  color-mix(in srgb, var(--role-student) 16%, transparent) 0%, transparent 70%);
     }
     .bg-layer[data-role="instructor"]{
-      --layer-color:var(--role-instructor);
       background:
-        radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--layer-color) 55%, transparent) 0%, transparent 42%),
-        radial-gradient(circle at 15% 75%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%);
+        radial-gradient(60% 55% at 92% 8%,  color-mix(in srgb, var(--role-instructor) 28%, transparent) 0%, transparent 70%),
+        radial-gradient(50% 45% at 8% 92%,  color-mix(in srgb, var(--role-instructor) 14%, transparent) 0%, transparent 70%);
     }
     .bg-layer[data-role="admin"]{
-      --layer-color:var(--role-admin);
       background:
-        radial-gradient(circle at 50% 92%, color-mix(in srgb, var(--layer-color) 55%, transparent) 0%, transparent 42%),
-        radial-gradient(circle at 82% 25%, color-mix(in srgb, var(--layer-color) 35%, transparent) 0%, transparent 50%);
+        radial-gradient(60% 55% at 50% 100%, color-mix(in srgb, var(--role-admin) 26%, transparent) 0%, transparent 70%),
+        radial-gradient(50% 45% at 88% 12%,  color-mix(in srgb, var(--role-admin) 14%, transparent) 0%, transparent 70%);
     }
     .bg-layer.is-active{opacity:1;}
-     .showcase-noise{
-      position:absolute;inset:0;z-index:1;
-      background-image:radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px);
-      background-size:3px 3px;
-      pointer-events:none;
-      mix-blend-mode:overlay;
+
+    /* fine grid + concentric rings for depth */
+    .showcase-grid{
+      position:absolute;inset:0;z-index:1;pointer-events:none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size:56px 56px;
+      -webkit-mask-image:radial-gradient(ellipse 85% 75% at 30% 35%, #000 20%, transparent 78%);
+              mask-image:radial-gradient(ellipse 85% 75% at 30% 35%, #000 20%, transparent 78%);
+    }
+    .showcase-ring{
+      position:absolute;z-index:1;pointer-events:none;
+      right:-170px;top:-170px;width:460px;height:460px;border-radius:50%;
+      border:1px solid rgba(255,255,255,.09);
+      box-shadow:0 0 0 70px rgba(255,255,255,.02), 0 0 0 140px rgba(255,255,255,.012);
     }
 
-    .showcase-inner{position:relative;z-index:2;height:100%;}
+    /* brand lockup (top-left) */
+    .brand{position:relative;z-index:2;display:flex;align-items:center;gap:12px;}
+    .brand-mark{
+      width:44px;height:44px;border-radius:12px;
+      display:grid;place-items:center;
+      font-size:23px;color:#fff;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.20);
+    }
+    .brand-text{display:flex;flex-direction:column;line-height:1.2;}
+    .brand-text strong{font-family:'Syne',sans-serif;font-weight:800;font-size:17px;letter-spacing:.04em;}
+    .brand-text small{font-size:12.5px;color:var(--muted-on-dark);}
 
-    /* idle state: shown only when no role is hovered — big centered logo + title */
-    .showcase-idle{
-      position:absolute;
-      inset:0;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      pointer-events:none;
+    /* the area that swaps content when a role is hovered */
+    .showcase-inner{
+      position:relative;z-index:2;flex:1;
+      display:grid;align-items:center;
+      padding:36px 0;
     }
-    .idle-logo{
-      width:128px;
-      height:auto;
-      display:block;
-      margin-bottom:24px;
-      filter:drop-shadow(0 4px 18px rgba(0,0,0,.35));
-    }
-    .idle-title{
-      font-family:'Syne',sans-serif;
-      font-weight:800;
-      font-size:clamp(5px,2.7vw,15px);
-      line-height:1.24;
-      /* max-width:340px; */
-      letter-spacing:.003em;
-      justify-content: left;
-    }
-
-    .showcase-idle > *{
-      opacity:0;
-      transform:translateY(16px);
-      filter:blur(6px);
-      transition:opacity .5s cubic-bezier(.22,1,.36,1), transform .5s cubic-bezier(.22,1,.36,1), filter .5s cubic-bezier(.22,1,.36,1);
-    }
-    .showcase-idle.is-active > *{opacity:1;transform:translateY(0);filter:blur(0);}
-    .showcase-idle.is-active > *:nth-child(1){transition-delay:.05s;}
-    .showcase-idle.is-active > *:nth-child(2){transition-delay:.14s;}
-    .showcase-idle.is-leaving > *{
-      transition-delay:0s !important;
-      opacity:0;
-      transform:translateY(-14px);
-      filter:blur(9px);
-      transition-duration:.28s;
-    }
-
-    /* hover state: role content, larger, sitting in the upper portion of the panel */
-    .showcase-stage{
-      position:absolute;
-      inset:0;
-      padding-top:9%;
-    }
-
-    .showcase-slide{
-      position:absolute;
-      left:0;right:0;top:0;
-      pointer-events:none;
-    }
+    .showcase-idle,
+    .showcase-stage{grid-area:1/1;}
+    .showcase-idle{pointer-events:none;max-width:540px;}
+    .showcase-stage{display:grid;max-width:540px;}
+    .showcase-slide{grid-area:1/1;align-self:center;pointer-events:none;}
     .showcase-slide.is-active{pointer-events:auto;}
 
-    .showcase-slide .eyebrow{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      font-family:'DM Sans',sans-serif;
-      font-size:13px;
-      font-weight:500;
-      letter-spacing:.14em;
-      text-transform:uppercase;
-      color:var(--role-accent);
-      transition:color .5s ease;
-      margin-bottom:16px;
-    }
-    .showcase-slide .eyebrow i{font-size:16px;}
-
+    /* headline + supporting text (shared by the default view and the role views) */
+    .showcase-idle h1,
     .showcase-slide h1{
       font-family:'Syne',sans-serif;
-      font-weight:800;
-      font-size:clamp(32px,3.6vw,46px);
-      line-height:1.1;
-      margin:0 0 20px;
-      letter-spacing:-.01em;
+      font-weight:700;
+      font-size:clamp(28px,2.7vw,38px);
+      line-height:1.12;
+      letter-spacing:-.015em;
+      margin:0 0 16px;
+    }
+    .showcase-idle .lead{
+      font-size:16px;line-height:1.65;
+      color:var(--muted-on-dark);
+      margin:0 0 28px;max-width:470px;
     }
 
-    .feature-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px;max-width:400px;}
-    .feature-list li{
-      display:flex;
-      align-items:flex-start;
-      gap:10px;
-      font-size:16px;
-      line-height:1.5;
+    .eyebrow-pill,
+    .showcase-slide .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 13px;border-radius:99px;
+      font-size:12px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
+      margin-bottom:20px;
+    }
+    .eyebrow-pill{
       color:var(--muted-on-dark);
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.14);
+    }
+    .eyebrow-pill .dot{
+      width:7px;height:7px;border-radius:50%;
+      background:var(--accent-default);
+      box-shadow:0 0 0 4px rgba(143,224,192,.2);
+    }
+    .showcase-slide .eyebrow{
+      color:var(--role-accent);
+      background:color-mix(in srgb, var(--role-accent) 14%, transparent);
+      border:1px solid color-mix(in srgb, var(--role-accent) 38%, transparent);
+      transition:color .5s ease, background .5s ease, border-color .5s ease;
+    }
+    .showcase-slide .eyebrow i{font-size:15px;}
+
+    /* default view: three feature cards */
+    .feature-cards{display:grid;gap:12px;max-width:500px;}
+    .feature-card{
+      display:flex;align-items:flex-start;gap:14px;
+      padding:15px 17px;border-radius:14px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.11);
+      -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    }
+    .fc-icon{
+      flex:0 0 40px;height:40px;border-radius:11px;
+      display:grid;place-items:center;
+      font-size:20px;color:var(--accent-default);
+      background:rgba(143,224,192,.12);
+      border:1px solid rgba(143,224,192,.22);
+    }
+    .feature-card h3{margin:1px 0 3px;font-size:15px;font-weight:600;letter-spacing:.005em;}
+    .feature-card p{margin:0;font-size:13.5px;line-height:1.5;color:var(--muted-on-dark);}
+
+    /* role views: feature rows */
+    .feature-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;max-width:480px;}
+    .feature-list li{
+      display:flex;align-items:flex-start;gap:12px;
+      padding:11px 15px;border-radius:12px;
+      font-size:14.5px;line-height:1.5;
+      color:rgba(255,255,255,.88);
+      background:rgba(255,255,255,.055);
+      border:1px solid rgba(255,255,255,.10);
     }
     .feature-list li i{
       color:var(--role-accent);
@@ -260,27 +274,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       flex-shrink:0;
     }
 
-    /* animated children: rise + blur, staggered on enter, snap-out on leave */
+    /* trust chips (bottom) */
+    .panel-foot{position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:10px;}
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:7px 13px;border-radius:99px;
+      font-size:12.5px;color:var(--muted-on-dark);
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.11);
+    }
+    .chip i{font-size:15px;color:var(--role-accent);transition:color .5s ease;}
+
+    /* animation: children rise in with a stagger, and snap out when leaving */
+    .showcase-idle > *,
     .showcase-slide > *{
       opacity:0;
       transform:translateY(16px);
       filter:blur(6px);
-      transition:opacity .45s cubic-bezier(.22,1,.36,1), transform .45s cubic-bezier(.22,1,.36,1), filter .45s cubic-bezier(.22,1,.36,1);
+      transition:opacity .5s cubic-bezier(.22,1,.36,1), transform .5s cubic-bezier(.22,1,.36,1), filter .5s cubic-bezier(.22,1,.36,1);
     }
+    .showcase-idle.is-active > *,
     .showcase-slide.is-active > *{opacity:1;transform:translateY(0);filter:blur(0);}
-    .showcase-slide.is-active > *:nth-child(1){transition-delay:.05s;}
-    .showcase-slide.is-active > *:nth-child(2){transition-delay:.12s;}
-    .showcase-slide.is-active > *:nth-child(3){transition-delay:.2s;}
+    .showcase-idle.is-active > *:nth-child(1), .showcase-slide.is-active > *:nth-child(1){transition-delay:.04s;}
+    .showcase-idle.is-active > *:nth-child(2), .showcase-slide.is-active > *:nth-child(2){transition-delay:.11s;}
+    .showcase-idle.is-active > *:nth-child(3), .showcase-slide.is-active > *:nth-child(3){transition-delay:.18s;}
+    .showcase-idle.is-active > *:nth-child(4){transition-delay:.25s;}
 
     .showcase-slide .feature-list li{
       opacity:0;transform:translateY(12px);filter:blur(5px);
       transition:opacity .4s cubic-bezier(.22,1,.36,1), transform .4s cubic-bezier(.22,1,.36,1), filter .4s cubic-bezier(.22,1,.36,1);
     }
     .showcase-slide.is-active .feature-list li{opacity:1;transform:translateY(0);filter:blur(0);}
-    .showcase-slide.is-active .feature-list li:nth-child(1){transition-delay:.26s;}
-    .showcase-slide.is-active .feature-list li:nth-child(2){transition-delay:.33s;}
-    .showcase-slide.is-active .feature-list li:nth-child(3){transition-delay:.4s;}
+    .showcase-slide.is-active .feature-list li:nth-child(1){transition-delay:.24s;}
+    .showcase-slide.is-active .feature-list li:nth-child(2){transition-delay:.30s;}
+    .showcase-slide.is-active .feature-list li:nth-child(3){transition-delay:.36s;}
+    .showcase-slide.is-active .feature-list li:nth-child(4){transition-delay:.42s;}
+    .showcase-slide.is-active .feature-list li:nth-child(5){transition-delay:.48s;}
 
+    .showcase-idle.is-leaving > *,
     .showcase-slide.is-leaving > *,
     .showcase-slide.is-leaving .feature-list li{
       transition-delay:0s !important;
@@ -445,12 +476,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     /* ---------- RESPONSIVE ---------- */
     @media (max-width:920px){
       .auth-shell{grid-template-columns:1fr;}
-      .showcase-panel{min-height:280px;padding:32px 28px;}
-      .idle-logo{width:72px;margin-bottom:14px;}
-      .idle-title{font-size:15px;max-width:260px;}
-      .showcase-stage{padding-top:6%;}
-      .showcase-slide h1{font-size:24px;}
-      .feature-list{display:none;}
+      .showcase-panel{padding:24px 24px 22px;}
+      .showcase-inner{padding:22px 0 4px;}
+      .showcase-idle h1,
+      .showcase-slide h1{font-size:26px;margin-bottom:0;}
+      .showcase-idle .lead,
+      .feature-cards,
+      .feature-list,
+      .panel-foot,
+      .showcase-ring{display:none;}
+      .eyebrow-pill,
+      .showcase-slide .eyebrow{margin-bottom:14px;}
       .auth-panel{padding:32px 24px 48px;}
     }
 
@@ -468,19 +504,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <!-- LEFT: showcase panel -->
   <div class="showcase-panel" id="showcasePanel">
-    <div class="showcase-bg" id="showcaseBg">
+    <div class="showcase-bg" id="showcaseBg" aria-hidden="true">
       <span class="bg-layer is-active" data-role="default"></span>
       <span class="bg-layer" data-role="student"></span>
       <span class="bg-layer" data-role="instructor"></span>
       <span class="bg-layer" data-role="admin"></span>
     </div>
-    <div class="showcase-noise"></div>
+    <div class="showcase-grid" aria-hidden="true"></div>
+    <div class="showcase-ring" aria-hidden="true"></div>
+
+    <div class="brand">
+      <span class="brand-mark"><i class="ti ti-school"></i></span>
+      <span class="brand-text">
+        <strong>TCM</strong>
+        <small>Classroom Management System</small>
+      </span>
+    </div>
 
     <div class="showcase-inner">
+      <!-- default view (shown until a role is hovered) -->
       <div class="showcase-idle is-active" id="showcaseIdle">
-        <!-- <img class="idle-logo" src="assets/images/TCM logo (2).png" alt="TCM Logo"> -->
-        <div class="idle-title" style="position: fixed; bottom: 25px;white-space: nowrap; width: 100%; color: white;">TCM Classroom Management System</div>
+        <span class="eyebrow-pill"><span class="dot"></span> One platform &middot; every role</span>
+        <h1>Manage your classroom<br>with confidence.</h1>
+        <p class="lead">Grades, attendance, class records and reports &mdash; organised in one secure place for students, instructors and administrators.</p>
+        <div class="feature-cards">
+          <div class="feature-card">
+            <span class="fc-icon"><i class="ti ti-chart-bar"></i></span>
+            <div><h3>Live grades</h3><p>Scores and averages update the moment they are recorded.</p></div>
+          </div>
+          <div class="feature-card">
+            <span class="fc-icon"><i class="ti ti-fingerprint"></i></span>
+            <div><h3>Biometric attendance</h3><p>A fingerprint scan marks attendance automatically.</p></div>
+          </div>
+          <div class="feature-card">
+            <span class="fc-icon"><i class="ti ti-file-export"></i></span>
+            <div><h3>Reports &amp; exports</h3><p>Class records ready to download whenever you need them.</p></div>
+          </div>
+        </div>
       </div>
+
+      <!-- role views (shown when a role button on the right is hovered) -->
       <div class="showcase-stage" id="showcaseStage">
         <div class="showcase-slide" data-role="student">
           <span class="eyebrow"><i class="ti ti-backpack"></i> For Students</span>
@@ -488,6 +551,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <ul class="feature-list">
             <li><i class="ti ti-chart-bar"></i> Check grades in real time.</li>
             <li><i class="ti ti-eye"></i> View all outputs -- Quiz, Exam, Attendance, Activity</li>
+            <li><i class="ti ti-calendar-event"></i> See your weekly class schedule on your home screen.</li>
+            <li><i class="ti ti-speakerphone"></i> Read announcements from your instructors.</li>
+            <li><i class="ti ti-bell"></i> Get notified as soon as new scores are posted.</li>
             <!-- <li><i class="ti ti-calendar-event"></i> See section schedules and requirements.</li> -->
           </ul>
         </div>
@@ -501,6 +567,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <li><i class="ti ti-report"></i> Generate reports across every class.</li>
             <li><i class="ti ti-fingerprint"></i> Take attendance automatically via biometric scan.</li>
             <li><i class="ti ti-report"></i> Export class records anytime.</li>
+            <li><i class="ti ti-speakerphone"></i> Post class announcements and notify students of new scores.</li>
+            <li><i class="ti ti-building-community"></i> Request access to sections through admin approval.</li>
           </ul>
         </div>
 
@@ -509,13 +577,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <h1>Oversee the whole<br>system, in one place.</h1>
           <ul class="feature-list">
             <li><i class="ti ti-users"></i> Manage accounts, students, and access requests.</li>
+            <li><i class="ti ti-history"></i> Audit every sign-in by IP address and device.</li>
+            <li><i class="ti ti-lock-open"></i> Approve password recovery with one-time reset links.</li>
             <li><i class="ti ti-device-desktop"></i> Monitor biometric devices and system health.</li>
             <li><i class="ti ti-file-spreadsheet"></i> Import students in bulk from CSV or Excel.</li>
-
+            <li><i class="ti ti-key"></i> Issue API keys for connected systems.</li>
           </ul>
         </div>
-
       </div>
+    </div>
+
+    <div class="panel-foot">
+      <span class="chip"><i class="ti ti-shield-lock"></i> Secure sign-in</span>
+      <span class="chip"><i class="ti ti-users"></i> Role-based access</span>
+      <span class="chip"><i class="ti ti-history"></i> Audited activity</span>
     </div>
   </div>
 

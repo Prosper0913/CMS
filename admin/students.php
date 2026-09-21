@@ -27,6 +27,17 @@ $sections_list = $conn->query(
     "SELECT id, section_name FROM sections ORDER BY section_name ASC"
 )->fetch_all(MYSQLI_ASSOC);
 
+// Contact number is optional. Allow digits, spaces, dashes, parentheses and a
+// leading +, with 7–15 digits in total. Returns '' when fine, else the error text.
+function student_contact_error(string $c): string {
+    if ($c === '') return '';
+    $digits = strlen(preg_replace('/\D/', '', $c));
+    if (strlen($c) > 20 || !preg_match('/^\+?[0-9\s\-()]+$/', $c) || $digits < 7 || $digits > 15) {
+        return "Contact number must be 7–15 digits (spaces, dashes, brackets and a leading + are allowed).";
+    }
+    return '';
+}
+
 // ── ADD student ─────────────────────────────────────────────
 if (isset($_POST['add_student'])) {
     $student_id     = trim($_POST['student_id']);
@@ -34,6 +45,10 @@ if (isset($_POST['add_student'])) {
     $first_name     = trim($_POST['first_name']);
     $middle_initial = trim($_POST['middle_initial']);
     $email          = trim($_POST['email']);
+    $contact        = trim($_POST['contact_number'] ?? '');
+    $gender         = trim($_POST['gender'] ?? '');
+    $contact_db     = $contact !== '' ? $contact : null;
+    $gender_db      = $gender  !== '' ? $gender  : null;
     $course         = trim($_POST['course'] ?? '');
     $username       = $student_id;   // Students log in with their Student ID
     $password       = trim($_POST['password']);
@@ -43,6 +58,10 @@ if (isset($_POST['add_student'])) {
         $error_msg = "Student ID, name, and password are all required.";
     } elseif (!in_array($course, ['BSIT','LAED','BSBA','BSN','FPST','BSA'], true)) {
         $error_msg = "Please select a valid course.";
+    } elseif (($contact_err = student_contact_error($contact)) !== '') {
+        $error_msg = $contact_err;
+    } elseif (!in_array($gender, ['', 'Male', 'Female'], true)) {
+        $error_msg = "Please choose Male or Female for gender.";
     } else {
         $chk = $conn->prepare(
             "SELECT id FROM students WHERE student_id=? OR username=?
@@ -60,11 +79,11 @@ if (isset($_POST['add_student'])) {
             try {
                 $ins = $conn->prepare(
                     "INSERT INTO students
-                        (student_id,last_name,first_name,middle_initial,email,course,username,password,created_by)
-                     VALUES (?,?,?,?,?,?,?,?,?)"
+                        (student_id,last_name,first_name,middle_initial,email,contact_number,gender,course,username,password,created_by)
+                     VALUES (?,?,?,?,?,?,?,?,?,?,?)"
                 );
-                $ins->bind_param("ssssssssi",
-                    $student_id,$last_name,$first_name,$middle_initial,$email,$course,$username,$hashed,$admin_id
+                $ins->bind_param("ssssssssssi",
+                    $student_id,$last_name,$first_name,$middle_initial,$email,$contact_db,$gender_db,$course,$username,$hashed,$admin_id
                 );
                 $ins->execute();
 
@@ -138,19 +157,27 @@ if (isset($_POST['update_student'])) {
     $first_name     = trim($_POST['first_name']);
     $middle_initial = trim($_POST['middle_initial']);
     $email          = trim($_POST['email']);
+    $contact        = trim($_POST['contact_number'] ?? '');
+    $gender         = trim($_POST['gender'] ?? '');
+    $contact_db     = $contact !== '' ? $contact : null;
+    $gender_db      = $gender  !== '' ? $gender  : null;
     $course         = trim($_POST['course'] ?? '');
 
     if (!in_array($course, ['BSIT','LAED','BSBA','BSN','FPST','BSA'], true)) {
         $error_msg = "Please select a valid course.";
+    } elseif (($contact_err = student_contact_error($contact)) !== '') {
+        $error_msg = $contact_err;
+    } elseif (!in_array($gender, ['', 'Male', 'Female'], true)) {
+        $error_msg = "Please choose Male or Female for gender.";
     } else {
 
     $upd = $conn->prepare(
         "UPDATE students SET
-            last_name=?,first_name=?,middle_initial=?,email=?,course=?
+            last_name=?,first_name=?,middle_initial=?,email=?,contact_number=?,gender=?,course=?
          WHERE student_id=?"
     );
-    $upd->bind_param("ssssss",
-        $last_name,$first_name,$middle_initial,$email,$course,$student_id
+    $upd->bind_param("ssssssss",
+        $last_name,$first_name,$middle_initial,$email,$contact_db,$gender_db,$course,$student_id
     );
     $upd->execute();
 
@@ -329,6 +356,21 @@ $active_nav = 'students';
               value="<?php echo htmlspecialchars($edit_data['email'] ?? ''); ?>">
           </div>
           <div class="form-group">
+            <label>Contact Number</label>
+            <input type="tel" name="contact_number" class="form-control" maxlength="20"
+              placeholder="e.g. 09171234567"
+              value="<?php echo htmlspecialchars($edit_data['contact_number'] ?? ''); ?>">
+          </div>
+          <div class="form-group">
+            <label>Gender</label>
+            <select name="gender" class="form-control">
+              <option value="">Select gender</option>
+              <?php foreach (['Male','Female'] as $g): ?>
+              <option value="<?php echo $g; ?>" <?php echo (($edit_data['gender'] ?? '') === $g) ? 'selected' : ''; ?>><?php echo $g; ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Course <span class="text-red">*</span></label>
             <select name="course" class="form-control" required>
               <option value="">Select course</option>
@@ -384,6 +426,18 @@ $active_nav = 'students';
           <div class="form-group">
             <label>Email</label>
             <input type="email" name="email" class="form-control" placeholder="Enter email">
+          </div>
+          <div class="form-group">
+            <label>Contact Number</label>
+            <input type="tel" name="contact_number" class="form-control" maxlength="20" placeholder="e.g. 09171234567">
+          </div>
+          <div class="form-group">
+            <label>Gender</label>
+            <select name="gender" class="form-control">
+              <option value="">Select gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
           </div>
           <div class="form-group">
             <label>Course <span class="text-red">*</span></label>
@@ -493,7 +547,12 @@ $active_nav = 'students';
                       <?php endif; ?>
                     </div>
                     <div style="font-size:11px;color:var(--text7);">
-                      <?php echo htmlspecialchars($s['email'] ?: '—'); ?>
+                      <?php
+                        $sub = [$s['email'] ?: '—'];
+                        if (!empty($s['contact_number'])) $sub[] = $s['contact_number'];
+                        if (!empty($s['gender']))         $sub[] = $s['gender'];
+                        echo htmlspecialchars(implode(' · ', $sub));
+                      ?>
                     </div>
                   </div>
                 </div>
