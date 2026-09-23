@@ -37,6 +37,9 @@
 //
 //  NO ArduinoJson needed — JSON parsed with simple string search.
 // ============================================================
+//CHANGE TCP reachability test, USE THE GATEWAY IP
+//SERVER BASE IS DROPLET PUBLIC IPV4:80
+
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -51,15 +54,15 @@
 //  CONFIG — edit before flashing
 // ============================================================
 
-const char* WIFI_SSID     = "----------------";            //"GlobeAtHome_b60e8_2.4";
-const char* WIFI_PASSWORD = "----------------";
+const char* WIFI_SSID     = "ASUS-TUF-GAMING";            //"GlobeAtHome_b60e8_2.4";
+const char* WIFI_PASSWORD = "passwOrd";
 
 // Server base URL — no trailing slash
-const char* SERVER_BASE   = "--------------";
+const char* SERVER_BASE   = "http://68.183.228.242:80";
 
 // This device's unique key — register it in biometric.php
 // Generate any random string, e.g. "rm201-scanner-a3f9"
-const char* DEVICE_KEY    = "-------------";
+const char* DEVICE_KEY    = "pre-defense-demo";
 
 // ── Pins ──────────────────────────────────────────────────────
 #define I2C_SDA    21
@@ -99,7 +102,7 @@ HardwareSerial          fpSerial(2);
 Adafruit_Fingerprint    finger = Adafruit_Fingerprint(&fpSerial);
 LiquidCrystal_I2C       lcd(0x27, 16, 2);
 
-bool    sdReady         = false;
+// bool    sdReady         = false;
 bool    rtcReady        = false;
 bool    configLoaded    = false;
 int     deviceSubjectId = 0;
@@ -138,8 +141,8 @@ bool     uploadImage(uint8_t* dst, int dstLen);
 String   fetchTemplatesAndMatch(const String& dateStr, const String& timeStr);
 bool     recordAttendance(const String& studentId, const String& dateStr,
                           const String& timeStr, const String& status);
-void     logToSD(const String& studentId, const String& dateStr,
-                 const String& timeStr, const String& result);
+// void     logToSD(const String& studentId, const String& dateStr,
+//                  const String& timeStr, const String& result);
 void     showResult(const String& l1, const String& l2, bool ok);
 void     showIdle();
 void     updateClock();
@@ -182,18 +185,18 @@ void setup() {
     }
 
     // SD card
-    if (SD_MMC.begin()) {
-        if (SD_MMC.cardType() != CARD_NONE) {
-            sdReady = true;
-            if (!SD_MMC.exists(SD_LOG_FILE)) {
-                File f = SD_MMC.open(SD_LOG_FILE, FILE_WRITE);
-                if (f) { f.println("date,time,student_id,result"); f.close(); }
-            }
-            Serial.println("[SD] Ready");
-        }
-    } else {
-        Serial.println("[SD] Not available");
-    }
+    // if (SD_MMC.begin()) {
+    //     if (SD_MMC.cardType() != CARD_NONE) {
+    //         sdReady = true;
+    //         if (!SD_MMC.exists(SD_LOG_FILE)) {
+    //             File f = SD_MMC.open(SD_LOG_FILE, FILE_WRITE);
+    //             if (f) { f.println("date,time,student_id,result"); f.close(); }
+    //         }
+    //         Serial.println("[SD] Ready");
+    //     }
+    // } else {
+    //     Serial.println("[SD] Not available");
+    // }
 
     // Fingerprint sensor
     fpSerial.begin(57600, SERIAL_8N1, FP_RX, FP_TX);
@@ -302,14 +305,14 @@ void attendanceMode() {
     String dateStr = getRTCDate();
     String timeStr = getRTCTime();
 
-    if (WiFi.status() != WL_CONNECTED) {
-        logToSD("UNKNOWN", dateStr, timeStr, "OFFLINE_NO_WIFI");
-        showResult("No WiFi!", "Saved to SD", false);
-        beep(2, false);
-        delay(LCD_HOLD_MS);
-        showIdle();
-        return;
-    }
+    // if (WiFi.status() != WL_CONNECTED) {
+    //     logToSD("UNKNOWN", dateStr, timeStr, "OFFLINE_NO_WIFI");
+    //     showResult("No WiFi!", "Saved to SD", false);
+    //     beep(2, false);
+    //     delay(LCD_HOLD_MS);
+    //     showIdle();
+    //     return;
+    // }
 
     // Step 2: Fetch all enrolled templates + run match on-sensor
     String matchResult = fetchTemplatesAndMatch(dateStr, timeStr);
@@ -319,25 +322,25 @@ void attendanceMode() {
     //   "NO_MATCH"
     //   "ERROR:message"
 
-    if (matchResult.startsWith("ERROR:")) {
-        String msg = matchResult.substring(6);
-        if (msg.length() > 16) msg = msg.substring(0,16);
-        showResult("Server Error", msg, false);
-        beep(3, false);
-        logToSD("UNKNOWN", dateStr, timeStr, "ERR:" + matchResult.substring(6,26));
-        delay(LCD_HOLD_MS);
-        showIdle();
-        return;
-    }
+    // if (matchResult.startsWith("ERROR:")) {
+    //     String msg = matchResult.substring(6);
+    //     if (msg.length() > 16) msg = msg.substring(0,16);
+    //     showResult("Server Error", msg, false);
+    //     beep(3, false);
+    //     logToSD("UNKNOWN", dateStr, timeStr, "ERR:" + matchResult.substring(6,26));
+    //     delay(LCD_HOLD_MS);
+    //     showIdle();
+    //     return;
+    // }
 
-    if (matchResult == "NO_MATCH") {
-        showResult("Not Recognized", "Unregistered?", false);
-        beep(3, false);
-        logToSD("UNKNOWN", dateStr, timeStr, "NO_MATCH");
-        delay(LCD_HOLD_MS);
-        showIdle();
-        return;
-    }
+    // if (matchResult == "NO_MATCH") {
+    //     showResult("Not Recognized", "Unregistered?", false);
+    //     beep(3, false);
+    //     logToSD("UNKNOWN", dateStr, timeStr, "NO_MATCH");
+    //     delay(LCD_HOLD_MS);
+    //     showIdle();
+    //     return;
+    // }
 
     // Parse "MATCH:student_id:name:status"
     // e.g.  "MATCH:2024-001:Ana Reyes:Present"
@@ -367,9 +370,9 @@ void attendanceMode() {
         showResult(nameTrunc, "Already marked", false);
     }
 
-    logToSD(studentId, dateStr, timeStr, recorded ? status : "DUP");
-    delay(LCD_HOLD_MS);
-    showIdle();
+    // logToSD(studentId, dateStr, timeStr, recorded ? status : "DUP");
+    // delay(LCD_HOLD_MS);
+    // showIdle();
 }
 
 // ============================================================
@@ -404,7 +407,7 @@ String fetchTemplatesAndMatch(const String& dateStr, const String& timeStr) {
     // ── POST to bio_match.php ─────────────────────────────────
     String image_b64 = base64Encode(imgBuf, IMG_PACKED_SIZE);
 
-    String url  = String(SERVER_BASE) + "/classroom/api/bio_match.php";
+    String url  = String(SERVER_BASE) + "/classroomv2/api/bio_match.php";
     String body = "device_key=" + urlencode(String(DEVICE_KEY))
                 + "&image_b64="  + urlencode(image_b64)
                 + "&date="       + dateStr
@@ -442,8 +445,13 @@ bool captureImage() {
     uint8_t p = finger.getImage();
     if (p == FINGERPRINT_NOFINGER) return false;
     if (p != FINGERPRINT_OK) {
-        if (p != FINGERPRINT_IMAGEMESS)   // suppress idle noise
+        if (p != FINGERPRINT_IMAGEMESS) {  // suppress idle noise
             Serial.printf("[FP] getImage error %d\n", p);
+            if (p == FINGERPRINT_PACKETRECIEVEERR)   // error 1
+                Serial.println("[FP] Sensor not answering on UART! "
+                               "Check: sensor TX->GPIO32, RX->GPIO33, 3.3V power, "
+                               "common GND, and that fpSerial.begin() ran.");
+        }
         return false;
     }
     return true;
@@ -455,7 +463,7 @@ bool captureImage() {
 // ============================================================
 void checkEnrollQueue() {
     String url = String(SERVER_BASE)
-                 + "/classroom/api/bio_enroll_poll.php?key="
+                 + "/classroomv2/api/bio_enroll_poll.php?key="
                  + urlencode(String(DEVICE_KEY));
 
     HTTPClient http;
@@ -487,7 +495,7 @@ void checkEnrollQueue() {
 // ============================================================
 void reportEnrollDone(bool success) {
     if (enrollQueueId <= 0) return;
-    String url    = String(SERVER_BASE) + "/classroom/api/bio_enroll_done.php";
+    String url    = String(SERVER_BASE) + "/classroomv2/api/bio_enroll_done.php";
     String result = success ? "done" : "failed";
     String body   = "key="      + urlencode(String(DEVICE_KEY))
                   + "&queue_id=" + String(enrollQueueId)
@@ -524,7 +532,7 @@ void enrollmentMode() {
                        : enrollStudentName;
     lcd.print(shortName);
 
-    String url = String(SERVER_BASE) + "/classroom/api/bio_enroll.php";
+    String url = String(SERVER_BASE) + "/classroomv2/api/bio_enroll.php";
 
     for (int slot = 1; slot <= 4; slot++) {
         lcd.setCursor(0,1);
@@ -609,7 +617,7 @@ void enrollmentMode() {
 // ============================================================
 bool recordAttendance(const String& studentId, const String& dateStr,
                       const String& timeStr,   const String& status) {
-    String url  = String(SERVER_BASE) + "/classroom/api/bio_record.php";
+    String url  = String(SERVER_BASE) + "/classroomv2/api/bio_record.php";
     String body = "device_key=" + urlencode(String(DEVICE_KEY))
                 + "&student_id=" + urlencode(studentId)
                 + "&date="       + dateStr
@@ -622,11 +630,11 @@ bool recordAttendance(const String& studentId, const String& dateStr,
     String response = "";
     postBody(http, url, body, httpCode, response);
 
-    if (httpCode != 200) {
-        Serial.printf("[RECORD] HTTP error %d\n", httpCode);
-        logToSD(studentId, dateStr, timeStr, "HTTP_ERR:" + String(httpCode));
-        return false;
-    }
+    // if (httpCode != 200) {
+    //     Serial.printf("[RECORD] HTTP error %d\n", httpCode);
+    //     logToSD(studentId, dateStr, timeStr, "HTTP_ERR:" + String(httpCode));
+    //     return false;
+    // }
 
     String st = jsonExtract(response, "status");
     return (st == "present" || st == "late");
@@ -639,7 +647,7 @@ bool recordAttendance(const String& studentId, const String& dateStr,
 // ============================================================
 bool loadConfig() {
     String url = String(SERVER_BASE)
-                 + "/classroom/api/bio_config.php?key="
+                 + "/classroomv2/api/bio_config.php?key="
                  + urlencode(String(DEVICE_KEY));
 
     HTTPClient http;
@@ -1041,16 +1049,16 @@ void beep(int n, bool ok) {
 // ============================================================
 //  SD CARD OFFLINE LOG
 // ============================================================
-void logToSD(const String& studentId, const String& dateStr,
-             const String& timeStr,   const String& result) {
-    if (!sdReady) return;
-    File f = SD_MMC.open(SD_LOG_FILE, FILE_APPEND);
-    if (!f) return;
-    f.printf("%s,%s,%s,%s\n",
-             dateStr.c_str(), timeStr.c_str(),
-             studentId.c_str(), result.c_str());
-    f.close();
-}
+// void logToSD(const String& studentId, const String& dateStr,
+//              const String& timeStr,   const String& result) {
+//     if (!sdReady) return;
+//     File f = SD_MMC.open(SD_LOG_FILE, FILE_APPEND);
+//     if (!f) return;
+//     f.printf("%s,%s,%s,%s\n",
+//              dateStr.c_str(), timeStr.c_str(),
+//              studentId.c_str(), result.c_str());
+//     f.close();
+// }
 
 // ============================================================
 //  WiFi
@@ -1088,7 +1096,7 @@ void connectWiFi() {
 Serial.println("[NET] Testing TCP to server...");
 WiFiClient testClient;
 testClient.setTimeout(5000);
-if (testClient.connect("192.168.254.115", 80)) {
+if (testClient.connect("192.168.137.1", 80)) {
     Serial.println("[NET] TCP port 80 OPEN — server reachable");
     testClient.stop();
 } else {

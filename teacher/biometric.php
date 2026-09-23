@@ -1073,8 +1073,23 @@ const style=document.createElement('style');
 style.textContent='@keyframes spin{to{transform:rotate(360deg);}}';
 document.head.appendChild(style);
 
-// Auto-refresh scan log
-setTimeout(()=>location.reload(),15000);
+// Auto-refresh scan log — but never while a modal is open (e.g. mid
+// device registration) or while the admin is typing/focused in a field.
+// Instead of giving up, it keeps checking every few seconds and reloads
+// as soon as the coast is clear.
+function scheduleLogRefresh(){
+  setTimeout(function tick(){
+    const modalOpen = document.querySelector('.modal-overlay.open');
+    const el = document.activeElement;
+    const typing = el && ['INPUT','SELECT','TEXTAREA'].includes(el.tagName);
+    if (modalOpen || typing) {
+      setTimeout(tick, 3000);   // busy — check again soon
+    } else {
+      location.reload();
+    }
+  }, 15000);
+}
+scheduleLogRefresh();
 </script>
 
 <?php
