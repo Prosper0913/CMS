@@ -3,8 +3,7 @@
 //  admin/_nav.php  —  Shared admin sidebar
 //  Included by every admin/*.php page. Expects $active_nav to
 //  be set beforehand ('dashboard' | 'teachers' | 'sections' |
-//  'students' | 'import' | 'api_keys' | 'section_requests' |
-//  'audit_log' | 'password_requests').
+//  'students' | 'api_keys' | 'audit_log' | 'password_requests').
 // ============================================================
 $active_nav = $active_nav ?? '';
 
@@ -33,15 +32,20 @@ function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ?
     <a href="/classroomv2/admin/teachers.php" class="<?php echo _nav_class('teachers', $active_nav); ?>"><i class="ti ti-user-star"></i><span>Teachers</span></a>
     <a href="/classroomv2/admin/sections.php" class="<?php echo _nav_class('sections', $active_nav); ?>"><i class="ti ti-building-community"></i><span>Sections</span></a>
     <a href="/classroomv2/admin/students.php" class="<?php echo _nav_class('students', $active_nav); ?>"><i class="ti ti-users"></i><span>Students</span></a>
-    <a href="/classroomv2/admin/import_students.php" class="<?php echo _nav_class('import', $active_nav); ?>"><i class="ti ti-file-import"></i><span>Import</span></a>
     <a href="/classroomv2/admin/api_keys.php" class="<?php echo _nav_class('api_keys', $active_nav); ?>"><i class="ti ti-key"></i><span>API Keys</span></a>
-    <a href="/classroomv2/admin/section_requests.php" class="<?php echo _nav_class('section_requests', $active_nav); ?>"><i class="ti ti-hand-stop"></i><span>Section Requests</span></a>
     <a href="/classroomv2/admin/password_requests.php" class="<?php echo _nav_class('password_requests', $active_nav); ?>"><i class="ti ti-lock-open"></i><span>Password Requests</span><?php if ($pending_pw_requests > 0): ?><span class="nav-badge"><?php echo $pending_pw_requests; ?></span><?php endif; ?></a>
     <a href="/classroomv2/admin/audit_log.php" class="<?php echo _nav_class('audit_log', $active_nav); ?>"><i class="ti ti-history"></i><span>Audit Log</span></a>
+    <a href="/classroomv2/admin/settings.php" class="<?php echo _nav_class('settings', $active_nav); ?>"><i class="ti ti-settings"></i><span>Settings</span></a>
   </nav>
   <div class="sidebar-footer">
     <span class="sidebar-role role-admin">Admin</span>
     <div class="sidebar-username"><?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?></div>
     <a href="/classroomv2/logout.php" class="sidebar-logout"><i class="ti ti-logout"></i><span>Logout</span></a>
+    <div style="margin-top:10px;font-size:11px;opacity:.6;color:var(--text);">
+      <a href="/classroomv2/privacy.php" style="color:var(--text);">Privacy</a> ·
+      <a href="/classroomv2/terms.php" style="color:var(--text);">Terms</a> ·
+      <a href="/classroomv2/cookie_policy.php" style="color:var(--text);">Cookies</a>
+    </div>
   </div>
 </aside>
+<?php include __DIR__ . '/../includes/cookie_notice.php'; ?>

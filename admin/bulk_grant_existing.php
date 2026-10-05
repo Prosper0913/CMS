@@ -1,18 +1,23 @@
 <?php
 // ============================================================
 //  admin/bulk_grant_existing.php
-//  ONE-TIME migration helper. Finds every (teacher, section) pair
-//  currently in active use via subject_enrollments where the
-//  section has no owner (teacher_id IS NULL) — i.e. teachers who
-//  will lose access the moment section-gating goes live — and lets
+//  ONE-TIME migration helper, run when retiring admin-owned
+//  ("template") sections in favor of every section always
+//  belonging to the teacher who uses it. Finds every (teacher,
+//  section) pair currently in active use via subject_enrollments
+//  where the section has no owner (teacher_id IS NULL), and lets
 //  admin grant each of them their own clone in one click.
+//
+//  Run this once, confirm zero rows remain in
+//  `SELECT * FROM sections WHERE teacher_id IS NULL`, then apply
+//  the teacher_owned_sections.sql migration (which makes
+//  sections.teacher_id NOT NULL) and delete this file — it has
+//  nothing left to do once no section can be unowned.
 //
 //  Safe to re-run: pairs that already have a matching clone
 //  (teacher_id = X AND cloned_from_section_id = Y) are skipped
 //  automatically, so running this twice does nothing extra the
-//  second time. Not linked in the nav on purpose — this is meant
-//  to be run once right after deploying the section-gating update,
-//  then can be deleted.
+//  second time. Not linked in the nav on purpose.
 // ============================================================
 require_once '../includes/auth.php';
 requireRole('admin');

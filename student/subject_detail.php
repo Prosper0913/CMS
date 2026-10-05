@@ -334,6 +334,16 @@ $pass = $fg >= 75;
         : 0;
   ?>
 
+  <style>
+    .xl-table-wrap{overflow-x:auto;border:1px solid var(--border2);border-radius:6px;}
+    table.xl-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+    table.xl-table th,table.xl-table td{border:1px solid var(--border2);padding:4px 8px;text-align:left;white-space:nowrap;}
+    table.xl-table thead th{background:var(--bg5);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text7);position:sticky;top:0;}
+    table.xl-table td.xl-num{font-family:var(--font-mono);text-align:right;}
+    table.xl-table tbody tr:nth-child(even){background:var(--bg6);}
+    table.xl-table tfoot td{background:var(--bg5);font-weight:600;border-top:2px solid var(--border2);}
+  </style>
+
   <div class="card">
     <p class="card-title">
       <i class="ti <?php echo $comp_icon; ?>" style="color:<?php echo $comp_color; ?>;"></i>
@@ -353,8 +363,8 @@ $pass = $fg >= 75;
       <p  class="text-muted">No <?php echo strtolower($comp_name); ?> scores recorded yet.</p>
     </div>
     <?php else: ?>
-    <div class="table-wrap">
-      <table>
+    <div class="xl-table-wrap">
+      <table class="xl-table">
         <thead>
           <tr>
             <th>#</th>
@@ -362,7 +372,7 @@ $pass = $fg >= 75;
             <th>Date</th>
             <th>Score</th>
             <th>Total</th>
-            <th>Percentage</th>
+            <th>%</th>
           </tr>
         </thead>
         <tbody>
@@ -371,37 +381,24 @@ $pass = $fg >= 75;
             $pass = $pct >= 75;
           ?>
           <tr>
-            <td class="td-mono"><?php echo $i + 1; ?></td>
-            <td style="font-weight:500;"><?php echo htmlspecialchars($sc['entry_name']); ?></td>
-            <td class="td-mono"><?php echo $sc['date_given'] ? date('M d, Y', strtotime($sc['date_given'])) : '—'; ?></td>
-            <td style="font-family:var(--font-mono);font-size:13px;">
-              <?php echo number_format((float)$sc['score'], 1); ?>
-            </td>
-            <td class="td-mono"><?php echo (int)$sc['total_items']; ?></td>
-            <td>
-              <div class="inline-bar">
-                <div class="inline-track">
-                  <div class="inline-fill" style="width:<?php echo min($pct,100); ?>%;background:<?php echo $comp_color; ?>;opacity:.8;"></div>
-                </div>
-                <span style="font-family:var(--font-mono);font-size:12px;min-width:46px;color:<?php echo $pass?'var(--green)':'var(--red)'; ?>;">
-                  <?php echo number_format($pct,1); ?>%
-                </span>
-              </div>
-            </td>
+            <td class="xl-num"><?php echo $i + 1; ?></td>
+            <td><?php echo htmlspecialchars($sc['entry_name']); ?></td>
+            <td><?php echo $sc['date_given'] ? date('M d, Y', strtotime($sc['date_given'])) : '—'; ?></td>
+            <td class="xl-num"><?php echo number_format((float)$sc['score'], 1); ?></td>
+            <td class="xl-num"><?php echo (int)$sc['total_items']; ?></td>
+            <td class="xl-num" style="color:<?php echo $pass?'var(--green)':'var(--red)'; ?>;"><?php echo number_format($pct,1); ?>%</td>
           </tr>
           <?php endforeach; ?>
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5"><?php echo count($comp_scores); ?> entr<?php echo count($comp_scores)===1?'y':'ies'; ?> — Average</td>
+            <td class="xl-num" style="color:<?php echo $avg>=75?'var(--green)':($avg>0?'var(--red)':'var(--text7)'); ?>;">
+              <?php echo $avg > 0 ? number_format($avg,1).'%' : '—'; ?>
+            </td>
+          </tr>
+        </tfoot>
       </table>
-    </div>
-    <!-- Summary bar -->
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;">
-      <span style="font-size:12px;color:var(--text7);"><?php echo count($comp_scores); ?> entr<?php echo count($comp_scores)===1?'y':'ies'; ?> · Average</span>
-      <div style="flex:1;height:6px;background:var(--bg3);border-radius:99px;overflow:hidden;">
-        <div style="height:100%;width:<?php echo min($avg,100); ?>%;background:<?php echo $comp_color; ?>;border-radius:99px;"></div>
-      </div>
-      <span style="font-family:var(--font-mono);font-size:14px;font-weight:500;color:<?php echo $avg>=75?'var(--green)':($avg>0?'var(--red)':'var(--text3)'); ?>;">
-        <?php echo $avg > 0 ? number_format($avg,1).'%' : '—'; ?>
-      </span>
     </div>
     <?php endif; ?>
   </div>

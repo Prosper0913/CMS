@@ -1,23 +1,21 @@
 <?php
 // ============================================================
 //  teacher/manage_sections.php
-//  Section dashboard for a teacher's own (approved/granted) sections.
-//  Sections are created by admin only now — a teacher gets access to
-//  one by requesting it (from another teacher's section, or from
-//  admin's pool) and having it approved, or by admin granting it
-//  directly. Approval always produces an independent CLONE owned by
-//  that teacher, never shared live access to the original.
+//  Section dashboard for a teacher's own sections.
+//  Teachers are the only creators of sections. Every section belongs to
+//  the teacher who made it (sections.teacher_id is never NULL), and names
+//  only need to be unique per teacher.
 //  Features:
-//    - Rename / delete sections you own (your own clones)
+//    - Create / rename / delete your own sections
 //    - View students per section
-//    - Add / remove students from a section (filtered by course)
-//    - Quick-enroll entire section into any of your own subjects
-//    - Request / respond-to section access, both peer-to-peer and
-//      admin-mediated
+//    - Add an existing student (by Student ID) / remove students
+//    - Quick-enroll an entire section into any of your own subjects
+//  Brand-new students are created from teacher/students.php.
 // ============================================================
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
+require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 $teacher_id  = $_SESSION['user_id'];
@@ -25,16 +23,8 @@ $success_msg = '';
 $error_msg   = '';
 
 // ── Access helper ─────────────────────────────────────────────
-// Sections are now admin-only to create. A teacher can manage a
-// section ONLY if they own it — which only happens after an
-// access request (to another teacher OR to admin) gets approved,
-// or admin grants it directly. There is no more free-for-all
-// "unowned section" bypass: an admin-owned section (teacher_id IS
-// NULL) is invisible/unusable to every teacher until they go
-// through that request flow.
-// NOTE: approval never grants access to the SAME section row — it
-// clones a brand-new, independently-owned copy for the requester
-// (see respond_section_request / respond to admin requests).
+// A teacher can manage a section ONLY if they own it (sections.teacher_id
+// = their id). Anyone else's section is off-limits.
 function sectionAccessible($conn, $section_id, $teacher_id) {
     $q = $conn->prepare(
         "SELECT id FROM sections WHERE id = ? AND teacher_id = ? LIMIT 1"
@@ -74,11 +64,6 @@ $all_subs = $subjects_stmt->get_result();
 // ══════════════════════════════════════════════════════════════
 //  POST HANDLERS
 // ══════════════════════════════════════════════════════════════
-
-// NOTE: teachers can no longer create sections directly — only admin
-// creates sections now (admin/sections.php). Teachers get access to a
-// section by requesting it (from another teacher OR from admin) below,
-// or by admin granting one directly.
 
 // ── RENAME section ───────────────────────────────────────────
 if (isset($_POST['rename_section'])) {
@@ -129,39 +114,49 @@ $type_cfg = [
     'Major Subject'          => ['color'=>'#1e5f4e','label'=>'MAJ'],
 ];
 
-// ── ADD student to section ───────────────────────────────────
+// ── ADD an existing student to one of my sections ────────────
+// Any existing student (found by Student ID) can be added — students are
+// shared across teachers, and adding one only creates THIS teacher's own
+// roster link; it never changes the student's record. Brand-new students
+// are created from the Students page instead.
 if (isset($_POST['add_to_section'])) {
     $sec_id = (int)$_POST['sec_id'];
-    $sid    = trim($_POST['student_id']);
+    $sid    = trim($_POST['student_id'] ?? '');
     if ($sid === '') {
-        $error_msg = "Please select a student.";
+        $error_msg = "Please enter a Student ID.";
     } elseif (!sectionAccessible($conn, $sec_id, $teacher_id)) {
         $error_msg = "Only the section's creator can add students to it.";
-    } elseif (!teacherHasStudentInAnySection($conn, $teacher_id, $sid)) {
-        // Prevents pulling in a brand-new / unclaimed student directly —
-        // they can only become accessible via the section access
-        // request -> approval -> clone flow, not a raw POST here.
-        $error_msg = "That student isn't in any of your existing sections yet. Request access to a section that includes them instead.";
     } else {
-        $chk = $conn->prepare(
-            "SELECT id FROM section_students WHERE section_id = ? AND student_id = ? LIMIT 1"
-        );
-        $chk->bind_param('is', $sec_id, $sid);
-        $chk->execute();
-        $chk->store_result();
-        if ($chk->num_rows > 0) {
-            $error_msg = "Student is already in this section.";
+        $sq = $conn->prepare("SELECT student_id FROM students WHERE student_id = ? LIMIT 1");
+        $sq->bind_param('s', $sid);
+        $sq->execute();
+        if (!$sq->get_result()->fetch_assoc()) {
+            $error_msg = "No student with that ID exists yet. Create them from the <a href=\"students.php\" class=\"text-accent\">Students</a> page first.";
         } else {
-            $ins = $conn->prepare(
-                "INSERT INTO section_students (section_id, student_id) VALUES (?, ?)"
+            $chk = $conn->prepare(
+                "SELECT id FROM section_students WHERE section_id = ? AND student_id = ? LIMIT 1"
             );
-            $ins->bind_param('is', $sec_id, $sid);
-            $ins->execute();
-            header("Location: manage_sections.php?sec={$sec_id}&msg=student_added");
-            exit;
+            $chk->bind_param('is', $sec_id, $sid);
+            $chk->execute();
+            $chk->store_result();
+            if ($chk->num_rows > 0) {
+                $error_msg = "Student is already in this section.";
+            } else {
+                $ins = $conn->prepare(
+                    "INSERT INTO section_students (section_id, student_id) VALUES (?, ?)"
+                );
+                $ins->bind_param('is', $sec_id, $sid);
+                $ins->execute();
+                backfillSubjectEnrollmentsForSection($conn, $sec_id, $sid);
+                auto_enroll_student_in_fpst_subjects($conn, $sec_id, $sid);
+                push_all_fpst_subjects_for_section($conn, $sec_id);
+                header("Location: manage_sections.php?sec={$sec_id}&msg=student_added");
+                exit;
+            }
         }
     }
 }
+
 
 // ── REMOVE student from section ──────────────────────────────
 if (isset($_POST['remove_from_section'])) {
@@ -192,7 +187,7 @@ if (isset($_POST['enroll_into_subject'])) {
     if ($own->num_rows === 0) {
         $error_msg = "Subject not found or access denied.";
     } elseif (!sectionAccessible($conn, $sec_id, $teacher_id)) {
-        $error_msg = "You don't have access to this section yet. Request access first.";
+        $error_msg = "You can only enroll sections that you own.";
     } else {
         $sq = $conn->prepare("SELECT student_id FROM section_students WHERE section_id = ?");
         $sq->bind_param('i', $sec_id);
@@ -219,210 +214,42 @@ if (isset($_POST['enroll_into_subject'])) {
     }
 }
 
-// ── SEND a request to access a section you don't own ──────────
-// The requester must know (and type) the teacher's username and the exact
-// section name — sections are no longer browsable/listed across teachers.
-if (isset($_POST['send_section_request'])) {
-    $target_username = trim($_POST['target_username'] ?? '');
-    $section_name_req = trim($_POST['section_name_req'] ?? '');
-    $message = trim($_POST['message'] ?? '');
+// ── CREATE section ───────────────────────────────────────────
+// Teachers are the only creators of sections. A section is always
+// owned by the teacher who makes it (teacher_id is never NULL), and
+// names only need to be unique per teacher — two teachers can each
+// have their own "BSIT1-A".
+if (isset($_POST['create_section'])) {
+    $name   = trim($_POST['section_name'] ?? '');
+    $desc   = trim($_POST['section_desc'] ?? '');
+    $course = trim($_POST['course'] ?? '');
+    $year   = (int)($_POST['year_level'] ?? 1);
+    $sy     = trim($_POST['school_year'] ?? '');
 
-    if ($target_username === '' || $section_name_req === '') {
-        $error_msg = "Please enter both the teacher's username and the section name.";
+    if ($name === '') {
+        $error_msg = "Section name is required.";
+    } elseif (!in_array($course, ['BSIT','LAED','BSBA','BSN','FPST','BSA'], true)) {
+        $error_msg = "Please select a valid course.";
+    } elseif ($year < 1 || $year > 6) {
+        $error_msg = "Year level must be between 1 and 6.";
     } else {
-        $tq = $conn->prepare("SELECT id FROM users WHERE username = ? AND role = 'teacher' LIMIT 1");
-        $tq->bind_param('s', $target_username);
-        $tq->execute();
-        $trow = $tq->get_result()->fetch_assoc();
-
-        if (!$trow) {
-            $error_msg = "No teacher found with that username.";
-        } elseif ((int)$trow['id'] === $teacher_id) {
-            $error_msg = "You can't request a section from yourself.";
-        } else {
-            $owner_teacher_id = (int)$trow['id'];
-            $sq = $conn->prepare("SELECT id FROM sections WHERE section_name = ? AND teacher_id = ? LIMIT 1");
-            $sq->bind_param('si', $section_name_req, $owner_teacher_id);
-            $sq->execute();
-            $srow = $sq->get_result()->fetch_assoc();
-
-            if (!$srow) {
-                $error_msg = "No section named <strong>" . htmlspecialchars($section_name_req) . "</strong> found for that teacher.";
-            } else {
-                $sec_id = (int)$srow['id'];
-                if (sectionAccessible($conn, $sec_id, $teacher_id)) {
-                    $error_msg = "You already have access to this section.";
-                } else {
-                    // Don't allow a duplicate pending request for the same section
-                    $dupe = $conn->prepare(
-                        "SELECT id FROM section_access_requests
-                         WHERE section_id = ? AND requesting_teacher_id = ? AND status = 'pending'
-                         LIMIT 1"
-                    );
-                    $dupe->bind_param('ii', $sec_id, $teacher_id);
-                    $dupe->execute();
-                    $dupe->store_result();
-                    if ($dupe->num_rows > 0) {
-                        $error_msg = "You already have a pending request for this section.";
-                    } else {
-                        $ins = $conn->prepare(
-                            "INSERT INTO section_access_requests
-                                (section_id, requesting_teacher_id, message, status)
-                             VALUES (?, ?, ?, 'pending')"
-                        );
-                        $ins->bind_param('iis', $sec_id, $teacher_id, $message);
-                        $ins->execute();
-                        header("Location: manage_sections.php?msg=request_sent");
-                        exit;
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── APPROVE / DENY an incoming section access request ────────
-// Only a teacher who currently owns (or holds legacy access to) the
-// requested section can respond. Approving does NOT share the same
-// section — it clones a brand-new, independently-owned copy of the
-// roster for the requester, so edits on one side never affect the other.
-if (isset($_POST['respond_section_request'])) {
-    $req_id = (int)$_POST['request_id'];
-    $action = $_POST['action'] ?? '';
-    $new_status = $action === 'approve' ? 'approved' : ($action === 'deny' ? 'denied' : null);
-
-    if (!$new_status) {
-        $error_msg = "Invalid request action.";
-    } else {
-        $rq = $conn->prepare(
-            "SELECT section_id, requesting_teacher_id FROM section_access_requests
-             WHERE id = ? AND status = 'pending'"
-        );
-        $rq->bind_param('i', $req_id);
-        $rq->execute();
-        $req_row = $rq->get_result()->fetch_assoc();
-
-        if (!$req_row) {
-            $error_msg = "Request not found or already handled.";
-        } elseif (!sectionAccessible($conn, $req_row['section_id'], $teacher_id)) {
-            $error_msg = "You don't own this section, so you can't respond to requests for it.";
-        } elseif ($new_status === 'approved') {
-            // Clone section metadata (including course, so the course-based
-            // enrollment filter still works correctly on the teacher's copy)
-            $orig = $conn->prepare(
-                "SELECT s.section_name, s.description, s.course, u.username AS owner_name
-                 FROM sections s LEFT JOIN users u ON u.id = s.teacher_id
-                 WHERE s.id = ?"
-            );
-            $orig->bind_param('i', $req_row['section_id']);
-            $orig->execute();
-            $orig_row = $orig->get_result()->fetch_assoc();
-
-            // Avoid colliding with a section the requester already owns
-            // under that exact name (per-teacher name uniqueness)
-            $clone_name = $orig_row['section_name'];
-            $nameChk = $conn->prepare("SELECT id FROM sections WHERE section_name = ? AND teacher_id = ? LIMIT 1");
-            $nameChk->bind_param('si', $clone_name, $req_row['requesting_teacher_id']);
-            $nameChk->execute();
-            $nameChk->store_result();
-            if ($nameChk->num_rows > 0) {
-                $clone_name = $orig_row['section_name'] . ' (from ' . ($orig_row['owner_name'] ?? 'shared') . ')';
-            }
-
-            $ins = $conn->prepare(
-                "INSERT INTO sections (section_name, description, course, teacher_id, cloned_from_section_id)
-                 VALUES (?, ?, ?, ?, ?)"
-            );
-            $ins->bind_param('sssii', $clone_name, $orig_row['description'], $orig_row['course'],
-                              $req_row['requesting_teacher_id'], $req_row['section_id']);
-            $ins->execute();
-            $new_section_id = $conn->insert_id;
-
-            // Copy the current roster as of right now (a snapshot, not a live link)
-            $copy = $conn->prepare(
-                "INSERT INTO section_students (section_id, student_id)
-                 SELECT ?, student_id FROM section_students WHERE section_id = ?"
-            );
-            $copy->bind_param('ii', $new_section_id, $req_row['section_id']);
-            $copy->execute();
-
-            $upd = $conn->prepare(
-                "UPDATE section_access_requests
-                 SET status = 'approved', approved_by_teacher_id = ?, resulting_section_id = ?, responded_at = NOW()
-                 WHERE id = ? AND status = 'pending'"
-            );
-            $upd->bind_param('iii', $teacher_id, $new_section_id, $req_id);
-            $upd->execute();
-            header("Location: manage_sections.php?msg=request_approved");
-            exit;
-        } else {
-            $upd = $conn->prepare(
-                "UPDATE section_access_requests
-                 SET status = 'denied', approved_by_teacher_id = ?, responded_at = NOW()
-                 WHERE id = ? AND status = 'pending'"
-            );
-            $upd->bind_param('ii', $teacher_id, $req_id);
-            $upd->execute();
-            header("Location: manage_sections.php?msg=request_denied");
-            exit;
-        }
-    }
-}
-
-// ── SEND a request to access an ADMIN-OWNED section ────────────
-// Unlike peer sections, admin-owned sections (teacher_id IS NULL)
-// ARE listed/selectable here — there's no privacy concern in
-// showing what sections admin has created, only in browsing other
-// teachers' personal sections.
-if (isset($_POST['send_admin_section_request'])) {
-    $sec_id  = (int)($_POST['admin_section_id'] ?? 0);
-    $message = trim($_POST['admin_message'] ?? '');
-
-    $sq = $conn->prepare("SELECT id, section_name FROM sections WHERE id = ? AND teacher_id IS NULL LIMIT 1");
-    $sq->bind_param('i', $sec_id);
-    $sq->execute();
-    $srow = $sq->get_result()->fetch_assoc();
-
-    if (!$srow) {
-        $error_msg = "Please choose a valid section to request.";
-    } elseif (sectionAccessible($conn, $sec_id, $teacher_id)) {
-        $error_msg = "You already have access to this section.";
-    } else {
-        $dupe = $conn->prepare(
-            "SELECT id FROM section_access_requests
-             WHERE section_id = ? AND requesting_teacher_id = ? AND status = 'pending'
-             LIMIT 1"
-        );
-        $dupe->bind_param('ii', $sec_id, $teacher_id);
-        $dupe->execute();
-        $dupe->store_result();
-        if ($dupe->num_rows > 0) {
-            $error_msg = "You already have a pending request for this section.";
+        $chk = $conn->prepare("SELECT id FROM sections WHERE section_name = ? AND teacher_id = ? LIMIT 1");
+        $chk->bind_param('si', $name, $teacher_id);
+        $chk->execute();
+        $chk->store_result();
+        if ($chk->num_rows > 0) {
+            $error_msg = "You already have a section named <strong>" . htmlspecialchars($name) . "</strong>.";
         } else {
             $ins = $conn->prepare(
-                "INSERT INTO section_access_requests
-                    (section_id, requesting_teacher_id, message, status)
-                 VALUES (?, ?, ?, 'pending')"
+                "INSERT INTO sections (section_name, description, course, year_level, school_year, teacher_id, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
-            $ins->bind_param('iis', $sec_id, $teacher_id, $message);
+            $ins->bind_param('sssisii', $name, $desc, $course, $year, $sy, $teacher_id, $teacher_id);
             $ins->execute();
-            header("Location: manage_sections.php?msg=request_sent");
+            header("Location: manage_sections.php?sec=" . $conn->insert_id . "&msg=created");
             exit;
         }
     }
-}
-
-// ── CANCEL a pending request you sent ─────────────────────────
-if (isset($_POST['cancel_section_request'])) {
-    $req_id = (int)$_POST['request_id'];
-    $del = $conn->prepare(
-        "DELETE FROM section_access_requests
-         WHERE id = ? AND requesting_teacher_id = ? AND status = 'pending'"
-    );
-    $del->bind_param('ii', $req_id, $teacher_id);
-    $del->execute();
-    header("Location: manage_sections.php?msg=request_cancelled");
-    exit;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -437,10 +264,6 @@ switch ($_GET['msg'] ?? '') {
     case 'enrolled':
         $cnt = (int)($_GET['count'] ?? 0);
         $success_msg = "Enrolled <strong>{$cnt}</strong> student(s) into the selected subject."; break;
-    case 'request_sent':      $success_msg = "Access request sent."; break;
-    case 'request_approved':  $success_msg = "Request approved."; break;
-    case 'request_denied':    $success_msg = "Request denied."; break;
-    case 'request_cancelled': $success_msg = "Request withdrawn."; break;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -449,62 +272,33 @@ switch ($_GET['msg'] ?? '') {
 
 // Active section panel (from GET)
 $active_sec_id = (int)($_GET['sec'] ?? 0);
+$view = ($_GET['view'] ?? 'roster') === 'analytics' ? 'analytics' : 'roster';
 
-// All sections with student counts, owner info, and clone lineage
-$sections_res = $conn->query(
-    "SELECT s.id, s.section_name, s.description, s.teacher_id, s.cloned_from_section_id, s.course,
-            u.username  AS owner_name,
-            ou.username AS original_owner_name,
+// My sections, with student counts. Sections are always teacher-owned now,
+// so there's nothing to browse across teachers.
+$sections_stmt = $conn->prepare(
+    "SELECT s.id, s.section_name, s.description, s.teacher_id, s.course, s.year_level, s.school_year,
             COUNT(ss.student_id) AS student_count
      FROM sections s
      LEFT JOIN section_students ss ON ss.section_id = s.id
-     LEFT JOIN users u  ON u.id  = s.teacher_id
-     LEFT JOIN sections os ON os.id = s.cloned_from_section_id
-     LEFT JOIN users ou ON ou.id = os.teacher_id
-     GROUP BY s.id, s.section_name, s.description, s.teacher_id, s.cloned_from_section_id,
-              u.username, ou.username
+     WHERE s.teacher_id = ?
+     GROUP BY s.id, s.section_name, s.description, s.teacher_id, s.course, s.year_level, s.school_year
      ORDER BY s.section_name ASC"
 );
-$all_sections = [];
-while ($r = $sections_res->fetch_assoc()) $all_sections[] = $r;
+$sections_stmt->bind_param('i', $teacher_id);
+$sections_stmt->execute();
+$all_sections = $sections_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$my_sections  = $all_sections;
 
-// Sections I actually own — only ever populated by an approved request
-// (from a teacher or from admin) or a direct admin grant. Admin-owned
-// sections (teacher_id IS NULL) are deliberately excluded here now.
-$my_sections = [];
-foreach ($all_sections as $sec) {
-    if ((int)$sec['teacher_id'] === $teacher_id) {
-        $my_sections[] = $sec;
-    }
-}
-
-// Admin-owned sections available to request access to
-$admin_sections_list = [];
-foreach ($all_sections as $sec) {
-    if ($sec['teacher_id'] === null) {
-        $admin_sections_list[] = $sec;
-    }
-}
-
-// Active section data (only if I actually own/have access to it)
+// Active section data (only ever one of my own sections)
 $active_section = null;
 $access_denied  = false;
 $section_students_list = [];
-$not_in_section = [];
 if ($active_sec_id) {
     foreach ($all_sections as $s) {
-        if ((int)$s['id'] === $active_sec_id) {
-            $is_mine = (int)$s['teacher_id'] === $teacher_id;
-            if ($is_mine) {
-                $active_section = $s;
-            } else {
-                $access_denied = $s; // keep the row so we can show its name + a Request button
-            }
-            break;
-        }
+        if ((int)$s['id'] === $active_sec_id) { $active_section = $s; break; }
     }
     if ($active_section) {
-        // Students already in section
         $ss_res = $conn->prepare(
             "SELECT s.student_id, s.last_name, s.first_name, s.middle_initial
              FROM section_students ss
@@ -514,61 +308,71 @@ if ($active_sec_id) {
         );
         $ss_res->bind_param('i', $active_sec_id);
         $ss_res->execute();
-        $ssr = $ss_res->get_result();
-        $in_ids = [];
-        while ($r = $ssr->fetch_assoc()) {
-            $section_students_list[] = $r;
-            $in_ids[] = $r['student_id'];
-        }
-
-        // Students NOT in section (for add dropdown) — filtered to the
-        // section's course when one is set, AND restricted to students
-        // who are already in one of THIS teacher's own sections. This
-        // is a roster-management tool for moving your own students
-        // between your own sections — it is NOT a way to pick up brand
-        // new / unclaimed students system-wide. A newly admin-added
-        // student who isn't yet in any of your sections should only
-        // become reachable through the section access request ->
-        // approval -> clone flow, same as everything else here.
-        $section_course = trim((string)($active_section['course'] ?? ''));
-        $course_clause = $section_course !== ''
-            ? "AND (s.course IS NULL OR s.course = '' OR UPPER(TRIM(s.course)) = UPPER(TRIM(?)))"
-            : "";
-
-        if ($in_ids) {
-            $ph = implode(',', array_fill(0, count($in_ids), '?'));
-            $sql = "SELECT DISTINCT s.student_id, s.last_name, s.first_name, s.course
-                    FROM students s
-                    JOIN section_students ss2 ON ss2.student_id = s.student_id
-                    JOIN sections sec2 ON sec2.id = ss2.section_id
-                    WHERE sec2.teacher_id = ?
-                      AND s.student_id NOT IN ($ph)
-                      $course_clause
-                    ORDER BY s.last_name ASC";
-            $ne = $conn->prepare($sql);
-            $types = 'i' . str_repeat('s', count($in_ids)) . ($section_course !== '' ? 's' : '');
-            $bind_args = array_merge([$teacher_id], $in_ids);
-            if ($section_course !== '') $bind_args[] = $section_course;
-            $ne->bind_param($types, ...$bind_args);
-        } else {
-            $sql = "SELECT DISTINCT s.student_id, s.last_name, s.first_name, s.course
-                    FROM students s
-                    JOIN section_students ss2 ON ss2.student_id = s.student_id
-                    JOIN sections sec2 ON sec2.id = ss2.section_id
-                    WHERE sec2.teacher_id = ?
-                      $course_clause
-                    ORDER BY s.last_name ASC";
-            $ne = $conn->prepare($sql);
-            if ($section_course !== '') {
-                $ne->bind_param('is', $teacher_id, $section_course);
-            } else {
-                $ne->bind_param('i', $teacher_id);
-            }
-        }
-        $ne->execute();
-        $ne_res = $ne->get_result();
-        while ($r = $ne_res->fetch_assoc()) $not_in_section[] = $r;
+        $section_students_list = $ss_res->get_result()->fetch_all(MYSQLI_ASSOC);
     }
+}
+
+// ── Analytics for the active section (computed only when that tab is open) ──
+$analytics_subjects = [];
+$analytics_overall  = ['avg_grade' => null, 'attendance_rate' => null, 'passing_rate' => null, 'student_count' => 0];
+if ($active_section && $view === 'analytics') {
+    $subs = $conn->prepare(
+        "SELECT id, subject_code, subject_name FROM subjects
+         WHERE teacher_id = ? AND TRIM(section) = TRIM(?) AND is_active = 1
+         ORDER BY subject_name ASC"
+    );
+    $subs->bind_param('is', $teacher_id, $active_section['section_name']);
+    $subs->execute();
+    $subject_rows = $subs->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $sum_grade = 0; $n_grade = 0; $n_pass = 0;
+    $sum_present = 0; $n_att = 0;
+
+    foreach ($subject_rows as $subj) {
+        $sub_id = $subj['id'];
+
+        $gq = $conn->prepare("SELECT final_grade FROM subject_grades WHERE subject_id = ? AND final_grade IS NOT NULL AND final_grade > 0");
+        $gq->bind_param('i', $sub_id);
+        $gq->execute();
+        $grades  = array_column($gq->get_result()->fetch_all(MYSQLI_ASSOC), 'final_grade');
+        $avg     = $grades ? array_sum($grades) / count($grades) : null;
+        $passing = $grades ? count(array_filter($grades, fn($g) => $g >= 75)) : 0;
+
+        $aq = $conn->prepare("SELECT status, COUNT(*) AS c FROM attendance WHERE subject_id = ? GROUP BY status");
+        $aq->bind_param('i', $sub_id);
+        $aq->execute();
+        $att_counts  = $aq->get_result()->fetch_all(MYSQLI_ASSOC);
+        $att_total   = 0;
+        $att_present = 0;
+        foreach ($att_counts as $row) {
+            $att_total += (int)$row['c'];
+            if (in_array($row['status'], ['Present', 'Late'], true)) $att_present += (int)$row['c'];
+        }
+        $att_rate = $att_total > 0 ? ($att_present / $att_total) * 100 : null;
+
+        $eq = $conn->prepare("SELECT COUNT(*) AS c FROM subject_enrollments WHERE subject_id = ?");
+        $eq->bind_param('i', $sub_id);
+        $eq->execute();
+        $enrolled = (int)$eq->get_result()->fetch_assoc()['c'];
+
+        $analytics_subjects[] = [
+            'subject_code' => $subj['subject_code'],
+            'subject_name' => $subj['subject_name'],
+            'enrolled'     => $enrolled,
+            'avg_grade'    => $avg,
+            'passing'      => $passing,
+            'graded_count' => count($grades),
+            'att_rate'     => $att_rate,
+        ];
+
+        if ($grades)        { $sum_grade += array_sum($grades); $n_grade += count($grades); $n_pass += $passing; }
+        if ($att_total > 0) { $sum_present += $att_present; $n_att += $att_total; }
+    }
+
+    $analytics_overall['student_count']   = count($section_students_list);
+    $analytics_overall['avg_grade']       = $n_grade > 0 ? $sum_grade / $n_grade : null;
+    $analytics_overall['passing_rate']    = $n_grade > 0 ? ($n_pass / $n_grade) * 100 : null;
+    $analytics_overall['attendance_rate'] = $n_att > 0 ? ($sum_present / $n_att) * 100 : null;
 }
 
 // Teacher's subjects for bulk-enroll dropdown
@@ -581,60 +385,16 @@ $subj_res->bind_param('i', $teacher_id);
 $subj_res->execute();
 $teacher_subjects_list = $subj_res->get_result()->fetch_all(MYSQLI_ASSOC);
 
-// Summary counts
+// Summary counts (mine only)
 $total_sections = count($all_sections);
-$total_in_sections = $conn->query(
-    "SELECT COUNT(DISTINCT student_id) AS c FROM section_students"
-)->fetch_assoc()['c'];
-$total_students_global = $conn->query(
-    "SELECT COUNT(*) AS c FROM students"
-)->fetch_assoc()['c'];
-
-// ══════════════════════════════════════════════════════════════
-//  SECTION ACCESS REQUESTS
-// ══════════════════════════════════════════════════════════════
-
-// IDs of sections I currently have access to (owner, legacy/no-owner,
-// or an approved request) — used to find requests I'm allowed to act on
-$my_section_ids = array_map(fn($s) => (int)$s['id'], $my_sections);
-
-$incoming_requests = [];
-$pending_incoming_count = 0;
-if (!empty($my_section_ids)) {
-    $ph = implode(',', array_fill(0, count($my_section_ids), '?'));
-    $types = str_repeat('i', count($my_section_ids));
-    $incoming_stmt = $conn->prepare(
-        "SELECT r.id, r.section_id, r.message, r.created_at,
-                s.section_name, u.username AS requester_name
-         FROM section_access_requests r
-         JOIN sections s ON s.id = r.section_id
-         JOIN users u    ON u.id = r.requesting_teacher_id
-         WHERE r.status = 'pending'
-           AND r.requesting_teacher_id != ?
-           AND r.section_id IN ($ph)
-         ORDER BY r.created_at DESC"
-    );
-    $incoming_stmt->bind_param('i' . $types, $teacher_id, ...$my_section_ids);
-    $incoming_stmt->execute();
-    $incoming_requests = $incoming_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $pending_incoming_count = count($incoming_requests);
-}
-
-// Requests I've sent (any status), most recent first
-$outgoing_stmt = $conn->prepare(
-    "SELECT r.id, r.section_id, r.status, r.message, r.created_at, r.responded_at,
-            r.resulting_section_id,
-            s.section_name, ub.username AS approved_by_name
-     FROM section_access_requests r
-     JOIN sections s ON s.id = r.section_id
-     LEFT JOIN users ub ON ub.id = r.approved_by_teacher_id
-     WHERE r.requesting_teacher_id = ?
-     ORDER BY r.created_at DESC
-     LIMIT 20"
+$tis = $conn->prepare(
+    "SELECT COUNT(DISTINCT ss.student_id) AS c FROM section_students ss
+     JOIN sections sec ON sec.id = ss.section_id WHERE sec.teacher_id = ?"
 );
-$outgoing_stmt->bind_param('i', $teacher_id);
-$outgoing_stmt->execute();
-$outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$tis->bind_param('i', $teacher_id);
+$tis->execute();
+$total_in_sections = $tis->get_result()->fetch_assoc()['c'];
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -677,205 +437,92 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
       <div class="stat-chip-val"><?php echo $total_in_sections; ?></div>
       <div class="stat-chip-lbl">Students in Sections</div>
     </div>
-    <div class="stat-chip y">
-      <div class="stat-chip-val"><?php echo $total_students_global; ?></div>
-      <div class="stat-chip-lbl">Total Students</div>
-    </div>
   </div>
 
-    <!-- <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="openRequestModal()">
-        <i class="ti ti-hand-stop"></i> Request a Section (from a teacher)
-      </button>
-      <button class="btn btn-primary" onclick="openAdminRequestModal()">
-        <i class="ti ti-building-community"></i> Request a Section (from admin)
-      </button>
-    </div> -->
+  <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+    <button type="button" class="btn btn-primary" onclick="openCreateModal()">
+      <i class="ti ti-plus"></i> New Section
+    </button>
+  </div>
 
   <hr class="thin-line" style="margin-bottom:20px;">
 
+  <!-- ── MY SECTIONS TABLE ── -->
+  <div class="card" style="margin-bottom:24px;">
+    <p class="card-title" style="margin-bottom:14px;"><i class="ti ti-building-community"></i> My Sections</p>
 
-  <!-- ── SECTION ACCESS REQUESTS ── -->
-  <?php if (!empty($incoming_requests) || !empty($outgoing_requests)): ?>
-  <div class="requests-grid">
-
-    <!-- Incoming: requests other teachers sent me -->
-    <div class="card">
-      <p class="card-title">
-        <i class="ti ti-inbox text-accent"></i>
-        Incoming Requests
-        <?php if ($pending_incoming_count > 0): ?>
-          <span class="card-title-right" style="font-family:var(--font-mono);font-size:11px;color:var(--text7);">
-            <?php echo $pending_incoming_count; ?> pending
-          </span>
-        <?php endif; ?>
-      </p>
-      <?php if (empty($incoming_requests)): ?>
-        <p style="font-size:13px;color:var(--text7);">No pending requests from other teachers.</p>
-      <?php else: ?>
-        <?php foreach ($incoming_requests as $req): ?>
-        <div class="req-item">
-          <div class="req-main">
-            <div class="req-title">
-              <strong><?php echo htmlspecialchars($req['requester_name']); ?></strong>
-              wants <?php echo htmlspecialchars($req['section_name']); ?>
-            </div>
-            <div class="req-sub"><?php echo date('M d, Y g:ia', strtotime($req['created_at'])); ?></div>
-            <?php if ($req['message'] !== ''): ?>
-            <div class="req-msg">“<?php echo htmlspecialchars($req['message']); ?>”</div>
-            <?php endif; ?>
-          </div>
-          <div class="req-actions">
-            <form method="POST" style="display:inline;">
-              <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
-              <input type="hidden" name="action" value="approve">
-              <button type="submit" name="respond_section_request" class="btn btn-green btn-sm" title="Approve">
-                <i class="ti ti-check"></i>
-              </button>
-            </form>
-            <form method="POST" style="display:inline;">
-              <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
-              <input type="hidden" name="action" value="deny">
-              <button type="submit" name="respond_section_request" class="btn btn-danger btn-sm" title="Deny"
-                onclick="return confirm('Deny this request?')">
-                <i class="ti ti-x"></i>
-              </button>
-            </form>
-          </div>
-        </div>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </div>
-
-    <!-- Outgoing: requests I've sent -->
-    <div class="card">
-      <p class="card-title">
-        <i class="ti ti-send text-accent"></i>
-        My Requests
-      </p>
-      <?php if (empty($outgoing_requests)): ?>
-        <p style="font-size:13px;color:var(--text3);">You haven't requested access to any section yet.</p>
-      <?php else: ?>
-        <?php foreach ($outgoing_requests as $req): ?>
-        <div class="req-item">
-          <div class="req-main">
-            <div class="req-title">
-              <?php echo htmlspecialchars($req['section_name']); ?>
-              <?php if ($req['status'] === 'approved' && $req['approved_by_name']): ?>
-                <span style="color:var(--text3);font-weight:400;">— approved by <?php echo htmlspecialchars($req['approved_by_name']); ?></span>
-              <?php elseif ($req['status'] === 'pending'): ?>
-                <span style="color:var(--text3);font-weight:400;">— awaiting approval</span>
+    <?php if (empty($my_sections)): ?>
+      <div class="empty-state">
+        <i class="ti ti-building-off"></i>
+        <p style="color: var(--text7);">No sections yet. Use <strong>New Section</strong> to create your first one.</p>
+      </div>
+    <?php else: ?>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Course</th>
+            <th>Year</th>
+            <th>School Year</th>
+            <th>Students</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($my_sections as $sec): ?>
+          <tr style="<?php echo (int)$sec['id'] === $active_sec_id ? 'background:var(--bg6);' : ''; ?>">
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <i class="ti ti-users" style="color:var(--text7);"></i>
+                <span style="font-weight:500;"><?php echo htmlspecialchars($sec['section_name']); ?></span>
+              </div>
+              <?php if ($sec['description']): ?>
+                <div style="font-size:11px;color:var(--text7);margin-top:2px;"><?php echo htmlspecialchars($sec['description']); ?></div>
               <?php endif; ?>
-            </div>
-            <div class="req-sub"><?php echo date('M d, Y g:ia', strtotime($req['created_at'])); ?></div>
-          </div>
-          <span class="req-status <?php echo $req['status']; ?>"><?php echo $req['status']; ?></span>
-          <?php if ($req['status'] === 'pending'): ?>
-          <form method="POST" style="display:inline;">
-            <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
-            <button type="submit" name="cancel_section_request" class="btn btn-outline btn-sm" title="Withdraw"
-              onclick="return confirm('Withdraw this request?')">
-              <i class="ti ti-trash"></i>
-            </button>
-          </form>
-          <?php elseif ($req['status'] === 'approved' && $req['resulting_section_id']): ?>
-          <a href="manage_sections.php?sec=<?php echo $req['resulting_section_id']; ?>" class="btn btn-outline btn-sm" title="View your copy">
-            <i class="ti ti-external-link"></i> View
-          </a>
-          <?php endif; ?>
-        </div>
-        <?php endforeach; ?>
-      <?php endif; ?>
+            </td>
+            <td><?php echo htmlspecialchars($sec['course'] ?: '—'); ?></td>
+            <td><?php echo htmlspecialchars((string)($sec['year_level'] ?: '—')); ?></td>
+            <td><?php echo htmlspecialchars($sec['school_year'] ?: '—'); ?></td>
+            <td><span class="badge badge-blue"><?php echo (int)$sec['student_count']; ?></span></td>
+            <td>
+              <div class="td-actions" style="display:flex;gap:6px;">
+                <a href="manage_sections.php?sec=<?php echo (int)$sec['id']; ?>" class="btn btn-sm btn-outline">
+                  <i class="ti ti-settings"></i> Manage
+                </a>
+                <button type="button" class="btn btn-sm btn-delete"
+                  onclick="openDeleteModal('<?php echo (int)$sec['id']; ?>','<?php echo htmlspecialchars(addslashes($sec['section_name'])); ?>')">
+                  <i class="ti ti-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
     </div>
-
+    <?php endif; ?>
   </div>
-  <?php endif; ?>
 
-  <!-- ── MAIN LAYOUT ── -->
-  <div class="sections-layout">
+  <?php if ($active_section): ?>
 
-    <!-- ── LEFT: SECTION SIDEBAR ── -->
-    <div class="section-sidebar">
-      <div class="section-list-header">
-        <span>My Sections</span>
-        <span style="font-family:var(--font-mono);font-size:11px;"><?php echo count($my_sections); ?></span>
-      </div>
-
-      <?php if (empty($my_sections)): ?>
-        <div style="text-align:center;padding:24px 12px;color:var(--text7);font-size:12px;">
-          <i class="ti ti-building-off" style="font-size:26px;display:block;margin-bottom:8px;opacity:.4;"></i>
-          No sections yet.<br>Request one from admin, or from another teacher, below.
-        </div>
-      <?php else: ?>
-        <?php foreach ($my_sections as $sec): ?>
-        <a href="manage_sections.php?sec=<?php echo $sec['id']; ?>"
-           class="section-list-item <?php echo (int)$sec['id'] === $active_sec_id ? 'active' : ''; ?>">
-          <div class="sli-icon"><i class="ti ti-users"></i></div>
-          <span class="sli-name"><?php echo htmlspecialchars($sec['section_name']); ?></span>
-          <?php if (!empty($sec['course'])): ?>
-            <span style="font-size:10px;color:var(--text7);border:1px solid var(--border2);border-radius:99px;padding:1px 6px;">
-              <?php echo htmlspecialchars($sec['course']); ?>
-            </span>
-          <?php endif; ?>
-          <?php if ($sec['cloned_from_section_id'] !== null): ?>
-            <i class="ti ti-copy" style="color:var(--accent);font-size:13px;"
-               title="Your own copy, originally from <?php echo htmlspecialchars($sec['original_owner_name'] ?? 'another teacher'); ?>"></i>
-          <?php endif; ?>
-          <span class="sli-count"><?php echo $sec['student_count']; ?></span>
+      <!-- ── TAB STRIP — made visually distinct so Roster/Analytics are easy to tell apart ── -->
+      <div class="tab-strip" style="display:flex;gap:10px;margin-bottom:24px;">
+        <a href="manage_sections.php?sec=<?php echo $active_sec_id; ?>&view=roster"
+           style="display:flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;transition:all .15s;
+                  <?php echo $view === 'roster'
+                      ? 'background:var(--bg);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);'
+                      : 'background:var(--bg6);color:var(--text7);border:1px solid var(--border2);'; ?>">
+          <i class="ti ti-list" style="font-size:17px;"></i> Roster
         </a>
-        <?php endforeach; ?>
-      <?php endif; ?>
-
-      <!-- Request buttons (peer + admin) -->
-      <div style="display:flex;flex-direction:column;gap:6px;margin-top:14px;">
-        <button type="button" class="btn btn-outline btn-full" style="font-size:12px;padding:8px 0;justify-content:center;"
-          onclick="openRequestModal()">
-          <i class="ti ti-hand-stop"></i> Request from a Teacher
-        </button>
-        <button type="button" class="btn btn-outline btn-full" style="font-size:12px;padding:8px 0;justify-content:center;"
-          onclick="openAdminRequestModal()">
-          <i class="ti ti-building-community"></i> Request from Admin
-        </button>
+        <a href="manage_sections.php?sec=<?php echo $active_sec_id; ?>&view=analytics"
+           style="display:flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;transition:all .15s;
+                  <?php echo $view === 'analytics'
+                      ? 'background:var(--bg);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);'
+                      : 'background:var(--bg6);color:var(--text7);border:1px solid var(--border2);'; ?>">
+          <i class="ti ti-chart-bar" style="font-size:17px;"></i> Analytics
+        </a>
       </div>
-    </div>
-
-    <!-- ── RIGHT: SECTION DETAIL ── -->
-    <div class="main-panel">
-
-      <?php if ($access_denied): ?>
-      <!-- Section exists, but I don't have access to it — don't reveal
-           its name or owner; direct link/ID guessing shouldn't work as
-           a discovery method. -->
-      <div class="card">
-        <div class="no-selection">
-          <i class="ti ti-lock"></i>
-          <h3>No access</h3>
-          <?php if ($access_denied['teacher_id'] === null): ?>
-            <p>This section belongs to admin's pool.<br>Request it below to get your own copy of its roster.</p>
-            <button type="button" class="btn btn-primary" style="margin-top:12px;" onclick="openAdminRequestModal()">
-              <i class="ti ti-building-community"></i> Request from Admin
-            </button>
-          <?php else: ?>
-            <p>You don't have access to this section.<br>
-               If you know which teacher created it, you can request your own copy of its roster.</p>
-            <button type="button" class="btn btn-primary" style="margin-top:12px;" onclick="openRequestModal()">
-              <i class="ti ti-hand-stop"></i> Request a Section
-            </button>
-          <?php endif; ?>
-        </div>
-      </div>
-
-      <?php elseif (!$active_section): ?>
-      <!-- No section selected -->
-      <div class="card">
-        <div class="no-selection">
-          <i class="ti ti-building-community"></i>
-          <h3>Select a section</h3>
-          <p>Choose a section from the left panel to view and manage its students,<br>or create a new section to get started.</p>
-        </div>
-      </div>
-
-      <?php else: ?>
 
       <!-- ── SECTION HERO ── -->
       <div class="section-hero" style="margin-bottom:24px;background:linear-gradient(135deg,rgba(19, 95, 63, 0.75) 0%,transparent 100%);border-color:rgba(36, 90, 31, 0.2);">
@@ -896,11 +543,6 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:center;">
-          <?php if ($active_section['cloned_from_section_id'] !== null): ?>
-            <span class="req-status approved" title="Your own independent copy, originally from <?php echo htmlspecialchars($active_section['original_owner_name'] ?? 'another teacher'); ?>">
-              <i class="ti ti-copy"></i> Your Copy
-            </span>
-          <?php endif; ?>
           <button class="btn btn-outline btn-sm" onclick="openEditModal()">
             <i class="ti ti-edit"></i> Edit
           </button>
@@ -910,6 +552,8 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
           </button>
         </div>
       </div>
+
+      <?php if ($view === 'roster'): ?>
 
       <!-- ── BULK ENROLL INTO SUBJECT ── -->
       <?php if ($teacher_subjects_list): ?>
@@ -955,11 +599,9 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
               <?php echo count($section_students_list); ?> student<?php echo count($section_students_list) !== 1 ? 's' : ''; ?>
             </span>
           </p>
-          <?php if ($not_in_section): ?>
           <button class="btn btn-primary btn-sm" onclick="openAddStudentModal()">
             <i class="ti ti-user-plus"></i> Add Student
           </button>
-          <?php endif; ?>
         </div>
 
         <!-- Search roster -->
@@ -1020,10 +662,68 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         <?php endif; ?>
       </div>
 
-      <?php endif; /* end $active_section */ ?>
+      <?php else: /* ── ANALYTICS VIEW ── */ ?>
 
-    </div><!-- end main-panel -->
-  </div><!-- end sections-layout -->
+      <div class="stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px;">
+        <div class="stat-card" style="width:auto;min-width:0;place-items:stretch;">
+          <div class="stat-label">Students</div>
+          <div class="stat-value"><?php echo (int)$analytics_overall['student_count']; ?></div>
+        </div>
+        <div class="stat-card" style="width:auto;min-width:0;place-items:stretch;">
+          <div class="stat-label">Average Grade</div>
+          <div class="stat-value"><?php echo $analytics_overall['avg_grade'] !== null ? number_format($analytics_overall['avg_grade'], 1) : '—'; ?></div>
+        </div>
+        <div class="stat-card" style="width:auto;min-width:0;place-items:stretch;">
+          <div class="stat-label">Passing Rate</div>
+          <div class="stat-value"><?php echo $analytics_overall['passing_rate'] !== null ? number_format($analytics_overall['passing_rate'], 1) . '%' : '—'; ?></div>
+        </div>
+        <div class="stat-card" style="width:auto;min-width:0;place-items:stretch;">
+          <div class="stat-label">Attendance Rate</div>
+          <div class="stat-value"><?php echo $analytics_overall['attendance_rate'] !== null ? number_format($analytics_overall['attendance_rate'], 1) . '%' : '—'; ?></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title"><i class="ti ti-books"></i> By Subject</p>
+        <?php if (empty($analytics_subjects)): ?>
+          <div class="empty-state">
+            <i class="ti ti-chart-bar"></i>
+            <p>No subjects have been created for this section yet.<br>Analytics will appear once you add subjects and start recording grades/attendance.</p>
+          </div>
+        <?php else: ?>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Enrolled</th>
+                <th>Graded</th>
+                <th>Average</th>
+                <th>Passing</th>
+                <th>Attendance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($analytics_subjects as $as): ?>
+              <tr>
+                <td><strong><?php echo htmlspecialchars($as['subject_code']); ?></strong> — <?php echo htmlspecialchars($as['subject_name']); ?></td>
+                <td><?php echo (int)$as['enrolled']; ?></td>
+                <td><?php echo (int)$as['graded_count']; ?></td>
+                <td><?php echo $as['avg_grade'] !== null ? number_format($as['avg_grade'], 1) : '—'; ?></td>
+                <td><?php echo $as['graded_count'] > 0 ? (int)$as['passing'] . ' / ' . (int)$as['graded_count'] : '—'; ?></td>
+                <td><?php echo $as['att_rate'] !== null ? number_format($as['att_rate'], 1) . '%' : '—'; ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <?php endif; /* end roster/analytics view */ ?>
+
+  <?php endif; /* end $active_section */ ?>
+
 </div><!-- end page-wrap -->
 
 <!-- ══════════════════════════════════════════════════════
@@ -1074,111 +774,61 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
   </div>
 </div>
 
-<!-- Request Section Access Modal -->
-<div class="modal-overlay" id="requestModal">
+<!-- Create Section Modal -->
+<div class="modal-overlay" id="createModal">
   <div class="modal">
-    <h3><i class="ti ti-hand-stop" style="color:var(--text6);"></i> Request a Section</h3>
-    <p class="modal-sub">
-      Enter the teacher's username and the exact section name. If approved, you'll get
-      your own independent copy of its current roster — separate from the original, so changes
-      on either side won't affect the other.
-    </p>
+    <h3><i class="ti ti-plus" style="color:var(--text6);"></i> New Section</h3>
+    <p class="modal-sub">Sections you create are yours alone — other teachers can have their own section with the same name.</p>
     <form method="POST">
       <div class="form-group">
-        <label>Teacher's username</label>
-        <input type="text" name="target_username" class="form-control" required
-          placeholder="e.g. jadances">
+        <label>Section name <span class="text-red">*</span></label>
+        <input type="text" name="section_name" class="form-control" required maxlength="80" placeholder="e.g. BSIT1-A">
       </div>
       <div class="form-group">
-        <label>Section name</label>
-        <input type="text" name="section_name_req" class="form-control" required
-          placeholder="e.g. BSIT1C">
-      </div>
-      <div class="form-group">
-        <label>Message (optional)</label>
-        <input type="text" name="message" class="form-control" maxlength="255"
-          placeholder="e.g. I'd like to use this section for my Fil 2 class">
-      </div>
-      <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="send_section_request" class="btn btn-primary btn-fill">
-          <i class="ti ti-send"></i> Send Request
-        </button>
-        <button type="button" class="btn btn-outline" onclick="closeRequestModal()">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Request Section from Admin Modal -->
-<div class="modal-overlay" id="adminRequestModal">
-  <div class="modal">
-    <h3><i class="ti ti-building-community" style="color:var(--text6);"></i> Request a Section from Admin</h3>
-    <p class="modal-sub">
-      Pick a section from admin's pool. If approved, you'll get your own independent copy of its
-      current roster — separate from admin's original, so changes on either side won't affect the other.
-    </p>
-    <?php if (empty($admin_sections_list)): ?>
-      <p style="font-size:13px;color:var(--text3);">Admin hasn't created any sections yet.</p>
-      <button type="button" class="btn btn-outline btn-full" style="margin-top:8px;" onclick="closeAdminRequestModal()">Close</button>
-    <?php else: ?>
-    <form method="POST">
-      <div class="form-group">
-        <label>Section</label>
-        <select name="admin_section_id" class="form-control" required>
-          <option value="">— Select a section —</option>
-          <?php foreach ($admin_sections_list as $asec): ?>
-          <option value="<?php echo (int)$asec['id']; ?>">
-            <?php echo htmlspecialchars($asec['section_name']); ?><?php echo $asec['course'] ? ' — '.htmlspecialchars($asec['course']) : ''; ?>
-            (<?php echo (int)$asec['student_count']; ?> students)
-          </option>
+        <label>Course <span class="text-red">*</span></label>
+        <select name="course" class="form-control" required>
+          <option value="">Select course</option>
+          <?php foreach (['BSIT','LAED','BSBA','BSN','FPST','BSA'] as $c): ?>
+          <option value="<?php echo $c; ?>"><?php echo $c; ?></option>
           <?php endforeach; ?>
         </select>
       </div>
       <div class="form-group">
-        <label>Message (optional)</label>
-        <input type="text" name="admin_message" class="form-control" maxlength="255"
-          placeholder="e.g. I'd like to use this section for my Fil 2 class">
+        <label>Year level</label>
+        <input type="number" name="year_level" class="form-control" value="1" min="1" max="6">
+      </div>
+      <div class="form-group">
+        <label>School year</label>
+        <input type="text" name="school_year" class="form-control" placeholder="e.g. 2026-2027">
+      </div>
+      <div class="form-group">
+        <label>Description (optional)</label>
+        <input type="text" name="section_desc" class="form-control" maxlength="255">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button type="submit" name="send_admin_section_request" class="btn btn-primary btn-fill">
-          <i class="ti ti-send"></i> Send Request
+        <button type="submit" name="create_section" class="btn btn-primary btn-fill">
+          <i class="ti ti-check"></i> Create Section
         </button>
-        <button type="button" class="btn btn-outline" onclick="closeAdminRequestModal()">Cancel</button>
+        <button type="button" class="btn btn-outline" onclick="closeCreateModal()">Cancel</button>
       </div>
     </form>
-    <?php endif; ?>
   </div>
 </div>
 
 <div class="modal-overlay" id="addStudentModal">
   <div class="modal">
     <h3><i class="ti ti-user-plus" style="color:var(--bg5);"></i> Add Student to Section</h3>
-    <p class="modal-sub">Select a student to add to <strong><?php echo htmlspecialchars($active_section['section_name'] ?? ''); ?></strong>.</p>
-    <?php if (empty($not_in_section)): ?>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">
-        No students available to add — this only lists students already in one of
-        your other sections. To bring in a new student, request access to a
-        section that includes them from the Sections tab.
-      </p>
-    <?php else: ?>
+    <p class="modal-sub">
+      Enter the Student ID of an existing student to add them to
+      <strong><?php echo htmlspecialchars($active_section['section_name'] ?? ''); ?></strong>.
+      Brand-new students are created from the <a href="students.php" class="text-accent">Students</a> page.
+    </p>
     <form method="POST">
       <input type="hidden" name="sec_id" value="<?php echo $active_sec_id; ?>">
       <div class="form-group">
-        <label>Student</label>
-        <!-- Live search filter -->
-        <input type="text" id="addStudentSearch" class="form-control"
-          placeholder="Type to filter students…"
-          oninput="filterAddStudentList()"
-          style="margin-bottom:6px;">
-        <select name="student_id" id="addStudentSelect" class="form-control" size="6"
-          style="height:auto;padding:4px;" required>
-          <?php foreach ($not_in_section as $ns): ?>
-          <option value="<?php echo htmlspecialchars($ns['student_id']); ?>"
-            data-label="<?php echo strtolower($ns['last_name'] . ' ' . $ns['first_name'] . ' ' . $ns['student_id']); ?>">
-            <?php echo htmlspecialchars($ns['last_name'] . ', ' . $ns['first_name'] . ' (' . $ns['student_id'] . ')'); ?>
-          </option>
-          <?php endforeach; ?>
-        </select>
+        <label>Student ID</label>
+        <input type="text" name="student_id" id="addStudentId" class="form-control" required
+          autocomplete="off" placeholder="Enter student ID">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px;">
         <button type="submit" name="add_to_section" class="btn btn-primary btn-fill">
@@ -1187,13 +837,12 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         <button type="button" class="btn btn-outline" onclick="closeAddStudentModal()">Cancel</button>
       </div>
     </form>
-    <?php endif; ?>
   </div>
 </div>
     <div style="text-align:center;margin-top:20px;">
       <p style="font-size:12px;color:var(--text7);margin-top:-14px;margin-bottom:20px;">
-      Sections are created by admin — you get access by requesting one, either from another
-      teacher's section or from admin's pool. Approval always gives you your own independent copy.
+      You create and own your sections. Students are shared across teachers by Student ID —
+      adding one only links them to your section.
       </p>
     </div>
 
@@ -1201,7 +850,7 @@ $outgoing_requests = $outgoing_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 // ── Modal helpers ────────────────────────────────────
 function openEditModal()    { document.getElementById('editModal').classList.add('open'); }
 function closeEditModal()   { document.getElementById('editModal').classList.remove('open'); }
-function openAddStudentModal()    { document.getElementById('addStudentModal').classList.add('open'); document.getElementById('addStudentSearch')?.focus(); }
+function openAddStudentModal()    { document.getElementById('addStudentModal').classList.add('open'); document.getElementById('addStudentId')?.focus(); }
 function closeAddStudentModal()   { document.getElementById('addStudentModal').classList.remove('open'); }
 function openDeleteModal(id, name) {
   document.getElementById('deleteSectionId').value = id;
@@ -1210,17 +859,11 @@ function openDeleteModal(id, name) {
   document.getElementById('deleteModal').classList.add('open');
 }
 function closeDeleteModal() { document.getElementById('deleteModal').classList.remove('open'); }
-function openRequestModal() {
-  document.getElementById('requestModal').classList.add('open');
-}
-function closeRequestModal() { document.getElementById('requestModal').classList.remove('open'); }
-function openAdminRequestModal() {
-  document.getElementById('adminRequestModal').classList.add('open');
-}
-function closeAdminRequestModal() { document.getElementById('adminRequestModal').classList.remove('open'); }
+function openCreateModal()  { document.getElementById('createModal').classList.add('open'); }
+function closeCreateModal() { document.getElementById('createModal').classList.remove('open'); }
 
 // Close modals on backdrop click
-['editModal','deleteModal','addStudentModal','requestModal','adminRequestModal'].forEach(id => {
+['editModal','deleteModal','addStudentModal','createModal'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
 });
@@ -1230,14 +873,6 @@ function filterRoster() {
   const q = document.getElementById('rosterSearch').value.toLowerCase();
   document.querySelectorAll('#rosterTable tr').forEach(row => {
     row.style.display = row.dataset.name?.includes(q) ? '' : 'none';
-  });
-}
-
-// ── Add-student modal filter ─────────────────────────
-function filterAddStudentList() {
-  const q = document.getElementById('addStudentSearch').value.toLowerCase();
-  document.querySelectorAll('#addStudentSelect option').forEach(opt => {
-    opt.style.display = opt.dataset.label.includes(q) ? '' : 'none';
   });
 }
 

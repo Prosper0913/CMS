@@ -193,9 +193,9 @@ $comp_colors = [
   <!-- ── SUBJECT CARDS ── -->
   <?php if ($all_subs->num_rows === 0): ?>
   <div class="card" style="text-align:center;padding:64px 24px;">
-    <i class="ti ti-books" style="font-size:44px;color:var(--text6);display:block;margin-bottom:16px;"></i>
-    <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text6);margin-bottom:8px;">No subjects yet</p>
-    <p style="font-size:13px;color:var(--text6);margin-bottom:24px;">Create your first subject to get started.</p>
+    <i class="ti ti-books" style="font-size:44px;color:var(--text7);display:block;margin-bottom:16px;"></i>
+    <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text7);margin-bottom:8px;">No subjects yet</p>
+    <p style="font-size:13px;color:var(--text7);margin-bottom:24px;">Create your first subject to get started.</p>
     <a href="/classroomv2/teacher/add_subject.php" class="btn btn-primary" style="display:inline-flex;">
       <i class="ti ti-book-plus"></i> Add Your First Subject
     </a>

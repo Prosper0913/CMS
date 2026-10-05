@@ -68,7 +68,7 @@ if (isset($_POST['save_subject'])) {
             // ownership here, right before using it.
             $sec_chk = $conn->prepare(
                 "SELECT id, section_name FROM sections
-                 WHERE id = ? AND (teacher_id = ? OR teacher_id IS NULL)
+                 WHERE id = ? AND teacher_id = ?
                  LIMIT 1"
             );
             $sec_chk->bind_param('ii', $section_id, $teacher_id);
@@ -134,22 +134,15 @@ if (isset($_POST['save_subject'])) {
 
 // Sections list
 // ── ACCESS CONTROL: only show sections this teacher can actually use ──
-// A section is usable here if either:
-//   (a) s.teacher_id = $teacher_id   → this teacher created it, OR
-//   (b) s.teacher_id IS NULL         → a legacy section from before
-//                                      ownership existed (kept visible
-//                                      to everyone for backward compat)
-// Without this WHERE clause, EVERY teacher's sections show up for
-// EVERY other teacher — that was the bug. This is the same rule used
-// in manage_sections.php's sectionAccessible() helper; whenever you
-// query the `sections` table anywhere in the app, re-apply this same
-// filter (or better, factor it into a shared helper function/include
-// so it can't be forgotten in a new file).
+// A section is usable here only if this teacher created it
+// (s.teacher_id = $teacher_id). Sections are always teacher-owned now —
+// there is no unowned/shared pool anymore. Same rule as
+// manage_sections.php's sectionAccessible() helper.
 $sections_stmt = $conn->prepare(
     "SELECT s.id, s.section_name, COUNT(ss.student_id) AS sc
      FROM sections s
      LEFT JOIN section_students ss ON ss.section_id = s.id
-     WHERE s.teacher_id = ? OR s.teacher_id IS NULL
+     WHERE s.teacher_id = ?
      GROUP BY s.id
      ORDER BY s.section_name ASC"
 );

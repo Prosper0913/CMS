@@ -599,6 +599,16 @@ if (isset($_POST['update_subject_meta'])) {
 // ── ENROLL entire section ────────────────────────────────────
 if (isset($_POST['enroll_section'])) {
     $sec_id = (int)$_POST['enroll_section_id'];
+    // Only one of THIS teacher's own sections can be enrolled — the
+    // dropdown only lists them, but a POST can carry any section_id.
+    $own_sec = $conn->prepare("SELECT id FROM sections WHERE id = ? AND teacher_id = ? LIMIT 1");
+    $own_sec->bind_param('ii', $sec_id, $teacher_id);
+    $own_sec->execute();
+    $own_sec_ok = $own_sec->get_result()->num_rows > 0;
+    if (!$own_sec_ok) {
+        $error_msg = "You can only enroll sections that you own.";
+        $sec_id = 0;
+    }
     $sq = $conn->prepare("SELECT student_id FROM section_students WHERE section_id = ?");
     $sq->bind_param('i', $sec_id);
     $sq->execute();
@@ -618,7 +628,7 @@ if (isset($_POST['enroll_section'])) {
         $e2->execute();
         $added++;
     }
-    $success_msg = "Enrolled <strong>{$added}</strong> student(s) from section.";
+    if ($own_sec_ok) $success_msg = "Enrolled <strong>{$added}</strong> student(s) from section.";
     // ── Push to tooltrack: we have sec_id directly, so push this
     // specific section+subject pair. Non-FPST sections are a no-op
     // inside push_section_subject_to_tooltrack. Failures never break
@@ -641,6 +651,11 @@ if (isset($_POST['enroll_single'])) {
     $sid = trim($_POST['single_student_id']);
     if ($sid === '') {
         $error_msg = "Please select a student.";
+    } elseif (!teacherOwnsStudent($conn, $teacher_id, $sid)) {
+        // Irregular students: anyone already on one of YOUR section rosters (or
+        // in one of your subjects) can be put into this subject individually.
+        // Someone who isn't yours yet must be added from the Students page first.
+        $error_msg = "That student isn't in any of your sections. Add them from the Students page first.";
     } else {
         $chk = $conn->prepare(
             "SELECT id FROM subject_enrollments WHERE subject_id=? AND student_id=? LIMIT 1"
@@ -781,25 +796,31 @@ if ($active_tab === 'settings') {
     while ($er = $enrolled_list->fetch_assoc()) $enrolled_ids[] = $er['student_id'];
     $enrolled_list->data_seek(0);
 
+    // Only students who are already MINE (on one of my section rosters or in one
+    // of my subjects) and not yet in this subject — never the whole school.
+    $mine_sql = "SELECT s.student_id, s.last_name, s.first_name FROM students s
+                 WHERE (EXISTS (SELECT 1 FROM section_students ss JOIN sections sec ON sec.id = ss.section_id
+                                WHERE ss.student_id = s.student_id AND sec.teacher_id = ?)
+                     OR EXISTS (SELECT 1 FROM subject_enrollments se JOIN subjects sub ON sub.id = se.subject_id
+                                WHERE se.student_id = s.student_id AND sub.teacher_id = ?))";
     if ($enrolled_ids) {
         $ph    = implode(',', array_fill(0, count($enrolled_ids), '?'));
-        $ne    = $conn->prepare(
-            "SELECT student_id, last_name, first_name FROM students
-             WHERE student_id NOT IN ($ph) ORDER BY last_name ASC"
-        );
-        $types = str_repeat('s', count($enrolled_ids));
-        $ne->bind_param($types, ...$enrolled_ids);
+        $ne    = $conn->prepare($mine_sql . " AND s.student_id NOT IN ($ph) ORDER BY s.last_name ASC");
+        $types = 'ii' . str_repeat('s', count($enrolled_ids));
+        $bind  = array_merge([$teacher_id, $teacher_id], $enrolled_ids);
+        $ne->bind_param($types, ...$bind);
     } else {
-        $ne = $conn->prepare(
-            "SELECT student_id, last_name, first_name FROM students ORDER BY last_name ASC"
-        );
+        $ne = $conn->prepare($mine_sql . " ORDER BY s.last_name ASC");
+        $ne->bind_param('ii', $teacher_id, $teacher_id);
     }
     $ne->execute();
     $ne_result = $ne->get_result();
     while ($r = $ne_result->fetch_assoc()) $not_enrolled_list[] = $r;
 
-    $sec_res = $conn->query("SELECT id, section_name FROM sections ORDER BY section_name ASC");
-    while ($sr = $sec_res->fetch_assoc()) $sections_list[] = $sr;
+    $sec_q = $conn->prepare("SELECT id, section_name FROM sections WHERE teacher_id = ? ORDER BY section_name ASC");
+    $sec_q->bind_param('i', $teacher_id);
+    $sec_q->execute();
+    $sections_list = $sec_q->get_result()->fetch_all(MYSQLI_ASSOC);
 }
 
 // Type colors
@@ -893,7 +914,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
           <i class="ti ti-calendar"></i>
           <?php echo htmlspecialchars($subject['school_year']); ?> — <?php echo $subject['semester']; ?> Sem
         </span>
-        <span class="type-badge" style="color:var(--subject-color);border-color:var(--subject-color);background:rgba(91,141,238,.08);">
+        <span class="type-badge" style="color:var(--subject-color);border-color:var(--subject-color);background:color-mix(in srgb, var(--subject-color) 8%, transparent);">
           <?php echo htmlspecialchars($subject['subject_type']); ?>
         </span>
       </div>
@@ -1085,9 +1106,9 @@ if ($sv_latest_activity) {
 }
 
 $sv_comp_colors = [
-    'Major Exam'       => ['color'=>'#7aa3ff','icon'=>'ti-file-certificate'],
-    'Written Work'     => ['color'=>'#34d399','icon'=>'ti-pencil'],
-    'Performance Task' => ['color'=>'#fbbf24','icon'=>'ti-star'],
+    'Major Exam'       => ['color'=>'var(--text7)','icon'=>'ti-file-certificate'],
+    'Written Work'     => ['color'=>'var(--text7)','icon'=>'ti-pencil'],
+    'Performance Task' => ['color'=>'var(--text7)','icon'=>'ti-star'],
 ];
 ?>
 
@@ -1133,8 +1154,8 @@ $sv_comp_colors = [
     </p>
     <?php if (!$sv_latest_activity): ?>
       <div class="empty-state" style="padding:24px;">
-        <i class="ti ti-pencil-off" style="color:var(--text6);"></i>
-        <p class="black-font">No score entries yet.</p>
+        <i class="ti ti-pencil-off"></i>
+        <p>No score entries yet.</p>
       </div>
     <?php else: ?>
       <div style="font-size:11px;color:var(--text7);margin-bottom:10px;">
@@ -1198,12 +1219,12 @@ $sv_comp_colors = [
     </p>
     <?php if ($sv_recent->num_rows === 0): ?>
       <div class="empty-state" style="padding:24px;">
-        <i class="ti ti-pencil-off" style="color:var(--text6);"></i>
-        <p class="black-font">No score entries yet.</p>
+        <i class="ti ti-pencil-off"></i>
+        <p>No score entries yet.</p>
       </div>
     <?php else: ?>
       <?php while ($r = $sv_recent->fetch_assoc()):
-        $sv_cc  = $sv_comp_colors[$r['component']] ?? ['color'=>'#7aa3ff','icon'=>'ti-pencil'];
+        $sv_cc  = $sv_comp_colors[$r['component']] ?? ['color'=>'var(--text7)','icon'=>'ti-pencil'];
         $sv_pct = $r['total_items'] > 0 ? round($r['score']/$r['total_items']*100,1) : 0;
       ?>
       <div class="recent-item">
@@ -1234,24 +1255,24 @@ $sv_comp_colors = [
       <p class="card-title"><i class="ti ti-percentage"></i> Grade Composition</p>
       <div class="grade-breakdown">
         <div class="grade-comp-card">
-          <div class="gc-pct" style="color:#7aa3ff;"><?php echo (int)$subject['exam_pct']; ?>%</div>
+          <div class="gc-pct" style="color:var(--text);"><?php echo (int)$subject['exam_pct']; ?>%</div>
           <div class="gc-label">Major Exams</div>
           <div class="gc-weight">Class avg: <?php echo number_format($st['avg'] ?? 0, 1); ?>%</div>
         </div>
         <div class="grade-comp-card">
-          <div class="gc-pct" style="color:#34d399;"><?php echo (int)$subject['written_pct']; ?>%</div>
+          <div class="gc-pct" style="color:var(--text);"><?php echo (int)$subject['written_pct']; ?>%</div>
           <div class="gc-label">Written Works</div>
         </div>
         <div class="grade-comp-card">
-          <div class="gc-pct" style="color:#fbbf24;"><?php echo (int)$subject['performance_pct']; ?>%</div>
+          <div class="gc-pct" style="color:var(--text);"><?php echo (int)$subject['performance_pct']; ?>%</div>
           <div class="gc-label">Performance</div>
           <div class="gc-weight">Incl. <?php echo (int)$subject['attendance_pct']; ?>% attendance</div>
         </div>
       </div>
       <div class="weight-bar">
-        <div class="weight-bar-seg" style="width:<?php echo $subject['exam_pct']; ?>%;background:#7aa3ff;"></div>
-        <div class="weight-bar-seg" style="width:<?php echo $subject['written_pct']; ?>%;background:#34d399;"></div>
-        <div class="weight-bar-seg" style="width:<?php echo $subject['performance_pct']; ?>%;background:#fbbf24;"></div>
+        <div class="weight-bar-seg" style="width:<?php echo $subject['exam_pct']; ?>%;background:var(--bg);"></div>
+        <div class="weight-bar-seg" style="width:<?php echo $subject['written_pct']; ?>%;background:var(--bg);"></div>
+        <div class="weight-bar-seg" style="width:<?php echo $subject['performance_pct']; ?>%;background:var(--bg);"></div>
       </div>
     </div>
 
@@ -1262,9 +1283,9 @@ $sv_comp_colors = [
 elseif (in_array($active_tab, ['written','exams','performance'])):
     $comp_label = $current_component;
     $comp_color = match($current_component) {
-        'Major Exam'       => '#7aa3ff',
-        'Written Work'     => '#34d399',
-        'Performance Task' => '#fbbf24',
+        'Major Exam'       => 'var(--bg)',
+        'Written Work'     => 'var(--bg)',
+        'Performance Task' => 'var(--bg)',
         default            => 'var(--subject-color)',
     };
     $comp_icon = match($current_component) {
@@ -1592,7 +1613,7 @@ elseif ($active_tab === 'attendance'):
   <div>
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-calendar-check" style="color:var(--purple);"></i>
+        <i class="ti ti-calendar-check" style="color:var(--bg);"></i>
         Manual Attendance
         <span style="font-size:11px;font-weight:400;color:var(--text7);margin-left:4px;">
           (<?php echo (int)$subject['attendance_pct']; ?>% of final grade)
@@ -1667,7 +1688,7 @@ elseif ($active_tab === 'attendance'):
           <?php endwhile; ?>
         </div>
         <button type="submit" name="save_attendance"
-          class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;background:var(--purple);">
+          class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;background:var(--bg);">
           <i class="ti ti-device-floppy"></i>
           Save Attendance for <?php echo date('M d, Y', strtotime($view_att_date)); ?>
         </button>
@@ -2014,7 +2035,7 @@ elseif ($active_tab === 'biometric'):
           </div>
           <button type="submit" name="start_bio_session"
             class="btn btn-primary btn-sm"
-            style="width:100%;justify-content:center;background:var(--green);margin-top:4px;">
+            style="width:100%;justify-content:center;background:var(--bg);margin-top:4px;">
             <i class="ti ti-player-play"></i> Start Session
           </button>
         </form>
@@ -2272,10 +2293,10 @@ elseif ($active_tab === 'grades'):
         <tr>
           <th>#</th>
           <th>Student</th>
-          <th style="color:#7aa3ff;">Exam Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
-          <th style="color:#34d399;">Written Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
-          <th style="color:#fbbf24;">Perf. Task</th>
-          <th style="color:#a78bfa;">Attendance</th>
+          <th style="color:var(--text7);">Exam Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
+          <th style="color:var(--text7);">Written Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
+          <th style="color:var(--text7);">Perf. Task</th>
+          <th style="color:var(--text7);">Attendance</th>
           <th>Final Grade</th>
           <th>Letter</th>
         </tr>
@@ -2304,10 +2325,10 @@ elseif ($active_tab === 'grades'):
             <div class="td-mono"><?php echo htmlspecialchars($r['student_id']); ?></div>
           </td>
           <?php foreach ([
-            [$r['exam_avg'],        '#7aa3ff'],
-            [$r['written_avg'],     '#34d399'],
-            [$r['performance_avg'], '#fbbf24'],
-            [$r['attendance_rate'], '#a78bfa'],
+            [$r['exam_avg'],        'var(--text7)'],
+            [$r['written_avg'],     'var(--text7)'],
+            [$r['performance_avg'], 'var(--text7)'],
+            [$r['attendance_rate'], 'var(--text7)'],
           ] as [$val, $color]):
               $v = (float)$val;
           ?>
@@ -2323,13 +2344,13 @@ elseif ($active_tab === 'grades'):
           </td>
           <?php endforeach; ?>
           <td>
-            <span style="font-family:var(--font-head);font-size:18px;font-weight:700;color:<?php echo $fg >= 75 ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
+            <span style="font-family:var(--font-head);font-size:15px;font-weight:700;color:<?php echo $fg >= 75 ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
               <?php echo $fg > 0 ? number_format($fg,2) . '%' : '—'; ?>
             </span>
           </td>
           <td>
             <?php if ($fg > 0): ?>
-              <span class="badge <?php echo $letter_color; ?>" style="font-size:12px;padding:3px 10px;">
+              <span class="badge <?php echo $letter_color; ?>" style="font-size:18px;padding:3px 10px;">
                 <?php echo $r['letter_grade']; ?>
               </span>
               <span style="font-size:11px;color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>;display:block;margin-top:3px;">
@@ -2508,25 +2529,25 @@ elseif ($active_tab === 'settings'):
     <form method="POST">
       <div class="weight-row">
         <div class="form-group">
-          <label style="color:#7aa3ff;">Major Exams %</label>
+          <label style="color:var(--text7);">Major Exams %</label>
           <input type="number" name="exam_pct" id="s_exam" class="form-control"
             value="<?php echo (int)$subject['exam_pct']; ?>"
             min="0" max="100" step="1" oninput="sUpdateTotal()" required>
         </div>
         <div class="form-group">
-          <label style="color:#34d399;">Written Works %</label>
+          <label style="color:var(--text7);">Written Works %</label>
           <input type="number" name="written_pct" id="s_written" class="form-control"
             value="<?php echo (int)$subject['written_pct']; ?>"
             min="0" max="100" step="1" oninput="sUpdateTotal()" required>
         </div>
         <div class="form-group">
-          <label style="color:#fbbf24;">Performance %</label>
+          <label style="color:var(--text7);">Performance %</label>
           <input type="number" name="performance_pct" id="s_perf" class="form-control"
             value="<?php echo (int)$subject['performance_pct']; ?>"
             min="0" max="100" step="1" oninput="sUpdateTotal()" required>
         </div>
         <div class="form-group">
-          <label style="color:#a78bfa;">Attendance % <span style="font-weight:400;font-size:10px;">(inside Perf)</span></label>
+          <label style="color:var(--text7);">Attendance % <span style="font-weight:400;font-size:10px;">(inside Perf)</span></label>
           <input type="number" name="attendance_pct" id="s_att" class="form-control"
             value="<?php echo (int)$subject['attendance_pct']; ?>"
             min="0" max="10" step="1" required>
@@ -2534,9 +2555,9 @@ elseif ($active_tab === 'settings'):
       </div>
       <div id="s_total" style="font-size:12px;color:var(--green);margin-bottom:14px;">Total: 100% ✓</div>
       <div class="weight-bar" style="margin-bottom:16px;">
-        <div id="sb_exam"    class="weight-bar-seg" style="width:<?php echo $subject['exam_pct']; ?>%;background:#7aa3ff;"></div>
-        <div id="sb_written" class="weight-bar-seg" style="width:<?php echo $subject['written_pct']; ?>%;background:#34d399;"></div>
-        <div id="sb_perf"    class="weight-bar-seg" style="width:<?php echo $subject['performance_pct']; ?>%;background:#fbbf24;"></div>
+        <div id="sb_exam"    class="weight-bar-seg" style="width:<?php echo $subject['exam_pct']; ?>%;background:var(--text7);"></div>
+        <div id="sb_written" class="weight-bar-seg" style="width:<?php echo $subject['written_pct']; ?>%;background:var(--text7);"></div>
+        <div id="sb_perf"    class="weight-bar-seg" style="width:<?php echo $subject['performance_pct']; ?>%;background:var(--text7);"></div>
       </div>
       <button type="submit" name="update_weights" class="btn btn-primary"
         onclick="return confirm('This will recompute all student grades. Continue?')">
@@ -2881,8 +2902,8 @@ function filterEnrollees() {
 
 // ── Grade distribution chart ─────────────────────────
 <?php if ($active_tab === 'overview' && !empty($chart_labels)): ?>
-Chart.defaults.color = '#7d8aaa';
-Chart.defaults.borderColor = '#252a3d';
+Chart.defaults.color = '#757373';
+Chart.defaults.borderColor = '#dcdcdc';
 Chart.defaults.font.family = 'DM Sans';
 new Chart(document.getElementById('gradeChart'), {
   type: 'bar',
@@ -2899,7 +2920,7 @@ new Chart(document.getElementById('gradeChart'), {
     responsive: true,
     plugins: { legend: { display: false } },
     scales: {
-      y: { beginAtZero: true, max: 100, grid: { color: '#1a1e2b' } },
+      y: { beginAtZero: true, max: 100, grid: { color: '#e7e7e7' } },
       x: { grid: { display: false }, ticks: { font: { size: 11 } } }
     }
   }

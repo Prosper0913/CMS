@@ -651,6 +651,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <div class="auth-footer">
         TCM Classroom Management System &nbsp;·&nbsp; <?php echo date('Y'); ?>
+        <br>
+        <a href="/classroomv2/privacy.php" style="color:inherit;opacity:.8;">Privacy Policy</a> &nbsp;·&nbsp;
+        <a href="/classroomv2/terms.php" style="color:inherit;opacity:.8;">Terms &amp; Conditions</a> &nbsp;·&nbsp;
+        <a href="/classroomv2/cookie_policy.php" style="color:inherit;opacity:.8;">Cookie Policy</a>
       </div>
     </div>
   </div>
@@ -729,5 +733,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   });
 })();
 </script>
+<?php include __DIR__ . '/includes/cookie_notice.php'; ?>
 </body>
 </html>

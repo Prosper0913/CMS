@@ -69,6 +69,35 @@ if (isset($_POST['update_device'])) {
     $success_msg = "Device updated.";
 }
 
+// ── Cancel a queued/in-progress enrollment ─────────────────────
+// Removes the row so the device (next poll, or its current wait loop
+// once it times out — see ENROLL_WAIT_TIMEOUT_MS in the firmware)
+// won't act on it, and clears any bulk-enrollment chain on that
+// device so it doesn't move on to the next student either.
+if (isset($_POST['cancel_enroll'])) {
+    $queue_id = (int)$_POST['queue_id'];
+    $qr = $conn->prepare("SELECT device_id, student_id FROM bio_enroll_queue WHERE id=? LIMIT 1");
+    $qr->bind_param('i', $queue_id);
+    $qr->execute();
+    $row = $qr->get_result()->fetch_assoc();
+
+    if (!$row) {
+        $error_msg = "That enrollment is no longer pending — it may have just finished.";
+    } else {
+        $del = $conn->prepare("DELETE FROM bio_enroll_queue WHERE id=?");
+        $del->bind_param('i', $queue_id);
+        $del->execute();
+        // Stop a bulk section enrollment from chaining to the next student
+        $clr = $conn->prepare(
+            "UPDATE bio_devices SET bulk_enroll_students=NULL, bulk_enroll_index=0 WHERE id=?"
+        );
+        $clr->bind_param('i', $row['device_id']);
+        $clr->execute();
+        $success_msg = "Enrollment cancelled. If the device is already waiting for a finger, "
+                     . "it will give up on its own shortly.";
+    }
+}
+
 // ── Delete device ─────────────────────────────────────────────
 if (isset($_POST['delete_device'])) {
     $dev_id = (int)$_POST['dev_id'];
@@ -682,6 +711,13 @@ $type_cfg  = [
             </div>
           </div>
           <span class="badge badge-yellow"><?php echo strtoupper($qr['status']); ?></span>
+          <form method="POST" style="margin:0;"
+                onsubmit="return confirm('Cancel enrollment for <?php echo htmlspecialchars(addslashes($qr['last_name'].', '.$qr['first_name']), ENT_QUOTES); ?>?');">
+            <input type="hidden" name="queue_id" value="<?php echo (int)$qr['id']; ?>">
+            <button type="submit" name="cancel_enroll" class="btn btn-sm btn-delete" title="Cancel this enrollment">
+              <i class="ti ti-x"></i>
+            </button>
+          </form>
         </div>
         <?php endforeach; ?>
         <?php endif; ?>
@@ -794,7 +830,7 @@ $type_cfg  = [
         <?php if (empty($students)): ?>
         <div class="empty-state">
           <i class="ti ti-users-off"></i>
-          <p>No students in your subjects yet.</p>
+          <p style="color: var(--text7);">No students in your subjects yet.</p>
         </div>
         <?php else: ?>
         <div class="search-wrap">

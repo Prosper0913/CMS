@@ -17,8 +17,7 @@ $totals = $conn->query(
         (SELECT COUNT(*) FROM users WHERE role='teacher')  AS total_teachers,
         (SELECT COUNT(*) FROM students)                    AS total_students,
         (SELECT COUNT(*) FROM subjects WHERE is_active=1)  AS total_subjects,
-        (SELECT COUNT(*) FROM sections)                    AS total_sections,
-        (SELECT COUNT(*) FROM subject_section_requests WHERE status='pending') AS pending_requests"
+        (SELECT COUNT(*) FROM sections)                    AS total_sections"
 )->fetch_assoc();
 
 // ── Teachers overview (subject counts only — teachers no longer own students) ──

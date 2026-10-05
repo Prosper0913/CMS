@@ -1,46 +1,65 @@
 <?php
 // ============================================================
-//  admin/import_students.php
-//  Bulk-enroll students from a CSV or XLSX file. Reuses the exact
-//  same insert logic as the "Add Student" form on students.php
-//  (students + users [+ section_students]), looped over rows.
-//  Each row is its own transaction, so one bad row never kills
-//  the rest of the batch. If a row names a section that doesn't
-//  exist yet, that section is auto-created (same as manually
-//  creating one on sections.php). Admin-only.
+//  teacher/import_students.php
+//  Bulk-enroll students from a CSV or XLSX file — the teacher-side
+//  equivalent of the old admin import. Same create-or-attach model
+//  as the "Add Student" form on students.php:
+//    - New Student ID  -> full account created (students + users),
+//      password auto-generated (last name + last 4 ID digits), then
+//      added to the chosen section.
+//    - Existing Student ID -> identity untouched, just attached to
+//      the chosen section (and backfilled into any subjects already
+//      created for it).
+//  Sections named in the file that don't exist yet are auto-created
+//  as one of THIS teacher's own sections.
 //
 //  XLSX support is hand-rolled with ZipArchive + SimpleXML (both
-//  ship with standard PHP) instead of pulling in a Composer
-//  library like PhpSpreadsheet — an .xlsx file is just a zip of
-//  XML, so we read the first worksheet directly. This covers
-//  plain data cells (text/numbers/shared strings); it does not
-//  evaluate formulas or handle multiple sheets.
+//  ship with standard PHP) — an .xlsx is just a zip of XML, so the
+//  first worksheet is read directly. Covers plain data cells; does
+//  not evaluate formulas or handle multiple sheets.
 // ============================================================
 require_once '../includes/auth.php';
-requireRole('admin');
+requireRole('teacher');
 require_once '../config/db.php';
+require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
+require_once __DIR__ . '/../includes/sync_to_guidance.php';
 
-// Make DB failures loud instead of silent. Without this, a failed
-// prepare()/execute() just returns false and the script would carry
-// on as if nothing happened — which is exactly why earlier imports
-// looked like they "succeeded" but nothing showed up in the tables.
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-$admin_id = (int)$_SESSION['user_id'];
+$teacher_id = (int)$_SESSION['user_id'];
+
+const IMPORT_STUDENT_COURSES = ['BSIT','LAED','BSBA','BSN','FPST','BSA'];
+
+// Same generator used on students.php — duplicated here since this
+// page doesn't include that file.
+function import_generate_default_password(string $last_name, string $student_id): string {
+    $clean = preg_replace('/[^A-Za-z]/', '', $last_name);
+    if ($clean === '') $clean = 'Student';
+    $clean = ucfirst(strtolower($clean));
+    $digits = preg_replace('/\D/', '', $student_id);
+    $suffix = substr($digits, -4);
+    if ($suffix === '') $suffix = '0000';
+    return $clean . $suffix;
+}
+
+// ── My own sections, for display + "Section" dropdown in the help card ──
+$my_sections_q = $conn->prepare("SELECT id, section_name FROM sections WHERE teacher_id = ? ORDER BY section_name ASC");
+$my_sections_q->bind_param("i", $teacher_id);
+$my_sections_q->execute();
+$my_sections_list = $my_sections_q->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // ── Download a blank CSV template ──────────────────────────────
 if (isset($_GET['template'])) {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="student_import_template.csv"');
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['student_id','last_name','first_name','middle_name','email','course','section','password']);
-    fputcsv($out, ['2023-00123','Dela Cruz','Juan','P','juan.delacruz@example.com','BSIT','BSIT 3A','ChangeMe123']);
+    fputcsv($out, ['student_id','last_name','first_name','middle_name','email','contact_number','gender','course','section']);
+    fputcsv($out, ['2023-00123','Dela Cruz','Juan','P','juan.delacruz@example.com','09171234567','Male','BSIT','BSIT 3A']);
     fclose($out);
     exit;
 }
 
 // ── Header aliases: normalized header text -> our field name ───
-// Normalization = lowercase, strip spaces/underscores/hyphens.
 $HEADER_ALIASES = [
     'studentid'      => 'student_id',
     'idnumber'       => 'student_id',
@@ -54,17 +73,21 @@ $HEADER_ALIASES = [
     'mi'             => 'middle_name',
     'email'          => 'email',
     'emailaddress'   => 'email',
+    'contactnumber'  => 'contact_number',
+    'contact'        => 'contact_number',
+    'phone'          => 'contact_number',
+    'phonenumber'    => 'contact_number',
+    'gender'         => 'gender',
+    'sex'            => 'gender',
     'course'         => 'course',
     'program'        => 'course',
     'section'        => 'section',
     'sectionname'    => 'section',
-    'password'       => 'password',
 ];
 function normalize_header($h) {
     return strtolower(preg_replace('/[\s_\-]+/', '', trim((string)$h)));
 }
 
-// ── Column letter (A, B, ..., AA, AB...) -> zero-based index ───
 function colref_to_index($ref) {
     preg_match('/^([A-Z]+)/', $ref, $m);
     $letters = $m[1] ?? 'A';
@@ -75,7 +98,6 @@ function colref_to_index($ref) {
     return $col - 1;
 }
 
-// ── Read a CSV file into rows keyed by their physical line number ─
 function read_csv_rows($path) {
     $rows = [];
     $handle = fopen($path, 'r');
@@ -83,9 +105,8 @@ function read_csv_rows($path) {
     $line_num = 0;
     while (($row = fgetcsv($handle)) !== false) {
         $line_num++;
-        if (count($row) === 1 && trim((string)$row[0]) === '') continue; // blank line
+        if (count($row) === 1 && trim((string)$row[0]) === '') continue;
         if ($line_num === 1) {
-            // strip a UTF-8 BOM off the very first header cell, if present
             $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', $row[0]);
         }
         $rows[$line_num] = $row;
@@ -95,8 +116,6 @@ function read_csv_rows($path) {
     return $rows;
 }
 
-// ── Read the first worksheet of an .xlsx file into rows keyed by
-//    their actual Excel row number (via ZipArchive + SimpleXML) ───
 function read_xlsx_rows($path) {
     if (!class_exists('ZipArchive')) {
         throw new Exception("The server's PHP is missing the Zip extension needed to read .xlsx files. Enable php_zip in php.ini, or upload a .csv instead.");
@@ -106,8 +125,7 @@ function read_xlsx_rows($path) {
         throw new Exception("Could not open the .xlsx file — it may be corrupted or not a real Excel file.");
     }
 
-    // Resolve which worksheet XML file is the FIRST sheet in the workbook.
-    $sheet_path = 'xl/worksheets/sheet1.xml'; // sane fallback
+    $sheet_path = 'xl/worksheets/sheet1.xml';
     $workbook_xml = $zip->getFromName('xl/workbook.xml');
     $rels_xml     = $zip->getFromName('xl/_rels/workbook.xml.rels');
     if ($workbook_xml !== false && $rels_xml !== false) {
@@ -132,8 +150,6 @@ function read_xlsx_rows($path) {
         throw new Exception("Could not find a worksheet inside the .xlsx file.");
     }
 
-    // Shared strings table — most text cells reference this instead of
-    // storing their text inline.
     $shared = [];
     $shared_xml = $zip->getFromName('xl/sharedStrings.xml');
     if ($shared_xml !== false) {
@@ -172,7 +188,7 @@ function read_xlsx_rows($path) {
             } elseif ($type === 'inlineStr') {
                 $val = isset($c->is->t) ? (string)$c->is->t : '';
             } else {
-                $val = (string)$c->v; // plain number or formula-cached string
+                $val = (string)$c->v;
             }
             $row_out[$col_idx] = $val;
             if ($col_idx > $max_col) $max_col = $col_idx;
@@ -185,17 +201,17 @@ function read_xlsx_rows($path) {
     return $rows;
 }
 
-$results       = null; // set once a file has been processed
-$section_cache = [];   // name (lowercased) -> section id, built as we go
+$results       = null;
+$section_cache = [];
 
-// ── Look up (or auto-create) a section by name ──────────────────
-function resolve_section($conn, $admin_id, $name, &$section_cache, &$was_created) {
+// ── Look up (or auto-create) a section, scoped to THIS teacher ──
+function resolve_section($conn, $teacher_id, $name, &$section_cache, &$was_created) {
     $was_created = false;
     $key = strtolower($name);
     if (isset($section_cache[$key])) return $section_cache[$key];
 
-    $chk = $conn->prepare("SELECT id FROM sections WHERE section_name = ? LIMIT 1");
-    $chk->bind_param('s', $name);
+    $chk = $conn->prepare("SELECT id FROM sections WHERE section_name = ? AND teacher_id = ? LIMIT 1");
+    $chk->bind_param('si', $name, $teacher_id);
     $chk->execute();
     $row = $chk->get_result()->fetch_assoc();
     if ($row) {
@@ -204,19 +220,28 @@ function resolve_section($conn, $admin_id, $name, &$section_cache, &$was_created
     }
 
     $ins = $conn->prepare(
-        "INSERT INTO sections (section_name, description, course, year_level, school_year, created_by)
+        "INSERT INTO sections (section_name, description, course, year_level, school_year, teacher_id)
          VALUES (?, '', '', 1, '', ?)"
     );
-    $ins->bind_param('si', $name, $admin_id);
+    $ins->bind_param('si', $name, $teacher_id);
     $ins->execute();
     $section_cache[$key] = $conn->insert_id;
     $was_created = true;
     return $section_cache[$key];
 }
 
+function import_contact_error(string $c): string {
+    if ($c === '') return '';
+    $digits = strlen(preg_replace('/\D/', '', $c));
+    if (strlen($c) > 20 || !preg_match('/^\+?[0-9\s\-()]+$/', $c) || $digits < 7 || $digits > 15) {
+        return "contact number must be 7-15 digits";
+    }
+    return '';
+}
+
 // ── Handle uploaded file (CSV or XLSX) ──────────────────────────
 if (isset($_POST['import_csv'])) {
-    $results = ['created' => [], 'skipped' => [], 'errors' => [], 'sections_created' => []];
+    $results = ['created' => [], 'attached' => [], 'skipped' => [], 'errors' => [], 'sections_created' => []];
 
     if (!isset($_FILES['import_file']) || $_FILES['import_file']['error'] !== UPLOAD_ERR_OK) {
         $results['fatal'] = "No file uploaded, or the upload failed. Please choose a .csv or .xlsx file.";
@@ -245,7 +270,7 @@ if (isset($_POST['import_csv'])) {
                     $norm = normalize_header($h);
                     $col_map[$i] = $HEADER_ALIASES[$norm] ?? null;
                 }
-                $required     = ['student_id', 'last_name', 'first_name', 'password'];
+                $required     = ['student_id', 'last_name', 'first_name', 'course', 'section'];
                 $missing_cols = array_diff($required, array_filter($col_map));
 
                 if (!empty($missing_cols)) {
@@ -258,7 +283,7 @@ if (isset($_POST['import_csv'])) {
                         $row = $all_rows[$row_num];
 
                         $data = ['student_id'=>'','last_name'=>'','first_name'=>'','middle_name'=>'',
-                                 'email'=>'','course'=>'','section'=>'','password'=>''];
+                                 'email'=>'','contact_number'=>'','gender'=>'','course'=>'','section'=>''];
                         foreach ($col_map as $i => $field) {
                             if ($field !== null && isset($row[$i])) {
                                 $data[$field] = trim((string)$row[$i]);
@@ -270,41 +295,55 @@ if (isset($_POST['import_csv'])) {
                         $first_name     = $data['first_name'];
                         $middle_initial = $data['middle_name'];
                         $email          = $data['email'];
-                            $course         = $data['course'];
+                        $contact        = $data['contact_number'];
+                        $gender         = $data['gender'];
+                        $course         = $data['course'];
                         $section_name   = $data['section'];
-                        $username       = $student_id;   // Students log in with their Student ID
-                        $password       = $data['password'];
+                        $username       = $student_id;
 
                         $label = "Row {$row_num} ({$last_name}, {$first_name})";
 
-                        if ($student_id===''||$last_name===''||$first_name===''||$password==='') {
-                            $results['errors'][] = "$label: missing a required field (ID, name, or password).";
+                        if ($student_id === '' || $last_name === '' || $first_name === '') {
+                            $results['errors'][] = "$label: missing a required field (ID, last name, or first name).";
                             continue;
                         }
-                        if (strlen($password) < 6) {
-                            $results['errors'][] = "$label: password must be at least 6 characters.";
+                        if ($course === '') {
+                            $results['errors'][] = "$label: course is required.";
                             continue;
                         }
+                        if (!in_array($course, IMPORT_STUDENT_COURSES, true)) {
+                            $results['errors'][] = "$label: \"$course\" is not a recognized course — use one of " . implode(', ', IMPORT_STUDENT_COURSES) . ".";
+                            continue;
+                        }
+                        if ($section_name === '') {
+                            $results['errors'][] = "$label: section is required.";
+                            continue;
+                        }
+                        if (($cerr = import_contact_error($contact)) !== '') {
+                            $results['errors'][] = "$label: $cerr.";
+                            continue;
+                        }
+                        if ($gender !== '' && !in_array(ucfirst(strtolower($gender)), ['Male','Female'], true)) {
+                            $results['errors'][] = "$label: gender must be Male or Female (or left blank).";
+                            continue;
+                        }
+                        $gender = $gender !== '' ? ucfirst(strtolower($gender)) : '';
                         if (isset($seen_ids[$student_id])) {
                             $results['skipped'][] = "$label: duplicate student ID elsewhere in this file.";
                             continue;
                         }
 
                         try {
-                            $chk = $conn->prepare("SELECT id FROM students WHERE student_id=? OR username=? LIMIT 1");
-                            $chk->bind_param('ss', $student_id, $username);
-                            $chk->execute();
-                            $chk->store_result();
-                            if ($chk->num_rows > 0) {
-                                $results['skipped'][] = "$label: student ID already exists in the system.";
-                                continue;
-                            }
+                            $existing = $conn->prepare("SELECT * FROM students WHERE student_id = ? LIMIT 1");
+                            $existing->bind_param('s', $student_id);
+                            $existing->execute();
+                            $found = $existing->get_result()->fetch_assoc();
 
                             $section_id = null;
                             $section_note = '';
                             if ($section_name !== '') {
                                 $was_created = false;
-                                $section_id = resolve_section($conn, $admin_id, $section_name, $section_cache, $was_created);
+                                $section_id = resolve_section($conn, $teacher_id, $section_name, $section_cache, $was_created);
                                 if ($was_created) {
                                     $results['sections_created'][] = $section_name;
                                     $section_note = " — new section \"$section_name\" created";
@@ -313,45 +352,91 @@ if (isset($_POST['import_csv'])) {
                                 }
                             }
 
+                            if ($found) {
+                                // ── ATTACH: existing student — never touch identity fields.
+                                if ($section_id) {
+                                    $chk = $conn->prepare("SELECT id FROM section_students WHERE section_id=? AND student_id=? LIMIT 1");
+                                    $chk->bind_param("is", $section_id, $student_id);
+                                    $chk->execute();
+                                    if ($chk->get_result()->fetch_assoc()) {
+                                        $results['skipped'][] = "$label: already in that section.";
+                                        continue;
+                                    }
+                                    $ins3 = $conn->prepare("INSERT INTO section_students (section_id, student_id) VALUES (?, ?)");
+                                    $ins3->bind_param("is", $section_id, $student_id);
+                                    $ins3->execute();
+                                    backfillSubjectEnrollmentsForSection($conn, $section_id, $student_id);
+                                    if (function_exists('auto_enroll_student_in_fpst_subjects')) {
+                                        auto_enroll_student_in_fpst_subjects($conn, $section_id, $student_id);
+                                    }
+                                    if (function_exists('push_all_fpst_subjects_for_section')) {
+                                        push_all_fpst_subjects_for_section($conn, $section_id);
+                                    }
+                                    $results['attached'][] = "$label: attached existing student (" . htmlspecialchars($found['last_name'] . ', ' . $found['first_name']) . "){$section_note}.";
+                                } else {
+                                    $results['skipped'][] = "$label: student already exists and no section was given — nothing to do.";
+                                }
+                                continue;
+                            }
+
+                            // ── CREATE: brand-new Student ID.
+                            $clash = $conn->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+                            $clash->bind_param("s", $username);
+                            $clash->execute();
+                            if ($clash->get_result()->fetch_assoc()) {
+                                $results['errors'][] = "$label: that Student ID is already used as a login by another account.";
+                                continue;
+                            }
+
+                            $password   = import_generate_default_password($last_name, $student_id);
+                            $hashed     = password_hash($password, PASSWORD_DEFAULT);
+                            $contact_db = $contact !== '' ? $contact : null;
+                            $gender_db  = $gender  !== '' ? $gender  : null;
+
                             $conn->begin_transaction();
-                            $hashed = password_hash($password, PASSWORD_DEFAULT);
-
                             $ins = $conn->prepare(
-                                    "INSERT INTO students
-                                        (student_id,last_name,first_name,middle_initial,email,course,username,password,created_by)
-                                     VALUES (?,?,?,?,?,?,?,?,?)"
-                                );
-                                $ins->bind_param("ssssssssi",
-                                    $student_id,$last_name,$first_name,$middle_initial,$email,$course,$username,$hashed,$admin_id
-                                );
-                            $ins->execute();
-                            if ($ins->affected_rows < 1) {
-                                throw new Exception("insert into students affected 0 rows");
-                            }
-
-                            $ins2 = $conn->prepare(
-                                "INSERT INTO users (username,password,role,student_id) VALUES (?,?,'student',?)"
+                                "INSERT INTO students
+                                    (student_id,last_name,first_name,middle_initial,email,contact_number,gender,course,username,password,created_by)
+                                 VALUES (?,?,?,?,?,?,?,?,?,?,?)"
                             );
-                            $ins2->bind_param("sss",$username,$hashed,$student_id);
+                            $ins->bind_param("ssssssssssi",
+                                $student_id,$last_name,$first_name,$middle_initial,$email,$contact_db,$gender_db,$course,$username,$hashed,$teacher_id
+                            );
+                            $ins->execute();
+                            if ($ins->affected_rows < 1) throw new Exception("insert into students affected 0 rows");
+
+                            $ins2 = $conn->prepare("INSERT INTO users (username,password,role,student_id) VALUES (?,?,'student',?)");
+                            $ins2->bind_param("sss", $username, $hashed, $student_id);
                             $ins2->execute();
-                            if ($ins2->affected_rows < 1) {
-                                throw new Exception("insert into users affected 0 rows");
-                            }
+                            if ($ins2->affected_rows < 1) throw new Exception("insert into users affected 0 rows");
 
                             if ($section_id) {
                                 $ins3 = $conn->prepare("INSERT INTO section_students (section_id, student_id) VALUES (?, ?)");
                                 $ins3->bind_param("is", $section_id, $student_id);
                                 $ins3->execute();
-                                if ($ins3->affected_rows < 1) {
-                                    throw new Exception("insert into section_students affected 0 rows");
-                                }
+                                if ($ins3->affected_rows < 1) throw new Exception("insert into section_students affected 0 rows");
                             }
 
                             $conn->commit();
                             $seen_ids[$student_id] = true;
-                            $results['created'][] = "$label: enrolled as <code>" . htmlspecialchars($username) . "</code>{$section_note}.";
+
+                            if ($section_id) {
+                                backfillSubjectEnrollmentsForSection($conn, $section_id, $student_id);
+                                if (function_exists('auto_enroll_student_in_fpst_subjects')) {
+                                    auto_enroll_student_in_fpst_subjects($conn, $section_id, $student_id);
+                                }
+                                if (function_exists('push_all_fpst_subjects_for_section')) {
+                                    push_all_fpst_subjects_for_section($conn, $section_id);
+                                }
+                            }
+                            if (function_exists('push_student_to_guidance')) {
+                                push_student_to_guidance($conn, $student_id);
+                            }
+
+                            $results['created'][] = "$label: created as <code>" . htmlspecialchars($username)
+                                . "</code>, password <code>" . htmlspecialchars($password) . "</code>{$section_note}.";
                         } catch (Throwable $e) {
-                            if ($conn->errno || true) { $conn->rollback(); }
+                            $conn->rollback();
                             $results['errors'][] = "$label: database error — " . htmlspecialchars($e->getMessage());
                         }
                     }
@@ -361,47 +446,57 @@ if (isset($_POST['import_csv'])) {
     }
 }
 
-$active_nav = 'import';
+$active_nav = 'students';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Import Students — Admin</title>
+  <title>Import Students — Classroom CMS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
-<body class="page-admin-import">
+<body class="page-teacher-import">
 <div class="app-shell">
 
-
-<?php $active_nav = 'import'; include __DIR__ . '/_nav.php'; ?>
+<?php $active_nav = 'students'; include __DIR__ . '/_nav.php'; ?>
 <main class="main-content">
 
 <div class="page-wrap">
   <div class="page-header">
     <h1><i class="ti ti-file-import text-accent"></i> Import Students</h1>
-    <p>Bulk-enroll students from a CSV or Excel file instead of adding them one at a time.</p>
+    <p>Bulk-enroll students into your own sections from a CSV or Excel file instead of adding them one at a time.</p>
   </div>
   <hr class="thin-line" style="margin-bottom: 25px;">
+
+  <?php if (empty($my_sections_list)): ?>
+  <div class="alert alert-error" style="margin-bottom:20px;">
+    <i class="ti ti-alert-circle"></i>
+    <div>You don't have any sections yet. <a href="manage_sections.php" class="text-accent">Create one</a> first — or list a brand-new section name in the file's "section" column and it will be created automatically.</div>
+  </div>
+  <?php endif; ?>
 
   <div class="two-col">
     <div>
       <div class="card">
         <p class="card-title"><i class="ti ti-upload"></i> Upload File</p>
         <p style="font-size:12px;color:var(--text7);margin-top:-6px;margin-bottom:14px;">
-          Accepts <code>.csv</code> or <code>.xlsx</code>. Required columns: <code>student_id, last_name, first_name, password</code> (students log in with their student ID).
-          Optional: <code>middle_name, email, course, section</code>. Column order doesn't matter, and
-          a few common header spellings (e.g. "ID Number", "Last Name") are recognized automatically.
-          If a section name doesn't exist yet, it will be created automatically.
+          Accepts <code>.csv</code> or <code>.xlsx</code>. Required columns: <code>student_id, last_name, first_name, course, section</code>.
+          Optional: <code>middle_name, email, contact_number, gender</code>. Column order doesn't matter, and
+          a few common header spellings are recognized automatically.
         </p>
         <p style="font-size:12px;color:var(--text7);margin-top:0;margin-bottom:14px;">
-          <i class="ti ti-alert-triangle"></i> If your Student IDs are pure numbers (e.g. <code>00123</code>), format that
-          column as <b>Text</b> in Excel before typing — otherwise Excel silently drops leading zeros.
+          A Student ID that already exists in the system is just added to the section you list — its name/details are
+          never overwritten. A new Student ID gets a full account with an auto-generated password (last name + last
+          4 digits of the ID). A section name that doesn't exist yet becomes one of <em>your</em> sections automatically.
+        </p>
+        <p style="font-size:12px;color:var(--text7);margin-top:0;margin-bottom:14px;">
+          <i class="ti ti-alert-triangle"></i> If your Student IDs are pure numbers, format that column as <b>Text</b>
+          in Excel before typing — otherwise Excel silently drops leading zeros.
         </p>
         <form method="POST" enctype="multipart/form-data">
           <div class="form-group">
@@ -427,11 +522,10 @@ $active_nav = 'import';
         <div class="card">
           <p class="card-title"><i class="ti ti-info-circle"></i> How it works</p>
           <ul style="font-size:13px;color:var(--text7);line-height:1.9;padding-left:18px;margin:0;">
-            <li>Each row becomes one student, added exactly like the "Add Student" form.</li>
-            <li>Rows missing required fields, or with a password under 6 characters, are skipped and reported — the rest of the file still imports.</li>
-            <li>Rows whose student ID already exists (in the file or the system) are skipped, not overwritten.</li>
-            <li>Section names that don't exist yet are created automatically and reused for later rows with the same name.</li>
-            <li>Every insert is verified — if a row doesn't actually save, it now shows up as an error instead of silently disappearing.</li>
+            <li>Each row is processed the same way as the "Add Student" form — create-or-attach by Student ID.</li>
+            <li>Rows missing required fields, or with an invalid contact number/gender/course, are reported as errors — the rest of the file still imports.</li>
+            <li>A duplicate Student ID within the file is skipped after the first occurrence.</li>
+            <li>Section names that don't exist yet are created as your own section and reused for later rows with the same name.</li>
           </ul>
         </div>
       <?php else: ?>
@@ -444,6 +538,7 @@ $active_nav = 'import';
 
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
               <span class="badge badge-green"><?php echo count($results['created']); ?> created</span>
+              <span class="badge badge-blue"><?php echo count($results['attached']); ?> attached</span>
               <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(234,179,8,.12);color:var(--yellow);border:1px solid rgba(234,179,8,.25);">
                 <?php echo count($results['skipped']); ?> skipped
               </span>
@@ -451,14 +546,21 @@ $active_nav = 'import';
                 <?php echo count($results['errors']); ?> errors
               </span>
               <?php if (!empty($results['sections_created'])): ?>
-              <span class="badge badge-blue"><?php echo count(array_unique($results['sections_created'])); ?> new section(s)</span>
+              <span class="badge badge-gray"><?php echo count(array_unique($results['sections_created'])); ?> new section(s)</span>
               <?php endif; ?>
             </div>
 
             <?php if (!empty($results['created'])): ?>
               <p style="font-size:12px;font-weight:600;color:var(--text7);margin-bottom:6px;">CREATED</p>
               <ul style="font-size:12.5px;line-height:1.8;padding-left:18px;margin:0 0 14px;">
-                <?php foreach ($results['created'] as $line): ?><li><?php echo $line; /* already escaped/safe above */ ?></li><?php endforeach; ?>
+                <?php foreach ($results['created'] as $line): ?><li><?php echo $line; ?></li><?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+
+            <?php if (!empty($results['attached'])): ?>
+              <p style="font-size:12px;font-weight:600;color:var(--text7);margin-bottom:6px;">ATTACHED</p>
+              <ul style="font-size:12.5px;line-height:1.8;padding-left:18px;margin:0 0 14px;">
+                <?php foreach ($results['attached'] as $line): ?><li><?php echo $line; ?></li><?php endforeach; ?>
               </ul>
             <?php endif; ?>
 
@@ -472,7 +574,7 @@ $active_nav = 'import';
             <?php if (!empty($results['errors'])): ?>
               <p style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">ERRORS</p>
               <ul style="font-size:12.5px;line-height:1.8;padding-left:18px;margin:0;">
-                <?php foreach ($results['errors'] as $line): ?><li><?php echo $line; /* built with htmlspecialchars for dynamic parts */ ?></li><?php endforeach; ?>
+                <?php foreach ($results['errors'] as $line): ?><li><?php echo $line; ?></li><?php endforeach; ?>
               </ul>
             <?php endif; ?>
 

@@ -25,10 +25,17 @@ function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ?
       <i class="ti ti-bell"></i><span>Notifications</span>
       <?php if ($unread_count > 0): ?><span class="badge-count"><?php echo $unread_count > 9 ? '9+' : $unread_count; ?></span><?php endif; ?>
     </a>
+    <a href="/classroomv2/student/settings.php" class="<?php echo _nav_class('settings', $active_nav); ?>"><i class="ti ti-settings"></i><span>Settings</span></a>
   </nav>
   <div class="sidebar-footer">
     <span class="sidebar-role role-student">Student</span>
     <div class="sidebar-username"><?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?></div>
     <a href="/classroomv2/logout.php" class="sidebar-logout"><i class="ti ti-logout"></i><span>Logout</span></a>
+    <div style="margin-top:10px;font-size:11px;opacity:.6;color:var(--text);">
+      <a href="/classroomv2/privacy.php" style="color:var(--text);">Privacy</a> ·
+      <a href="/classroomv2/terms.php" style="color:var(--text);">Terms</a> ·
+      <a href="/classroomv2/cookie_policy.php" style="color:var(--text);">Cookies</a>
+    </div>
   </div>
 </aside>
+<?php include __DIR__ . '/../includes/cookie_notice.php'; ?>

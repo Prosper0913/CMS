@@ -145,7 +145,7 @@ function logAttempt($conn, $device, $session_id, $subject_id, $scan_date, $scan_
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $scanned_at = $scan_date . ' ' . $scan_time;
-    $ll->bind_param('iisisss', $device['id'], $session_id, $student_id, $subject_id, $scanned_at, $ip, $status, $message);
+    $ll->bind_param('iisissss', $device['id'], $session_id, $student_id, $subject_id, $scanned_at, $ip, $status, $message);
     $ll->execute();
 }
 
