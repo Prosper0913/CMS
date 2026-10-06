@@ -2626,7 +2626,7 @@ elseif ($active_tab === 'settings'):
     <?php endif; ?>
 
     <?php if (!$enrolled_list || $enrolled_list->num_rows === 0): ?>
-    <div class="empty-state" style="padding:24px;text-align:center;color:var(--text3);">
+    <div class="empty-state" style="padding:24px;text-align:center;color:var(--text7);">
       <i class="ti ti-users-off" style="font-size:26px;display:block;margin-bottom:8px;"></i>
       No students enrolled yet. Use the options above to add students.
     </div>

@@ -98,7 +98,7 @@ $type_colors = [
   <div class="empty-state">
     <i class="ti ti-calendar-off" style="color:var(--text6);"></i>
     <p>You are not enrolled in any subjects yet.</p>
-    <p style="font-size:12px;margin-top:6px;color:var(--text3);">Contact your teacher to be enrolled.</p>
+    <p style="font-size:12px;margin-top:6px;color:var(--text7);">Contact your teacher to be enrolled.</p>
   </div>
   <?php else: ?>
 
