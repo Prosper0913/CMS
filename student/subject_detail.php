@@ -35,11 +35,14 @@ if ($chk->num_rows === 0) {
 }
 
 // ── Subject info ─────────────────────────────────────────────
+// Not filtered to is_active=1 — a subject the teacher has since marked
+// inactive (semester ended) must stay viewable here as part of the
+// student's subject history (see student/subjects.php).
 $subq = $conn->prepare(
     "SELECT sub.*, t.username AS teacher_name
      FROM subjects sub
      LEFT JOIN users t ON t.id = sub.teacher_id
-     WHERE sub.id = ? AND sub.is_active = 1"
+     WHERE sub.id = ?"
 );
 $subq->bind_param("i", $subject_id);
 $subq->execute();
@@ -152,7 +155,14 @@ $pass = $fg >= 75;
     <div class="hero-accent"></div>
     <div class="hero-body">
       <div style="flex:1;">
-        <div class="hero-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+        <div class="hero-code">
+          <?php echo htmlspecialchars($subject['subject_code']); ?>
+          <?php if (!$subject['is_active']): ?>
+          <span style="margin-left:8px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;background:rgba(117,115,115,.15);color:var(--text7);border:1px solid var(--border2);vertical-align:middle;">
+            <i class="ti ti-history"></i> Past Semester
+          </span>
+          <?php endif; ?>
+        </div>
         <div class="hero-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
         <div class="hero-meta">
           <span class="hero-meta-item"><i class="ti ti-school"></i> <?php echo htmlspecialchars($subject['section']); ?></span>
@@ -215,26 +225,26 @@ $pass = $fg >= 75;
 
   <!-- Component averages -->
   <div class="stat-grid">
-    <div class="stat-box" style="border-top:2px solid #7aa3ff;">
-      <div class="stat-val" style="color:#7aa3ff;">
+    <div class="stat-box">
+      <div class="stat-val">
         <?php echo ($grade && $grade['exam_avg'] > 0) ? number_format($grade['exam_avg'],1).'%' : '—'; ?>
       </div>
       <div class="stat-lbl">Major Exam Avg</div>
     </div>
-    <div class="stat-box" style="border-top:2px solid #34d399;">
-      <div class="stat-val" style="color:#34d399;">
+    <div class="stat-box">
+      <div class="stat-val">
         <?php echo ($grade && $grade['written_avg'] > 0) ? number_format($grade['written_avg'],1).'%' : '—'; ?>
       </div>
       <div class="stat-lbl">Written Work Avg</div>
     </div>
-    <div class="stat-box" style="border-top:2px solid #fbbf24;">
-      <div class="stat-val" style="color:#fbbf24;">
+    <div class="stat-box">
+      <div class="stat-val">
         <?php echo ($grade && $grade['performance_avg'] > 0) ? number_format($grade['performance_avg'],1).'%' : '—'; ?>
       </div>
       <div class="stat-lbl">Performance Avg</div>
     </div>
-    <div class="stat-box" style="border-top:2px solid #a78bfa;">
-      <div class="stat-val" style="color:#a78bfa;">
+    <div class="stat-box">
+      <div class="stat-val">
         <?php echo ($grade && $grade['attendance_rate'] > 0) ? number_format($grade['attendance_rate'],1).'%' : '—'; ?>
       </div>
       <div class="stat-lbl">Attendance Rate</div>
@@ -248,9 +258,9 @@ $pass = $fg >= 75;
 
     <?php
     $breakdown = [
-      ['Major Exams',    '#7aa3ff', (float)$subject['exam_pct'],        (float)($grade['exam_avg'] ?? 0)],
-      ['Written Works',  '#34d399', (float)$subject['written_pct'],     (float)($grade['written_avg'] ?? 0)],
-      ['Performance',    '#fbbf24', (float)$subject['performance_pct'], (float)($grade['performance_component'] ?? 0)],
+      ['Major Exams',    'var(--bg)', (float)$subject['exam_pct'],        (float)($grade['exam_avg'] ?? 0)],
+      ['Written Works',  'var(--bg)', (float)$subject['written_pct'],     (float)($grade['written_avg'] ?? 0)],
+      ['Performance',    'var(--bg)', (float)$subject['performance_pct'], (float)($grade['performance_component'] ?? 0)],
     ];
     foreach ($breakdown as [$label, $color, $weight, $avg]):
       $contribution = $avg * $weight / 100;
@@ -284,21 +294,21 @@ $pass = $fg >= 75;
   <!-- Attendance quick stat on overview -->
   <?php if ($att_total > 0): ?>
   <div class="card">
-    <p class="card-title"><i class="ti ti-calendar-check" style="color:var(--purple);"></i> Attendance Summary</p>
+    <p class="card-title"><i class="ti ti-calendar-check" style="color:var(--text7);"></i> Attendance Summary</p>
     <div class="att-summary">
-      <div class="att-chip" style="border-top:2px solid var(--green);">
+      <div class="att-chip">
         <div class="att-chip-val text-green"><?php echo $att_present; ?></div>
         <div class="att-chip-lbl">Present</div>
       </div>
-      <div class="att-chip" style="border-top:2px solid var(--yellow);">
+      <div class="att-chip">
         <div class="att-chip-val" style="color:var(--text6);"><?php echo $att_late; ?></div>
         <div class="att-chip-lbl">Late</div>
       </div>
-      <div class="att-chip" style="border-top:2px solid var(--red);">
+      <div class="att-chip">
         <div class="att-chip-val text-red"><?php echo $att_absent; ?></div>
         <div class="att-chip-lbl">Absent</div>
       </div>
-      <div class="att-chip" style="border-top:2px solid var(--border2);">
+      <div class="att-chip">
         <div class="att-chip-val"><?php echo $att_total; ?></div>
         <div class="att-chip-lbl">Total Days</div>
       </div>
@@ -308,9 +318,9 @@ $pass = $fg >= 75;
     ?>
     <div style="display:flex;align-items:center;gap:12px;">
       <div style="flex:1;height:8px;background:var(--bg3);border-radius:99px;overflow:hidden;">
-        <div style="height:100%;width:<?php echo min($rate,100); ?>%;background:var(--purple);border-radius:99px;"></div>
+        <div style="height:100%;width:<?php echo min($rate,100); ?>%;background:var(--bg);border-radius:99px;"></div>
       </div>
-      <span style="font-family:var(--font-mono);font-size:13px;color:var(--purple);"><?php echo number_format($rate,1); ?>%</span>
+      <span style="font-family:var(--font-mono);font-size:13px;color:var(--text6);"><?php echo number_format($rate,1); ?>%</span>
     </div>
     <?php endif; ?>
   </div>
@@ -420,19 +430,19 @@ $pass = $fg >= 75;
 
     <!-- Summary chips -->
     <div class="att-summary">
-      <div class="att-chip" style="border-top:2px solid var(--green);">
+      <div class="att-chip">
         <div class="att-chip-val text-green"><?php echo $att_present; ?></div>
         <div class="att-chip-lbl">Present</div>
       </div>
-      <div class="att-chip" style="border-top:2px solid var(--yellow);">
+      <div class="att-chip">
         <div class="att-chip-val" style="color:var(--text6);"><?php echo $att_late; ?></div>
         <div class="att-chip-lbl">Late</div>
       </div>
-      <div class="att-chip" style="border-top:2px solid var(--red);">
+      <div class="att-chip">
         <div class="att-chip-val text-red"><?php echo $att_absent; ?></div>
         <div class="att-chip-lbl">Absent</div>
       </div>
-      <div class="att-chip" style="border-top:2px solid var(--border2);">
+      <div class="att-chip">
         <div class="att-chip-val"><?php echo $att_total; ?></div>
         <div class="att-chip-lbl">Total Days</div>
       </div>
@@ -445,9 +455,9 @@ $pass = $fg >= 75;
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <span>Attendance Rate</span>
       <div style="flex:1;height:8px;background:var(--bg3);border-radius:99px;overflow:hidden;">
-        <div style="height:100%;width:<?php echo min($rate,100); ?>%;background:var(--purple);border-radius:99px;"></div>
+        <div style="height:100%;width:<?php echo min($rate,100); ?>%;background:var(--bg);border-radius:99px;"></div>
       </div>
-      <span style="font-family:var(--font-mono);font-size:13px;color:var(--purple);white-space:nowrap;">
+      <span style="font-family:var(--font-mono);font-size:13px;color:var(--text6);white-space:nowrap;">
         <?php echo number_format($rate, 1); ?>%
       </span>
     </div>

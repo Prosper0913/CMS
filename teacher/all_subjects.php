@@ -261,8 +261,11 @@ function qs($overrides = []) {
     <p style="font-size:13px;color:var(--text7);margin-bottom:24px;">
       Try clearing search or adjusting the filters above.
     </p>
-    <a href="all_subjects.php" class="btn btn-primary" style="display:inline-flex;">
+    <a href="all_subjects.php" class="btn btn-primary" style="display:inline-flex; max-width: 50%; margin-top:25px;">
       <i class="ti ti-refresh"></i> Reset Filters
+    </a>
+        <a href="add_subject.php" class="btn btn-primary" style="display:inline-flex;margin-top:15px; max-width: 50%">
+      <i class="ti ti-refresh"></i> Add a Subject
     </a>
   </div>
   <?php else: ?>

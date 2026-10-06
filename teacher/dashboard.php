@@ -11,6 +11,18 @@ require_once '../config/db.php';
 
 $teacher_id = $_SESSION['user_id'];
 
+// ── Onboarding check: has this teacher set anything up yet? ──
+// Drives the getting-started card below — only shown for a brand
+// new / empty account, and tells them exactly which step they're on.
+$onboard_stmt = $conn->prepare(
+    "SELECT
+        (SELECT COUNT(*) FROM sections WHERE teacher_id = ?)       AS section_count,
+        (SELECT COUNT(*) FROM subjects WHERE teacher_id = ?)       AS subject_count_any"
+);
+$onboard_stmt->bind_param("ii", $teacher_id, $teacher_id);
+$onboard_stmt->execute();
+$onboard = $onboard_stmt->get_result()->fetch_assoc();
+
 // ── Subjects with per-subject stats ─────────────────────────
 $subjects_stmt = $conn->prepare(
     "SELECT s.*,
@@ -190,16 +202,89 @@ $comp_colors = [
 
 
 
+  <!-- ── GETTING STARTED (new/empty teacher account only) ── -->
+  <?php if ((int)$onboard['section_count'] === 0 && (int)$onboard['subject_count_any'] === 0): ?>
+  <div class="card" style="margin-bottom:20px;border-left:3px solid var(--bg);">
+    <p class="card-title"><i class="ti ti-rocket"></i> Getting Started</p>
+    <p style="font-size:13px;color:var(--text7);margin-bottom:18px;">
+      Your account is empty — here's the order that works, and why. Each step unlocks the next one.
+    </p>
+
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;gap:12px;">
+        <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">1</div>
+        <div>
+          <div style="font-weight:600;font-size:13.5px;color:var(--text6);">Create a Section first</div>
+          <div style="font-size:12.5px;color:var(--text7);margin-top:2px;">
+            A section is the home for a group of students (e.g. "BSIT 2-A") — their masterlist.
+            Go to <strong>Sections</strong> → <em>New Section</em>. You need this before you can add
+            students, because adding a student asks which section they belong to.
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">2</div>
+        <div>
+          <div style="font-weight:600;font-size:13.5px;color:var(--text6);">Add students to that section</div>
+          <div style="font-size:12.5px;color:var(--text7);margin-top:2px;">
+            Go to <strong>Students</strong> → add them one at a time, or use
+            <em>Import from CSV/Excel</em> to bring in a whole class list at once.
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">3</div>
+        <div>
+          <div style="font-weight:600;font-size:13.5px;color:var(--text6);">Create a Subject</div>
+          <div style="font-size:12.5px;color:var(--text7);margin-top:2px;">
+            A subject is the actual class you teach (e.g. "CS101 — Intro to Programming") with its
+            own grade weights and schedule. This is separate from the section on purpose — the same
+            section of students can take several of your subjects.
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">4</div>
+        <div>
+          <div style="font-weight:600;font-size:13.5px;color:var(--text6);">Enroll the section into the subject</div>
+          <div style="font-size:12.5px;color:var(--text7);margin-top:2px;">
+            Open the subject → <strong>Settings</strong> tab → <em>Enroll Entire Section</em> to add
+            everyone at once (or enroll individual students). Now you can record scores and attendance.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border2);display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="/classroomv2/teacher/manage_sections.php" class="btn btn-primary" style="display:inline-flex;">
+        <i class="ti ti-building-community"></i> Start: Create a Section
+      </a>
+      <a href="/classroomv2/teacher/add_subject.php" class="btn btn-outline" style="display:inline-flex;">
+        <i class="ti ti-book-plus"></i> Or Create a Subject First
+      </a>
+    </div>
+
+    <p style="font-size:11.5px;color:var(--text7);margin-top:14px;margin-bottom:0;">
+      <i class="ti ti-info-circle"></i> When a semester ends, you don't have to delete anything —
+      mark the subject inactive from its Settings tab and its roster stays ready for next time.
+    </p>
+  </div>
+  <?php endif; ?>
+
   <!-- ── SUBJECT CARDS ── -->
   <?php if ($all_subs->num_rows === 0): ?>
-  <div class="card" style="text-align:center;padding:64px 24px;">
-    <i class="ti ti-books" style="font-size:44px;color:var(--text7);display:block;margin-bottom:16px;"></i>
-    <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text7);margin-bottom:8px;">No subjects yet</p>
-    <p style="font-size:13px;color:var(--text7);margin-bottom:24px;">Create your first subject to get started.</p>
-    <a href="/classroomv2/teacher/add_subject.php" class="btn btn-primary" style="display:inline-flex;">
-      <i class="ti ti-book-plus"></i> Add Your First Subject
-    </a>
-  </div>
+    <?php if ((int)$onboard['section_count'] > 0 || (int)$onboard['subject_count_any'] > 0): ?>
+    <div class="card" style="text-align:center;padding:64px 24px;">
+      <i class="ti ti-books" style="font-size:44px;color:var(--text7);display:block;margin-bottom:16px;"></i>
+      <p style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text7);margin-bottom:8px;">No active subjects</p>
+      <p style="font-size:13px;color:var(--text7);margin-bottom:24px;">
+        <?php echo (int)$onboard['subject_count_any'] === 0 ? 'Create a subject to get started.' : 'Create a new subject, or reactivate one from All Subjects.'; ?>
+      </p>
+      <a href="/classroomv2/teacher/add_subject.php" class="btn btn-primary" style="display:inline-flex;">
+        <i class="ti ti-book-plus"></i> Add a Subject
+      </a>
+    </div>
+    <?php endif; ?>
   <?php else:
     $all_subs->data_seek(0);
   ?>
@@ -209,6 +294,39 @@ $comp_colors = [
   <!-- ── BOTTOM: At-risk + Recent activity ── -->
   <?php if (($t['total_subjects']??0) > 0): ?>
   <div class="bottom-grid" style="margin-top:28px;">
+
+    <!-- Passing rate per subject-section -->
+    <div class="card">
+      <p class="card-title">Passing Rate by Subject-Section</p>
+      <?php
+      $all_subs->data_seek(0);
+      $has_any_graded = false;
+      ?>
+      <?php while ($ps = $all_subs->fetch_assoc()):
+        $graded = (int)$ps['passing'] + (int)$ps['failing'];
+        $rate   = $graded > 0 ? round($ps['passing'] / $graded * 100) : null;
+        if ($rate !== null) $has_any_graded = true;
+        $bar_color = $rate === null ? 'var(--text7)' : ($rate >= 75 ? 'var(--green)' : ($rate >= 50 ? '#fbbf24' : 'var(--red)'));
+      ?>
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
+          <span style="font-size:12.5px;font-weight:600;color:var(--text6);">
+            <?php echo htmlspecialchars($ps['subject_code']); ?> &middot; <?php echo htmlspecialchars($ps['section']); ?>
+          </span>
+          <span style="font-size:12px;color:<?php echo $bar_color; ?>;font-weight:600;">
+            <?php echo $rate === null ? 'No grades yet' : $rate . '%'; ?>
+          </span>
+        </div>
+        <div style="height:7px;border-radius:99px;background:var(--bg6);overflow:hidden;">
+          <div style="height:100%;width:<?php echo $rate ?? 0; ?>%;background:<?php echo $bar_color; ?>;border-radius:99px;"></div>
+        </div>
+        <div style="font-size:10.5px;color:var(--text7);margin-top:3px;">
+          <?php echo $graded > 0 ? "{$ps['passing']} of {$graded} graded students passing" : "{$ps['enrollee_count']} enrolled, none graded yet"; ?>
+        </div>
+      </div>
+      <?php endwhile; ?>
+      <?php $all_subs->data_seek(0); ?>
+    </div>
 
     <!-- At-risk students -->
     <div class="card">

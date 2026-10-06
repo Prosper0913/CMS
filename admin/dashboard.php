@@ -39,6 +39,27 @@ $recent_students = $conn->query(
      ORDER BY s.created_at DESC
      LIMIT 8"
 );
+
+// ── Daily active users, last 30 days ──────────────────────────
+// Distinct accounts (any role) with at least one successful login
+// that day, sourced from the security audit log.
+$login_rows = $conn->query(
+    "SELECT DATE(created_at) AS d, COUNT(DISTINCT user_id) AS cnt
+     FROM audit_log
+     WHERE event_type = 'login' AND outcome = 'success'
+       AND created_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
+     GROUP BY DATE(created_at)"
+)->fetch_all(MYSQLI_ASSOC);
+$login_by_day = [];
+foreach ($login_rows as $r) { $login_by_day[$r['d']] = (int)$r['cnt']; }
+
+$usage_labels = [];
+$usage_counts = [];
+for ($i = 29; $i >= 0; $i--) {
+    $d = date('Y-m-d', strtotime("-{$i} days"));
+    $usage_labels[] = date('M j', strtotime($d));
+    $usage_counts[] = $login_by_day[$d] ?? 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -50,6 +71,7 @@ $recent_students = $conn->query(
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
 </head>
 <body class="page-admin-dashboard">
@@ -68,6 +90,21 @@ echo date("l, F j, Y");
   </div>
 
 <hr class="thin-line">
+
+  <!-- ── Daily active users ── -->
+  <div class="card" style="margin-top:20px;">
+    <p class="card-title"><i class="ti ti-chart-line"></i> Daily Active Users <span style="font-weight:400;font-size:11px;color:var(--text7);">(last 30 days)</span></p>
+    <?php if (array_sum($usage_counts) === 0): ?>
+    <div class="empty-state" style="padding:30px;">
+      <i class="ti ti-chart-line-off"></i>
+      <p>No logins recorded in the last 30 days yet.</p>
+    </div>
+    <?php else: ?>
+    <div style="height:260px;">
+      <canvas id="usageChart"></canvas>
+    </div>
+    <?php endif; ?>
+  </div>
 
   <div class="two-col" style="margin-top:20px;">
 
@@ -151,5 +188,38 @@ echo date("l, F j, Y");
 
 </main>
 </div>
+<?php if (array_sum($usage_counts) > 0): ?>
+<script>
+(function(){
+  const ctx = document.getElementById('usageChart');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: <?php echo json_encode($usage_labels); ?>,
+      datasets: [{
+        label: 'Users logged in',
+        data: <?php echo json_encode($usage_counts); ?>,
+        borderColor: '#1e5f4e',
+        backgroundColor: 'rgba(30,95,78,.12)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } },
+        x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } }
+      }
+    }
+  });
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>

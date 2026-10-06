@@ -25,13 +25,27 @@ $teacher_id = $_SESSION['user_id'];
 $subject_id = (int)($_GET['id'] ?? 0);
 if (!$subject_id) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
+// Note: intentionally NOT filtered to is_active=1 — an inactive (archived)
+// subject must still be reachable so its teacher can view/correct past
+// grades and attendance. See markEditedIfInactive() below.
 $sub_stmt = $conn->prepare(
-    "SELECT * FROM subjects WHERE id = ? AND teacher_id = ? AND is_active = 1"
+    "SELECT * FROM subjects WHERE id = ? AND teacher_id = ?"
 );
 $sub_stmt->bind_param("ii", $subject_id, $teacher_id);
 $sub_stmt->execute();
 $subject = $sub_stmt->get_result()->fetch_assoc();
 if (!$subject) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
+
+// ── Stamp a note whenever grades/attendance are touched while the
+//    subject is marked inactive (semester already ended) — surfaced
+//    in the UI as "edited after being marked inactive". ──────────
+function markEditedIfInactive($conn, $subject) {
+    if (empty($subject['is_active'])) {
+        $m = $conn->prepare("UPDATE subjects SET last_edited_while_inactive_at = NOW() WHERE id = ?");
+        $m->bind_param("i", $subject['id']);
+        $m->execute();
+    }
+}
 
 $active_tab = $_GET['tab'] ?? 'overview';
 $valid_tabs = ['overview','written','exams','performance','attendance','biometric','grades','announcements','settings'];
@@ -146,6 +160,7 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
 
 // ── ADD score entry (written / exam / performance) ───────────
 if (isset($_POST['add_score'])) {
+     markEditedIfInactive($conn, $subject);
      $component  = $_POST['component'];
      $entry_name = trim($_POST['entry_name']);
      $date_given = $_POST['date_given'];
@@ -249,6 +264,7 @@ if (isset($_GET['del_score'])) {
     $row = $del_stmt->get_result()->fetch_assoc();
 
     if ($row) {
+        markEditedIfInactive($conn, $subject);
         $d = $conn->prepare("DELETE FROM score_entries WHERE id = ? AND subject_id = ?");
         $d->bind_param("ii", $score_id, $subject_id);
         $d->execute();
@@ -266,6 +282,7 @@ if (isset($_GET['deleted'])) $success_msg = "Entry deleted and grades updated.";
 
 // ── BULK EDIT scores (whole quiz/activity, tab-through-students) ──
 if (isset($_POST['bulk_edit_scores'])) {
+    markEditedIfInactive($conn, $subject);
     $bulk_component  = $_POST['bulk_component']  ?? '';
     $bulk_entry_name = trim($_POST['bulk_entry_name'] ?? '');
     $bulk_scores     = $_POST['bulk_scores'] ?? []; // [score_id => new value]
@@ -314,6 +331,7 @@ if (isset($_POST['bulk_edit_scores'])) {
 
 // ── BULK DELETE a whole quiz/activity ────────────────────────
 if (isset($_POST['delete_quiz'])) {
+    markEditedIfInactive($conn, $subject);
     $del_component  = $_POST['del_component']  ?? '';
     $del_entry_name = trim($_POST['del_entry_name'] ?? '');
     $valid_components = ['Major Exam', 'Written Work', 'Performance Task'];
@@ -347,6 +365,7 @@ if (isset($_POST['delete_quiz'])) {
 
 // ── SAVE bulk attendance ─────────────────────────────────────
 if (isset($_POST['save_attendance'])) {
+    markEditedIfInactive($conn, $subject);
     $att_date = $_POST['att_date'];
     $statuses = $_POST['att_status'] ?? [];
     foreach ($statuses as $sid => $status) {
@@ -413,6 +432,7 @@ if (isset($_GET['ann_deleted'])) $success_msg = "Announcement deleted.";
 
 // ── BULK EDIT attendance for one day (tab-through-students) ──
 if (isset($_POST['bulk_edit_attendance'])) {
+    markEditedIfInactive($conn, $subject);
     $bea_date     = $_POST['bea_date'] ?? '';
     $bea_statuses = $_POST['bea_status']  ?? [];
     $bea_times    = $_POST['bea_time_in'] ?? [];
@@ -461,6 +481,7 @@ if (isset($_GET['att_deleted'])) $success_msg = "Attendance record deleted and g
 
 // ── BULK DELETE a whole day's attendance ─────────────────────
 if (isset($_POST['delete_attendance_day'])) {
+    markEditedIfInactive($conn, $subject);
     $dad_date = $_POST['dad_date'] ?? '';
     if ($dad_date === '') {
         $error_msg = "Invalid day to delete.";
@@ -594,6 +615,28 @@ if (isset($_POST['update_subject_meta'])) {
         $subject = $sub_stmt->get_result()->fetch_assoc();
         $success_msg = "Subject details updated.";
     }
+}
+
+// ── DEACTIVATE / REACTIVATE this subject ─────────────────────
+// Deactivating just hides it from the active "My Schedule" / dashboard
+// views and from new-enrollment pickers — nothing is deleted. The
+// section's own student masterlist (section_students) is untouched,
+// so re-activating later brings back the exact same roster. Students
+// can still see the subject under their own subject history either way.
+if (isset($_POST['toggle_subject_active'])) {
+    if ((int)$subject['is_active'] === 1) {
+        $t = $conn->prepare("UPDATE subjects SET is_active = 0, deactivated_at = NOW() WHERE id = ? AND teacher_id = ?");
+        $t->bind_param("ii", $subject_id, $teacher_id);
+        $t->execute();
+        $success_msg = "Subject marked inactive. Its roster and records are kept — reactivate any time.";
+    } else {
+        $t = $conn->prepare("UPDATE subjects SET is_active = 1, deactivated_at = NULL, last_edited_while_inactive_at = NULL WHERE id = ? AND teacher_id = ?");
+        $t->bind_param("ii", $subject_id, $teacher_id);
+        $t->execute();
+        $success_msg = "Subject reactivated.";
+    }
+    $sub_stmt->execute();
+    $subject = $sub_stmt->get_result()->fetch_assoc();
 }
 
 // ── ENROLL entire section ────────────────────────────────────
@@ -899,8 +942,23 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
 <div class="subject-hero">
   <div class="hero-top">
     <div class="hero-left">
-      <div class="hero-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+      <div class="hero-code">
+        <?php echo htmlspecialchars($subject['subject_code']); ?>
+        <?php if (!$subject['is_active']): ?>
+        <span style="margin-left:8px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;background:rgba(117,115,115,.15);color:var(--text7);border:1px solid var(--border2);vertical-align:middle;">
+          <i class="ti ti-archive"></i> Inactive
+        </span>
+        <?php endif; ?>
+      </div>
       <div class="hero-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+      <?php if (!$subject['is_active']): ?>
+      <div style="font-size:12px;color:var(--text7);margin:4px 0 2px;">
+        Marked inactive on <?php echo date('M d, Y', strtotime($subject['deactivated_at'])); ?> — roster and records are kept.
+        <?php if (!empty($subject['last_edited_while_inactive_at'])): ?>
+        <strong style="color:var(--text6);">Edited after being marked inactive (last: <?php echo date('M d, Y g:i A', strtotime($subject['last_edited_while_inactive_at'])); ?>).</strong>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
       <div class="hero-meta">
         <span class="hero-meta-item">
           <i class="ti ti-users"></i>
@@ -936,6 +994,19 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
         <i class="ti ti-calendar-check" style="font-size:11px;"></i>
         Attendance <?php echo (int)$subject['attendance_pct']; ?>%
       </div>
+      <form method="POST" style="margin:0;"
+        onsubmit="return confirm('<?php echo $subject['is_active']
+          ? 'Mark this subject inactive? It will be hidden from your active schedule, but all records and the roster are kept, and students can still view their history.'
+          : 'Reactivate this subject? It will reappear in your active schedule.'; ?>');">
+        <input type="hidden" name="toggle_subject_active">
+        <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;white-space:nowrap;">
+          <?php if ($subject['is_active']): ?>
+            <i class="ti ti-archive"></i> Mark Inactive
+          <?php else: ?>
+            <i class="ti ti-rotate-clockwise"></i> Reactivate
+          <?php endif; ?>
+        </button>
+      </form>
     </div>
   </div>
 
@@ -1154,8 +1225,8 @@ $sv_comp_colors = [
     </p>
     <?php if (!$sv_latest_activity): ?>
       <div class="empty-state" style="padding:24px;">
-        <i class="ti ti-pencil-off"></i>
-        <p>No score entries yet.</p>
+        <i class="ti ti-pencil-off" style="color:var(--text6);"></i>
+        <p class="black-font">No score entries yet.</p>
       </div>
     <?php else: ?>
       <div style="font-size:11px;color:var(--text7);margin-bottom:10px;">
@@ -1219,8 +1290,8 @@ $sv_comp_colors = [
     </p>
     <?php if ($sv_recent->num_rows === 0): ?>
       <div class="empty-state" style="padding:24px;">
-        <i class="ti ti-pencil-off"></i>
-        <p>No score entries yet.</p>
+        <i class="ti ti-pencil-off" style="color:var(--text6);"></i>
+        <p class="black-font">No score entries yet.</p>
       </div>
     <?php else: ?>
       <?php while ($r = $sv_recent->fetch_assoc()):
@@ -1255,16 +1326,16 @@ $sv_comp_colors = [
       <p class="card-title"><i class="ti ti-percentage"></i> Grade Composition</p>
       <div class="grade-breakdown">
         <div class="grade-comp-card">
-          <div class="gc-pct" style="color:var(--text);"><?php echo (int)$subject['exam_pct']; ?>%</div>
+          <div class="gc-pct" style="color:var(--text6);"><?php echo (int)$subject['exam_pct']; ?>%</div>
           <div class="gc-label">Major Exams</div>
-          <div class="gc-weight">Class avg: <?php echo number_format($st['avg'] ?? 0, 1); ?>%</div>
+          <!-- <div class="gc-weight">Class avg: <?php echo number_format($st['avg'] ?? 0, 1); ?>%</div> -->
         </div>
         <div class="grade-comp-card">
-          <div class="gc-pct" style="color:var(--text);"><?php echo (int)$subject['written_pct']; ?>%</div>
+          <div class="gc-pct" style="color:var(--text6);"><?php echo (int)$subject['written_pct']; ?>%</div>
           <div class="gc-label">Written Works</div>
         </div>
         <div class="grade-comp-card">
-          <div class="gc-pct" style="color:var(--text);"><?php echo (int)$subject['performance_pct']; ?>%</div>
+          <div class="gc-pct" style="color:var(--text6);"><?php echo (int)$subject['performance_pct']; ?>%</div>
           <div class="gc-label">Performance</div>
           <div class="gc-weight">Incl. <?php echo (int)$subject['attendance_pct']; ?>% attendance</div>
         </div>
@@ -1506,7 +1577,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
                       value="<?php echo $r['score']; ?>" data-original="<?php echo $r['score']; ?>"
                       min="0" max="<?php echo $r['total_items']; ?>" step="1"
                       oninput="clampEditInput(this)" onblur="clampEditInput(this)">
-                    <span style="font-size:12px;color:var(--text7);">/ <?php echo $r['total_items']; ?></span>
+                    <!-- <span style="font-size:12px;color:var(--text);">/ <?php echo $r['total_items']; ?></span> -->
                   </td>
                   <td>
                     <div class="score-bar-wrap">
@@ -1728,7 +1799,7 @@ elseif ($active_tab === 'attendance'):
               <p style="font-weight:600;font-size:13px;">
                 <?php echo date('M d, Y', strtotime($d)); ?>
                 <?php if ($is_today): ?>
-                <span style="font-size:9px;font-weight:700;color:var(--purple);"> TODAY</span>
+                <span style="font-size:9px;font-weight:700;color:var(--text7);"> TODAY</span>
                 <?php endif; ?>
               </p>
               <div style="display:flex;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap;">
@@ -2293,10 +2364,10 @@ elseif ($active_tab === 'grades'):
         <tr>
           <th>#</th>
           <th>Student</th>
-          <th style="color:var(--text7);">Exam Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
-          <th style="color:var(--text7);">Written Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
-          <th style="color:var(--text7);">Perf. Task</th>
-          <th style="color:var(--text7);">Attendance</th>
+          <th style="color:var(--text6);">Exam Avg <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
+          <th style="color:var(--text6);">Written Avg <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
+          <th style="color:var(--text6);">Perf. Task <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['performance_pct']; ?>%)</span></th>
+          <th style="color:var(--text6);">Attendance <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['attendance_pct']; ?>%)</span></th>
           <th>Final Grade</th>
           <th>Letter</th>
         </tr>
@@ -2344,7 +2415,7 @@ elseif ($active_tab === 'grades'):
           </td>
           <?php endforeach; ?>
           <td>
-            <span style="font-family:var(--font-head);font-size:15px;font-weight:700;color:<?php echo $fg >= 75 ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
+            <span style="font-family:var(--font-head);font-size:13px;font-weight:700;color:<?php echo $fg >= 75 ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
               <?php echo $fg > 0 ? number_format($fg,2) . '%' : '—'; ?>
             </span>
           </td>
@@ -2385,7 +2456,7 @@ elseif ($active_tab === 'announcements'):
     $announcements = $ann_stmt->get_result();
 ?>
 <div class="settings-wrap">
-
+<div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start;">
   <div class="card" style="max-width:600px;margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-speakerphone"></i> Post an Announcement</p>
     <p style="font-size:12px;color:var(--text7);margin-bottom:14px;">
@@ -2440,6 +2511,8 @@ elseif ($active_tab === 'settings'):
 <div class="settings-wrap">
 
   <!-- 1. Subject Details -->
+   <div style="display:grid;grid-template-columns:500px 1fr;gap:20px;align-items:start;">
+
   <div class="card" style="max-width:600px;margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-pencil"></i> Edit Subject Details</p>
     <form method="POST">
@@ -2521,6 +2594,7 @@ elseif ($active_tab === 'settings'):
   </div>
 
   <!-- 2. Grade Weights -->
+   <div>
   <div class="card" style="max-width:600px;margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-percentage"></i> Edit Grade Weights</p>
     <p style="font-size:12px;color:var(--text7);margin-bottom:16px;">
@@ -2529,25 +2603,25 @@ elseif ($active_tab === 'settings'):
     <form method="POST">
       <div class="weight-row">
         <div class="form-group">
-          <label style="color:var(--text7);">Major Exams %</label>
+          <label style="color:var(--text6);">Major Exams %</label>
           <input type="number" name="exam_pct" id="s_exam" class="form-control"
             value="<?php echo (int)$subject['exam_pct']; ?>"
             min="0" max="100" step="1" oninput="sUpdateTotal()" required>
         </div>
         <div class="form-group">
-          <label style="color:var(--text7);">Written Works %</label>
+          <label style="color:var(--text6);">Written Works %</label>
           <input type="number" name="written_pct" id="s_written" class="form-control"
             value="<?php echo (int)$subject['written_pct']; ?>"
             min="0" max="100" step="1" oninput="sUpdateTotal()" required>
         </div>
         <div class="form-group">
-          <label style="color:var(--text7);">Performance %</label>
+          <label style="color:var(--text6);">Performance %</label>
           <input type="number" name="performance_pct" id="s_perf" class="form-control"
             value="<?php echo (int)$subject['performance_pct']; ?>"
             min="0" max="100" step="1" oninput="sUpdateTotal()" required>
         </div>
         <div class="form-group">
-          <label style="color:var(--text7);">Attendance % <span style="font-weight:400;font-size:10px;">(inside Perf)</span></label>
+          <label style="color:var(--text6);">Attendance % <span style="font-weight:400;font-size:10px;">(inside Perf)</span></label>
           <input type="number" name="attendance_pct" id="s_att" class="form-control"
             value="<?php echo (int)$subject['attendance_pct']; ?>"
             min="0" max="10" step="1" required>
@@ -2555,9 +2629,9 @@ elseif ($active_tab === 'settings'):
       </div>
       <div id="s_total" style="font-size:12px;color:var(--green);margin-bottom:14px;">Total: 100% ✓</div>
       <div class="weight-bar" style="margin-bottom:16px;">
-        <div id="sb_exam"    class="weight-bar-seg" style="width:<?php echo $subject['exam_pct']; ?>%;background:var(--text7);"></div>
-        <div id="sb_written" class="weight-bar-seg" style="width:<?php echo $subject['written_pct']; ?>%;background:var(--text7);"></div>
-        <div id="sb_perf"    class="weight-bar-seg" style="width:<?php echo $subject['performance_pct']; ?>%;background:var(--text7);"></div>
+        <div id="sb_exam"    class="weight-bar-seg" style="width:<?php echo $subject['exam_pct']; ?>%;background:var(--bg);"></div>
+        <div id="sb_written" class="weight-bar-seg" style="width:<?php echo $subject['written_pct']; ?>%;background:var(--bg);"></div>
+        <div id="sb_perf"    class="weight-bar-seg" style="width:<?php echo $subject['performance_pct']; ?>%;background:var(--bg);"></div>
       </div>
       <button type="submit" name="update_weights" class="btn btn-primary"
         onclick="return confirm('This will recompute all student grades. Continue?')">
@@ -2565,7 +2639,43 @@ elseif ($active_tab === 'settings'):
       </button>
     </form>
   </div>
-
+    <!-- 4. Archive / Danger Zone -->
+  <div class="card" style="max-width:600px;margin-bottom:20px;border-color:<?php echo $subject['is_active'] ? 'var(--border2)' : 'rgba(117,115,115,.4)'; ?>;">
+    <p class="card-title"><i class="ti ti-archive"></i> <?php echo $subject['is_active'] ? 'End of Semester' : 'Inactive Subject'; ?></p>
+    <?php if ($subject['is_active']): ?>
+    <p style="font-size:12.5px;color:var(--text7);margin-bottom:14px;">
+      When the semester ends and you're done with this subject-section, mark it inactive.
+      It disappears from your active schedule and dashboard, but nothing is deleted — the
+      enrolled roster, grades, and attendance all stay exactly as they are, and students can
+      still view their own history for it. If you pick it back up later (e.g. next term),
+      reactivate it and the masterlist is already there.
+    </p>
+    <?php else: ?>
+    <p style="font-size:12.5px;color:var(--text7);margin-bottom:14px;">
+      This subject is inactive since <?php echo date('M d, Y', strtotime($subject['deactivated_at'])); ?>.
+      It's hidden from your active schedule, but you can still view and correct its records
+      here any time — any change you make while it's inactive is noted automatically.
+      Reactivate it to bring it back into your active schedule.
+    </p>
+    <?php endif; ?>
+    <form method="POST" style="margin:0;"
+      onsubmit="return confirm('<?php echo $subject['is_active']
+        ? 'Mark this subject inactive? It will be hidden from your active schedule, but all records and the roster are kept, and students can still view their history.'
+        : 'Reactivate this subject? It will reappear in your active schedule.'; ?>');">
+      <input type="hidden" name="toggle_subject_active">
+      <?php if ($subject['is_active']): ?>
+      <button type="submit" class="btn btn-sm" style="background:rgba(255, 4, 4, 0.86);border:1px solid rgba(117,115,115,.3);color:var(--text);padding:8px 16px;font-size:12.5px;border-radius:8px;">
+        <i class="ti ti-archive"></i> Mark This Subject Inactive
+      </button>
+      <?php else: ?>
+      <button type="submit" class="btn btn-primary btn-sm" style="font-size:12.5px;">
+        <i class="ti ti-rotate-clockwise"></i> Reactivate This Subject
+      </button>
+      <?php endif; ?>
+    </form>
+  </div>
+  </div>
+</div>
   <!-- 3. Enrollee Management -->
   <div class="card" style="margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-users"></i>
@@ -2626,7 +2736,7 @@ elseif ($active_tab === 'settings'):
     <?php endif; ?>
 
     <?php if (!$enrolled_list || $enrolled_list->num_rows === 0): ?>
-    <div class="empty-state" style="padding:24px;text-align:center;color:var(--text7);">
+    <div class="empty-state" style="padding:24px;text-align:center;color:var(--text3);">
       <i class="ti ti-users-off" style="font-size:26px;display:block;margin-bottom:8px;"></i>
       No students enrolled yet. Use the options above to add students.
     </div>
@@ -2675,7 +2785,6 @@ elseif ($active_tab === 'settings'):
     </div>
     <?php endif; ?>
   </div>
-
 </div>
 
 <?php endif; ?>
