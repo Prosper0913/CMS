@@ -1,17 +1,24 @@
 <?php
 // ============================================================
 //  forgot_password.php
-//  "Forgot password?" — the person enters their Student ID /
-//  username. This does NOT reveal whether the account exists and
-//  does NOT email anything: it files a request that an admin sees
-//  under Admin → Password Requests. After verifying who they are,
-//  the admin issues a one-time reset link (valid 30 minutes).
+//  "Forgot password?" — two ways to recover an account:
+//    1. Email me a one-time code (self-service, needs an email
+//       on file — Settings → Contact Info). Handled here by
+//       generating + emailing an OTP, then handing off to
+//       otp_verify.php to enter the code and set a new password.
+//    2. Request admin help (unchanged) — files a request that an
+//       admin reviews under Admin → Password Requests, then issues
+//       a one-time reset link.
+//
+//  Neither path reveals whether an account/email exists: the
+//  response is always the same generic message either way.
 // ============================================================
 session_start();
 require_once 'config/db.php';
 require_once 'includes/audit.php';
 require_once 'includes/csrf.php';
 require_once 'includes/auth_page.php';
+require_once 'includes/otp.php';
 
 // Already signed in? Nothing to recover.
 if (isset($_SESSION['role'])) {
@@ -30,6 +37,8 @@ $submitted = false;
 $identifier = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $method = ($_POST['method'] ?? 'admin') === 'otp' ? 'otp' : 'admin';
+
     if (!csrf_verify()) {
         $error = "Your session expired. Please try again.";
     } else {
@@ -40,14 +49,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($identifier === '') {
             $error = "Please enter your Student ID or username.";
+        } elseif ($method === 'otp') {
+            // ── Self-service: email a one-time code ─────────────
+            $ip = audit_client_ip();
+            try {
+                $rl = $conn->prepare(
+                    "SELECT COUNT(*) AS c FROM audit_log
+                     WHERE event_type='otp_request' AND ip_address=?
+                       AND created_at >= (NOW() - INTERVAL 1 HOUR)"
+                );
+                $rl->bind_param('s', $ip);
+                $rl->execute();
+                $recent = (int)$rl->get_result()->fetch_assoc()['c'];
+
+                if ($recent >= RECOVERY_MAX_PER_IP_PER_HOUR) {
+                    audit_log($conn, 'otp_request', 'failure', [
+                        'username' => $identifier, 'reason' => 'rate_limited',
+                    ]);
+                } else {
+                    otp_request_and_send($conn, $identifier, 'password_reset', $ip);
+                }
+            } catch (Throwable $e) {
+                error_log('[forgot_password] ' . $e->getMessage());
+            }
+            // Always the same next step, whatever happened above.
+            header("Location: otp_verify.php?u=" . urlencode($identifier));
+            exit;
         } else {
-            // The person always gets the same answer, whatever happens below,
-            // so this form can't be used to find out which accounts exist.
+            // ── Admin-mediated request (unchanged) ───────────────
             $submitted = true;
             $ip = audit_client_ip();
 
             try {
-                // Too many requests from this address in the last hour?
                 $rl = $conn->prepare(
                     "SELECT COUNT(*) AS c FROM audit_log
                      WHERE event_type='recovery_request' AND ip_address=?
@@ -72,7 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'username' => $identifier, 'reason' => 'unknown_user',
                         ]);
                     } else {
-                        // Only one open request per account at a time.
                         $oq = $conn->prepare(
                             "SELECT id FROM password_reset_requests
                              WHERE user_id=? AND status IN ('pending','link_issued')
@@ -105,7 +137,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } catch (Throwable $e) {
                 error_log('[forgot_password] ' . $e->getMessage());
-                // Still show the generic message — never leak internals here.
             }
         }
     }
@@ -124,8 +155,7 @@ auth_page_start('Forgot password', 'Account recovery', 'Forgot your password?');
 
 <?php else: ?>
   <p class="lead">
-    Enter your Student ID (or username). An administrator will verify who you are and
-    give you a one-time link to choose a new password.
+    Enter your Student ID (or username), then choose how you'd like to recover your account.
   </p>
 
   <?php if ($error): ?>
@@ -143,6 +173,20 @@ auth_page_start('Forgot password', 'Account recovery', 'Forgot your password?');
                value="<?php echo htmlspecialchars($identifier); ?>">
       </div>
     </div>
+
+    <button type="submit" name="method" value="otp" class="btn-main">
+      <i class="ti ti-mail"></i> Email me a one-time code
+    </button>
+    <p class="hint" style="margin-top:-8px;">
+      Needs an email saved to your account (Settings → Contact Info).
+    </p>
+
+    <div style="display:flex;align-items:center;gap:10px;color:var(--school-text7);font-size:12px;margin:2px 0;">
+      <div style="flex:1;height:1px;background:var(--border-on-light);"></div>
+      or
+      <div style="flex:1;height:1px;background:var(--border-on-light);"></div>
+    </div>
+
     <div class="form-group">
       <label>Message for the administrator <span style="font-weight:400;">(optional)</span></label>
       <div class="input-wrap top">
@@ -151,7 +195,10 @@ auth_page_start('Forgot password', 'Account recovery', 'Forgot your password?');
           placeholder="e.g. your section, and how the admin can reach you to confirm it's you"></textarea>
       </div>
     </div>
-    <button type="submit" class="btn-main"><i class="ti ti-send"></i> Request password reset</button>
+    <button type="submit" name="method" value="admin" class="btn-main"
+            style="background:transparent;border:1px solid var(--border-on-light);color:var(--school-text6);">
+      <i class="ti ti-send"></i> Request admin help instead
+    </button>
   </form>
   <a class="back-link" href="login.php"><i class="ti ti-arrow-left"></i> Back to sign in</a>
 <?php endif; ?>

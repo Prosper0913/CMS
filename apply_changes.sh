@@ -1,3 +1,4 @@
+#cd ~/Downloads && unzip -o feature_update_11.zip && bash feature_update_11/apply.sh
 #!/usr/bin/env bash
 # ============================================================
 #  apply_changes.sh — run in Git Bash:   bash ~/Downloads/apply_changes.sh
