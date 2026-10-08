@@ -119,14 +119,15 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
     $aq = $conn->prepare(
         "SELECT s.student_id, s.last_name, s.first_name,
                 a.status AS att_status, a.time_in, a.source,
-                (ft.id IS NOT NULL) AS has_template
+                (ft.student_id IS NOT NULL) AS has_template
          FROM subject_enrollments se
          JOIN students s USING(student_id)
          LEFT JOIN attendance a
                ON  a.subject_id = se.subject_id
                AND a.student_id = se.student_id
                AND a.date = ?
-         LEFT JOIN fingerprint_templates ft ON ft.student_id = s.student_id
+         LEFT JOIN (SELECT DISTINCT student_id FROM fingerprint_templates) ft
+               ON ft.student_id = s.student_id
          WHERE se.subject_id = ?
          ORDER BY s.last_name ASC, s.first_name ASC"
     );
@@ -1963,14 +1964,15 @@ elseif ($active_tab === 'biometric'):
     $bio_init_q = $conn->prepare(
         "SELECT s.student_id, s.last_name, s.first_name,
                 a.status AS att_status, a.time_in, a.source,
-                (ft.id IS NOT NULL) AS has_template
+                (ft.student_id IS NOT NULL) AS has_template
          FROM subject_enrollments se
          JOIN students s USING(student_id)
          LEFT JOIN attendance a
                ON  a.subject_id = se.subject_id
                AND a.student_id = se.student_id
                AND a.date = ?
-         LEFT JOIN fingerprint_templates ft ON ft.student_id = s.student_id
+         LEFT JOIN (SELECT DISTINCT student_id FROM fingerprint_templates) ft
+               ON ft.student_id = s.student_id
          WHERE se.subject_id = ?
          ORDER BY s.last_name ASC, s.first_name ASC"
     );
@@ -2284,7 +2286,7 @@ elseif ($active_tab === 'biometric'):
         const el = document.getElementById('bioLastUpdated');
         if (el) el.textContent = 'Updated ' + d.time;
       })
-      .catch(() => {});
+      .catch(err => console.error('[bio roster poll] failed:', err));
   }
 
   setInterval(pollLive, POLL_MS);
