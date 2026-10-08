@@ -126,6 +126,10 @@ for ($y = 0; $y < IMG_HEIGHT; $y++) {
     }
 }
 $pngOk = imagepng($im, $pngPath);
+// TEMP DIAGNOSTIC — also save a viewable copy so we can confirm by eye
+// that the AS608 nibble order (hi/lo) is unpacking into a real
+// fingerprint and not scrambled static. Remove this line once confirmed.
+imagepng($im, TMP_DIR . '/latest_enroll_capture.png');
 imagedestroy($im);
 if (!$pngOk) fail('Failed to write enrollment PNG', 500);
 

@@ -2417,7 +2417,7 @@ transform: scale(1.05);
 }
 
 /* DEVICE CARD */ .device-card {
-  background:var(--bg);
+  background:var(--bg5);
   border:1px solid var(--border2);
   border-radius:var(--radius-lg);
   padding:16px;

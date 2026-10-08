@@ -648,7 +648,7 @@ $type_cfg  = [
 
         <!-- ── Single student enroll ── -->
         <div id="enrollSinglePanel">
-          <form method="POST">
+          <form method="POST" onsubmit="return confirmSingleEnroll(this)">
             <div class="form-group">
               <label>Device <span class="text-red">*</span></label>
               <select name="dev_id" class="form-control" required>
@@ -669,7 +669,9 @@ $type_cfg  = [
                 style="height:auto;padding:4px;" required>
                 <?php foreach ($students as $st): ?>
                 <option value="<?php echo htmlspecialchars($st['student_id']); ?>"
-                  data-label="<?php echo strtolower($st['last_name'].' '.$st['first_name'].' '.$st['student_id']); ?>">
+                  data-label="<?php echo strtolower($st['last_name'].' '.$st['first_name'].' '.$st['student_id']); ?>"
+                  data-has-template="<?php echo $st['has_template'] ? '1' : '0'; ?>"
+                  data-name="<?php echo htmlspecialchars($st['last_name'].', '.$st['first_name']); ?>">
                   <?php echo htmlspecialchars($st['last_name'].', '.$st['first_name'].' ('.$st['student_id'].')'); ?>
                   <?php echo $st['has_template'] ? ' ✓' : ''; ?>
                 </option>
@@ -704,7 +706,7 @@ $type_cfg  = [
             <i class="ti ti-info-circle"></i> No sections found. Assign students to sections in the Sections panel.
           </div>
           <?php else: ?>
-          <form method="POST">
+          <form method="POST" onsubmit="return confirmSectionEnroll()">
             <div class="form-group">
               <label>Device <span class="text-red">*</span></label>
               <select name="dev_id" class="form-control" required>
@@ -794,7 +796,7 @@ $type_cfg  = [
           <!-- Device header -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
-            <div style="font-weight:600;font-size:13px;flex:1;color:var(--text);"><?php echo htmlspecialchars($dev['label']); ?></div>
+            <div style="font-weight:600;font-size:13px;flex:1;"><?php echo htmlspecialchars($dev['label']); ?></div>
             <?php if ($sess): ?>
             <span class="badge badge-green">ACTIVE</span>
             <?php else: ?>
@@ -806,19 +808,19 @@ $type_cfg  = [
           <!-- Active session info -->
           <div style="background:var(--bg4);border-radius:6px;padding:10px;margin-bottom:10px;font-size:12px;">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text);">Subject</span>
+              <span style="color:var(--text2);">Subject</span>
               <span style="font-weight:600;"><?php echo htmlspecialchars($sess['subject_code'].' — '.$sess['section']); ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text);">Late after</span>
+              <span style="color:var(--text2);">Late after</span>
               <span style="font-family:var(--font-mono);"><?php echo (int)$sess['late_after_minutes']; ?> min</span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text);">Started</span>
+              <span style="color:var(--text2);">Started</span>
               <span style="font-family:var(--font-mono);"><?php echo date('H:i', strtotime($sess['started_at'])); ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;">
-              <span style="color:var(--text);">Expires</span>
+              <span style="color:var(--text2);">Expires</span>
               <span style="font-family:var(--font-mono);"><?php echo $sess['auto_expire_at'] ? date('H:i', strtotime($sess['auto_expire_at'])) : 'Manual'; ?></span>
             </div>
           </div>
@@ -835,7 +837,7 @@ $type_cfg  = [
           <form method="POST">
             <input type="hidden" name="dev_id" value="<?php echo $dev['id']; ?>">
             <div class="form-group" style="margin-bottom:8px;">
-              <label style="color: var(--text);">Subject</label>
+              <label>Subject</label>
               <select name="session_subject" class="form-control" required>
                 <option value="">— Choose —</option>
                 <?php foreach ($my_subjects as $s): ?>
@@ -848,11 +850,11 @@ $type_cfg  = [
             </div>
             <div class="form-row" style="margin-bottom:8px;">
               <div class="form-group" style="margin-bottom:0;">
-                <label style="color: var(--text);">Late After</label>
+                <label>Late After</label>
                 <input type="number" name="late_after_minutes" class="form-control" value="15" min="1" step="1" required>
               </div>
               <div class="form-group" style="margin-bottom:0;">
-                <label style="color: var(--text);">Duration (min)</label>
+                <label>Duration (min)</label>
                 <input type="number" name="duration_min" class="form-control" value="90" min="10" max="480" required>
               </div>
             </div>
@@ -953,7 +955,7 @@ $type_cfg  = [
         <span style="font-size:10px;font-weight:400;color:var(--green);">Auto-refresh 15s</span>
       </span>
       <a href="biometric.php" class="btn btn-sm btn-outline card-title-right" style="font-size:11px;">
-        <i class="ti ti-refresh" style="color: var(--text);"></i> Refresh Now
+        <i class="ti ti-refresh"></i> Refresh Now
       </a>
     </p>
 
@@ -1132,10 +1134,12 @@ function switchEnrollTab(tab) {
 }
 
 // Load section students preview via AJAX
+let sectionAlreadyEnrolled = [];   // names of students the bulk run would overwrite — used by confirmSectionEnroll()
 function loadSectionStudents(secId) {
   const preview = document.getElementById('sectionPreview');
   const list    = document.getElementById('sectionStudentList');
   const note    = document.getElementById('sectionEnrollNote');
+  sectionAlreadyEnrolled = [];
   if (!secId) { preview.style.display='none'; return; }
   list.innerHTML = '<span style="color:var(--text3);">Loading…</span>';
   preview.style.display = '';
@@ -1143,7 +1147,8 @@ function loadSectionStudents(secId) {
     .then(r => r.json())
     .then(data => {
       if (!data.length) { list.innerHTML='<span style="color:var(--text3);">No students found.</span>'; return; }
-      const enrolled = data.filter(s => s.has_template).length;
+      sectionAlreadyEnrolled = data.filter(s => s.has_template).map(s => `${s.last_name}, ${s.first_name}`);
+      const enrolled = sectionAlreadyEnrolled.length;
       list.innerHTML = data.map(s =>
         `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);">
           <span style="flex:1;">${s.last_name}, ${s.first_name}</span>
@@ -1155,6 +1160,28 @@ function loadSectionStudents(secId) {
       note.innerHTML = `<span style="color:var(--text3);">${enrolled} / ${data.length} already have templates — they will be <strong>re-enrolled</strong> (overwritten).</span>`;
     })
     .catch(() => { list.innerHTML='<span class="text-red">Failed to load.</span>'; });
+}
+
+// Single-student enroll: confirm before silently overwriting an existing template.
+function confirmSingleEnroll(form) {
+  const sel = form.querySelector('#enrollSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.hasTemplate === '1') {
+    return confirm(`${opt.dataset.name} already has a fingerprint enrolled.\n\nRe-enroll and overwrite it?`);
+  }
+  return true;
+}
+
+// Section bulk enroll: confirm before silently overwriting any already-enrolled
+// students in the chosen section (uses the preview loaded by loadSectionStudents()).
+function confirmSectionEnroll() {
+  if (sectionAlreadyEnrolled.length === 0) return true;
+  const names = sectionAlreadyEnrolled.length <= 6
+    ? sectionAlreadyEnrolled.join('\n')
+    : sectionAlreadyEnrolled.slice(0, 6).join('\n') + `\n…and ${sectionAlreadyEnrolled.length - 6} more`;
+  return confirm(
+    `${sectionAlreadyEnrolled.length} student(s) in this section already have a fingerprint enrolled:\n\n${names}\n\nRe-enroll and overwrite them too?`
+  );
 }
 
 // Spinner keyframe
