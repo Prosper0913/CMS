@@ -123,6 +123,13 @@ $session_started_at = $session['started_at'];
 $late_after_minutes = (int)$session['late_after_minutes'];
 
 // ── Load candidate .xyt templates for this subject ─────────────
+// Students already marked present/late today are excluded from the
+// matching pool. They'd only ever come back as a 'dup' in bio_record.php
+// anyway, so comparing a new scan against their templates is pure wasted
+// work -- and it's real work: every candidate template means another
+// full bozorth3 run. Shrinking the pool as a session's attendance fills
+// in means later scanners wait on far fewer comparisons than the first
+// few, instead of the whole class staying equally slow all period.
 $tq = $conn->prepare(
     "SELECT ft.student_id,
             ft.template_b64 AS xyt_data,
@@ -132,9 +139,14 @@ $tq = $conn->prepare(
      JOIN subject_enrollments se
        ON se.student_id COLLATE utf8mb4_unicode_ci = ft.student_id COLLATE utf8mb4_unicode_ci
       AND se.subject_id = ?
+     LEFT JOIN attendance a
+       ON a.subject_id = se.subject_id
+      AND a.student_id = ft.student_id
+      AND a.date = ?
+     WHERE a.id IS NULL
      ORDER BY s.last_name ASC"
 );
-$tq->bind_param('i', $subject_id);
+$tq->bind_param('is', $subject_id, $scan_date);
 $tq->execute();
 $candidates = $tq->get_result()->fetch_all(MYSQLI_ASSOC);
 

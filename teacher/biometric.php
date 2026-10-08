@@ -602,7 +602,7 @@ $type_cfg  = [
           </div>
           <div class="device-meta">
             <span class="device-pill">
-              <span class="last-seen-dot" style="background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;"></span>
+              <span class="last-seen-dot" style="background:<?php echo $is_online ? 'var(--green)' : 'var(--text7)'; ?>;"></span>
               <?php echo $is_online ? 'Online' : $last_seen_str; ?>
             </span>
             <?php if ($dev['subject_code'] ?? ''): ?>
@@ -792,10 +792,10 @@ $type_cfg  = [
           $sess = $active_sessions[$dev['id']] ?? null;
           $is_online = $dev['last_seen'] && (time() - strtotime($dev['last_seen']) < 120);
         ?>
-        <div style="background:var(--bg);border:1px solid <?php echo $sess ? 'rgba(52,211,153,.25)' : 'var(--border2)'; ?>;border-radius:var(--radius);padding:14px;margin-bottom:12px;">
+        <div style="background:var(--bg5);border:1px solid <?php echo $sess ? 'rgba(52,211,153,.25)' : 'var(--border2)'; ?>;border-radius:var(--radius);padding:14px;margin-bottom:12px;">
           <!-- Device header -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text7)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
             <div style="font-weight:600;font-size:13px;flex:1;"><?php echo htmlspecialchars($dev['label']); ?></div>
             <?php if ($sess): ?>
             <span class="badge badge-green">ACTIVE</span>
