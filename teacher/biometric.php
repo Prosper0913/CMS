@@ -794,7 +794,7 @@ $type_cfg  = [
           <!-- Device header -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
-            <div style="font-weight:600;font-size:13px;flex:1;"><?php echo htmlspecialchars($dev['label']); ?></div>
+            <div style="font-weight:600;font-size:13px;flex:1;color:var(--text);"><?php echo htmlspecialchars($dev['label']); ?></div>
             <?php if ($sess): ?>
             <span class="badge badge-green">ACTIVE</span>
             <?php else: ?>
@@ -806,19 +806,19 @@ $type_cfg  = [
           <!-- Active session info -->
           <div style="background:var(--bg4);border-radius:6px;padding:10px;margin-bottom:10px;font-size:12px;">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text2);">Subject</span>
+              <span style="color:var(--text);">Subject</span>
               <span style="font-weight:600;"><?php echo htmlspecialchars($sess['subject_code'].' — '.$sess['section']); ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text2);">Late after</span>
+              <span style="color:var(--text);">Late after</span>
               <span style="font-family:var(--font-mono);"><?php echo (int)$sess['late_after_minutes']; ?> min</span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text2);">Started</span>
+              <span style="color:var(--text);">Started</span>
               <span style="font-family:var(--font-mono);"><?php echo date('H:i', strtotime($sess['started_at'])); ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;">
-              <span style="color:var(--text2);">Expires</span>
+              <span style="color:var(--text);">Expires</span>
               <span style="font-family:var(--font-mono);"><?php echo $sess['auto_expire_at'] ? date('H:i', strtotime($sess['auto_expire_at'])) : 'Manual'; ?></span>
             </div>
           </div>
@@ -835,7 +835,7 @@ $type_cfg  = [
           <form method="POST">
             <input type="hidden" name="dev_id" value="<?php echo $dev['id']; ?>">
             <div class="form-group" style="margin-bottom:8px;">
-              <label>Subject</label>
+              <label style="color: var(--text);">Subject</label>
               <select name="session_subject" class="form-control" required>
                 <option value="">— Choose —</option>
                 <?php foreach ($my_subjects as $s): ?>
@@ -848,11 +848,11 @@ $type_cfg  = [
             </div>
             <div class="form-row" style="margin-bottom:8px;">
               <div class="form-group" style="margin-bottom:0;">
-                <label>Late After</label>
+                <label style="color: var(--text);">Late After</label>
                 <input type="number" name="late_after_minutes" class="form-control" value="15" min="1" step="1" required>
               </div>
               <div class="form-group" style="margin-bottom:0;">
-                <label>Duration (min)</label>
+                <label style="color: var(--text);">Duration (min)</label>
                 <input type="number" name="duration_min" class="form-control" value="90" min="10" max="480" required>
               </div>
             </div>
@@ -953,7 +953,7 @@ $type_cfg  = [
         <span style="font-size:10px;font-weight:400;color:var(--green);">Auto-refresh 15s</span>
       </span>
       <a href="biometric.php" class="btn btn-sm btn-outline card-title-right" style="font-size:11px;">
-        <i class="ti ti-refresh"></i> Refresh Now
+        <i class="ti ti-refresh" style="color: var(--text);"></i> Refresh Now
       </a>
     </p>
 
