@@ -56,7 +56,7 @@
 const char* WIFI_SSID     = "ASUS-TUF-GAMING";
 const char* WIFI_PASSWORD = "passwOrd";
 
-const char* SERVER_BASE   = "http://192.168.137.1";
+const char* SERVER_BASE   = "http://68.183.228.242";
 
 // This device's unique key — must match the device_key column in bio_devices
 const char* DEVICE_KEY    = "pre-defense-demo";

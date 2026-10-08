@@ -83,6 +83,20 @@ if (isset($_POST['cancel_enroll'])) {
 
     if (!$row) {
         $error_msg = "That enrollment is no longer pending — it may have just finished.";
+        // Even though the queue row is already gone, still clear any stale
+        // bulk-enroll chain on this device. Without this, a leftover
+        // bulk_enroll_students list from an earlier/abandoned section
+        // enrollment can silently re-queue the "next" student the moment
+        // the device reports its current enrollment done — which looks
+        // like the device refusing to stop enrolling.
+        $dev_id_raw = (int)($_POST['dev_id'] ?? 0);
+        if ($dev_id_raw > 0) {
+            $clr = $conn->prepare(
+                "UPDATE bio_devices SET bulk_enroll_students=NULL, bulk_enroll_index=0 WHERE id=?"
+            );
+            $clr->bind_param('i', $dev_id_raw);
+            $clr->execute();
+        }
     } else {
         $del = $conn->prepare("DELETE FROM bio_enroll_queue WHERE id=?");
         $del->bind_param('i', $queue_id);
@@ -123,6 +137,18 @@ if (isset($_POST['queue_enroll'])) {
         );
         $clr->bind_param('i', $dev_id);
         $clr->execute();
+
+        // This is a single, one-off enrollment — not a section bulk-enroll —
+        // so make sure no stale bulk_enroll_students chain from an earlier
+        // (possibly abandoned) section enrollment survives on this device.
+        // Without this, bio_enroll_done.php sees that leftover list once
+        // this enrollment finishes and silently re-queues whoever's next
+        // in it, which looks like the device refusing to stop enrolling.
+        $clrBulk = $conn->prepare(
+            "UPDATE bio_devices SET bulk_enroll_students=NULL, bulk_enroll_index=0 WHERE id=?"
+        );
+        $clrBulk->bind_param('i', $dev_id);
+        $clrBulk->execute();
 
         // Upsert: if a 'pending' or 'enrolling' row already exists for
         // this device, overwrite it with the new student (teacher changed mind).
@@ -714,6 +740,7 @@ $type_cfg  = [
           <form method="POST" style="margin:0;"
                 onsubmit="return confirm('Cancel enrollment for <?php echo htmlspecialchars(addslashes($qr['last_name'].', '.$qr['first_name']), ENT_QUOTES); ?>?');">
             <input type="hidden" name="queue_id" value="<?php echo (int)$qr['id']; ?>">
+            <input type="hidden" name="dev_id" value="<?php echo (int)$qr['device_id']; ?>">
             <button type="submit" name="cancel_enroll" class="btn btn-sm btn-delete" title="Cancel this enrollment">
               <i class="ti ti-x"></i>
             </button>

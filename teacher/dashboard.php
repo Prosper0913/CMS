@@ -180,6 +180,12 @@ $comp_colors = [
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
     <link rel="stylesheet" href="/classroomv2/assets/style.css">
+    <style>
+      /* Collapsed-by-default "Getting Started" reminder card (see teacher/dashboard.php) */
+      .getting-started-mini > summary { outline: none; }
+      .getting-started-mini > summary::-webkit-details-marker { display: none; }
+      .getting-started-mini > summary::marker { content: ""; }
+    </style>
 
 </head>
 <body class="page-teacher-dashboard">
@@ -202,7 +208,8 @@ $comp_colors = [
 
 
 
-  <!-- ── GETTING STARTED (new/empty teacher account only) ── -->
+  <!-- ── GETTING STARTED ── -->
+  <!-- Brand-new account (no section AND no subject yet): full, can't-miss card. -->
   <?php if ((int)$onboard['section_count'] === 0 && (int)$onboard['subject_count_any'] === 0): ?>
   <div class="card" style="margin-bottom:20px;border-left:3px solid var(--bg);">
     <p class="card-title"><i class="ti ti-rocket"></i> Getting Started</p>
@@ -269,6 +276,46 @@ $comp_colors = [
       mark the subject inactive from its Settings tab and its roster stays ready for next time.
     </p>
   </div>
+  <?php else: ?>
+  <!-- Already has at least a section or a subject: never fully remove the guide —
+       just tuck it out of the way as a small, collapsed-by-default card so it
+       doesn't compete with real data, but is one click away if they forget a step. -->
+  <details class="card getting-started-mini" style="margin-bottom:20px;border-left:3px solid var(--bg);">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;">
+      <i class="ti ti-rocket"></i>
+      <span class="card-title" style="margin:0;">Getting Started Guide</span>
+      <span style="font-size:11.5px;font-weight:400;color:var(--text7);">— click to review the setup steps again</span>
+      <i class="ti ti-chevron-down" style="margin-left:auto;"></i>
+    </summary>
+
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:10px;">
+        <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">1</div>
+        <div style="font-size:12.5px;color:var(--text7);"><strong style="color:var(--text6);">Create a Section</strong> — the home for a group of students (<strong>Sections</strong> → <em>New Section</em>).</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">2</div>
+        <div style="font-size:12.5px;color:var(--text7);"><strong style="color:var(--text6);">Add students</strong> to that section, one at a time or via <em>Import from CSV/Excel</em>.</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">3</div>
+        <div style="font-size:12.5px;color:var(--text7);"><strong style="color:var(--text6);">Create a Subject</strong> — the actual class you teach, with its own grade weights and schedule.</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">4</div>
+        <div style="font-size:12.5px;color:var(--text7);"><strong style="color:var(--text6);">Enroll the section into the subject</strong> — subject → <strong>Settings</strong> → <em>Enroll Entire Section</em> — then you can record scores and attendance.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border2);display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="/classroomv2/teacher/manage_sections.php" class="btn btn-outline" style="display:inline-flex;">
+        <i class="ti ti-building-community"></i> Sections
+      </a>
+      <a href="/classroomv2/teacher/add_subject.php" class="btn btn-outline" style="display:inline-flex;">
+        <i class="ti ti-book-plus"></i> Subjects
+      </a>
+    </div>
+  </details>
   <?php endif; ?>
 
   <!-- ── SUBJECT CARDS ── -->

@@ -49,8 +49,12 @@ function _oces_post($path, $payload) {
             'Content-Type: application/json',
             'X-Sync-Key: ' . OCES_SYNC_KEY,
         ],
-        CURLOPT_TIMEOUT        => 10,
-        CURLOPT_CONNECTTIMEOUT => 5,
+        // Kept short on purpose: this call happens inline during a normal
+        // page request (e.g. saving grades), so an OCES server that's
+        // down or unreachable must fail fast rather than stall the whole
+        // request toward PHP's execution-time limit.
+        CURLOPT_TIMEOUT        => 3,
+        CURLOPT_CONNECTTIMEOUT => 2,
     ]);
     $raw = curl_exec($ch);
     $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
