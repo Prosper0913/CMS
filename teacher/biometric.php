@@ -17,6 +17,13 @@ $teacher_id  = $_SESSION['user_id'];
 $success_msg = '';
 $error_msg   = '';
 
+// Pick up a flash message left by the POST/redirect/GET below, if any.
+if (!empty($_SESSION['biometric_flash'])) {
+    $success_msg = $_SESSION['biometric_flash']['success'] ?? '';
+    $error_msg   = $_SESSION['biometric_flash']['error']   ?? '';
+    unset($_SESSION['biometric_flash']);
+}
+
 // ══════════════════════════════════════════════════════════════
 //  POST HANDLERS
 // ══════════════════════════════════════════════════════════════
@@ -299,6 +306,25 @@ if (isset($_POST['clear_template'])) {
 }
 
 after_handlers:
+
+// ── Post/Redirect/Get ───────────────────────────────────────────
+// This page had no redirect after any POST — it just re-rendered itself
+// in place. That meant the browser's "current page" stayed a POST
+// response, and this page also auto-reloads itself every ~15s
+// (scheduleLogRefresh() below) to keep the scan log fresh. JS's
+// location.reload() replays the page's last navigation verbatim, so on
+// a page that was last loaded by submitting "Queue Enrollment", that
+// 15s auto-refresh was silently RESUBMITTING the same queue_enroll POST
+// — re-queuing the exact same student again on its own, which is why a
+// finished enrollment kept jumping back to "1/4 Center" with no one
+// touching anything. Redirecting to a plain GET after every POST here
+// fixes it at the root: there's never a POST left sitting as the
+// "current page" for an auto-reload to replay.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['biometric_flash'] = ['success' => $success_msg, 'error' => $error_msg];
+    header('Location: biometric.php');
+    exit;
+}
 
 // ══════════════════════════════════════════════════════════════
 //  DATA
