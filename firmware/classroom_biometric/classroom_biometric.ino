@@ -537,18 +537,39 @@ void checkEnrollQueue() {
 //  REPORT ENROLLMENT RESULT BACK TO SERVER
 // ============================================================
 void reportEnrollDone(bool success) {
-    if (enrollQueueId <= 0) return;
+    if (enrollQueueId <= 0) {
+        Serial.println("[ENROLL DONE] enrollQueueId<=0 -- skipping report, server never told to stop!");
+        return;
+    }
     String url    = String(SERVER_BASE) + "/classroomv2/api/bio_enroll_done.php";
     String result = success ? "done" : "failed";
     String body   = "key="      + urlencode(String(DEVICE_KEY))
                   + "&queue_id=" + String(enrollQueueId)
                   + "&result="   + result;
+
+    Serial.printf("[ENROLL DONE] Reporting queue_id=%d result=%s -> %s\n",
+                  enrollQueueId, result.c_str(), url.c_str());
+
     HTTPClient http;
     http.setTimeout(5000);
     http.begin(url);
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    http.POST(body);
+    int httpCode = http.POST(body);
+    String resp  = (httpCode > 0) ? http.getString() : "";
     http.end();
+
+    // This call used to be fire-and-forget: if it failed, the queue row on
+    // the server never flipped to done/failed, so the device's NEXT poll
+    // would see the same still-active row and jump right back into
+    // enrollment for the same student -- looking exactly like the device
+    // "refusing to stop enrolling" even though the fingerprint itself was
+    // captured and uploaded successfully. Logging it here makes a silent
+    // failure here visible instead of invisible.
+    Serial.printf("[ENROLL DONE] HTTP %d  Response: %s\n", httpCode, resp.c_str());
+    if (httpCode != 200) {
+        Serial.println("[ENROLL DONE] *** Server did not confirm -- queue row likely still active, expect a re-loop. ***");
+    }
+
     enrollQueueId = 0;
 }
 
@@ -563,6 +584,12 @@ void enrollmentMode() {
                        : enrollStudentName;
 
     const char* slotPrompts[NUM_ENROLL_CAPTURES] = { "Center", "Left side", "Right side", "Finger tip" };
+
+    // Server-side weak-capture retries (status:"retry", e.g. too few
+    // minutiae points) re-prompt the SAME slot rather than aborting.
+    // Capped so a genuinely bad sensor/finger doesn't trap the device.
+    const uint8_t MAX_SLOT_RETRIES = 3;
+    uint8_t slotRetryCount = 0;
 
     for (int slot = 1; slot <= NUM_ENROLL_CAPTURES; slot++) {
         lcd.clear();
@@ -640,7 +667,33 @@ void enrollmentMode() {
         String response = "";
         postBodyRaw(serverHost, 80, "/classroomv2/api/bio_enroll.php", body, httpCode, response);
 
-        if (!(httpCode == 200 && response.indexOf("\"status\":\"ok\"") >= 0)) {
+        bool isOk    = (httpCode == 200 && response.indexOf("\"status\":\"ok\"") >= 0);
+        bool isRetry = (!isOk && httpCode == 200 && response.indexOf("\"status\":\"retry\"") >= 0);
+
+        if (isRetry) {
+            slotRetryCount++;
+            Serial.printf("[ENROLL] Weak capture on slot %d (attempt %d/%d): %s\n",
+                          slot, slotRetryCount, MAX_SLOT_RETRIES, response.c_str());
+
+            if (slotRetryCount >= MAX_SLOT_RETRIES) {
+                showResult("Too many weak", "captures - abort", false);
+                beep(3, false);
+                reportEnrollDone(false);
+                delay(LCD_HOLD_MS);
+                enrollMode = false;
+                showIdle();
+                return;
+            }
+
+            showResult("Press firmer", "Try again...", false);
+            beep(2, false);
+            delay(900);
+            while (finger.getImage() != FINGERPRINT_NOFINGER) delay(50);
+            slot--;          // re-run this same slot
+            continue;        // for-loop's slot++ brings it right back
+        }
+
+        if (!isOk) {
             String msg = jsonExtract(response, "message");
             if (msg.length() > 16) msg = msg.substring(0,16);
             showResult("Enroll Failed", msg, false);
@@ -654,6 +707,7 @@ void enrollmentMode() {
         }
 
         Serial.printf("[ENROLL] Slot %d/%d OK for %s\n", slot, NUM_ENROLL_CAPTURES, enrollStudentId.c_str());
+        slotRetryCount = 0;   // reset for the next slot
 
         if (slot < NUM_ENROLL_CAPTURES) {
             lcd.setCursor(0,1); lcd.print("Remove finger   ");

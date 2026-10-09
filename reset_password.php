@@ -92,7 +92,6 @@ if ($req && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'reason' => $valid_format ? 'invalid_or_expired' : 'malformed_token',
     ]);
 }
-
 // ── Page ─────────────────────────────────────────────────────
 if (!$req):
     auth_page_start('Reset password', 'Account recovery', 'Link not valid');

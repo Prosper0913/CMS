@@ -151,6 +151,23 @@ if ($xytData === false || trim($xytData) === '') {
     fail('No minutiae detected in capture — try enrolling again with a cleaner scan', 500);
 }
 
+// ── Reject weak captures outright rather than storing a template that
+//    bozorth3 will never be able to match against later. Each line in
+//    the .xyt file is one minutia point; a faint/partial press yields
+//    very few of them. This is a distinct "retry" response (not "error")
+//    so the firmware knows to re-prompt the SAME slot instead of aborting
+//    the whole enrollment. ──────────────────────────────────────────
+define('MIN_MINUTIAE_POINTS', 12);
+$minutiaeCount = count(array_filter(explode("\n", trim($xytData)), fn($l) => trim($l) !== ''));
+if ($minutiaeCount < MIN_MINUTIAE_POINTS) {
+    http_response_code(200);
+    echo json_encode([
+        'status'  => 'retry',
+        'message' => 'Capture too faint — press firmly and try again',
+    ]);
+    exit;
+}
+
 // ── Upsert template for this (student, slot) — one row per finger
 //    position captured (see NUM_ENROLL_CAPTURES in the firmware) ──
 $ins = $conn->prepare(
