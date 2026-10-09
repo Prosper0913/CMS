@@ -248,7 +248,7 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
       background:none;border:none;padding:0;cursor:pointer;font-family:'DM Sans',sans-serif;text-align:left;}
     .footer-col a:hover,.footer-col button.linklike:hover{color:#fff;text-decoration:underline;}
     .footer-bottom{max-width:980px;margin:36px auto 0;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);
-      font-size:12.5px;color:rgba(255,255,255,.5);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+      font-size:12.5px;color:rgba(255,255,255,.5);display:flex;justify-content:center;flex-wrap:wrap;gap:10px;}
 
     /* ---------- REPORT-AN-ISSUE MODAL ---------- */
     .modal-overlay{position:fixed;inset:0;background:rgba(5,20,16,.55);display:none;align-items:center;
@@ -267,7 +267,7 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
     .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
     .btn-ghost{padding:10px 16px;border-radius:9px;border:1px solid var(--border-on-light);background:none;
       color:var(--school-text7);font-size:13.5px;cursor:pointer;}
-    .btn-primary{padding:10px 18px;border-radius:9px;border:none;background:var(--school-bg);color:#fff;
+    .btn-primary{padding:10px 18px;border-radius:9px;border:none;background:var(--school-bg);color:#FFFFFF;
       font-size:13.5px;font-weight:600;cursor:pointer;}
     .btn-primary:disabled{opacity:.6;cursor:default;}
     .modal-msg{font-size:13px;padding:10px 12px;border-radius:9px;margin-bottom:14px;display:none;}
@@ -380,6 +380,10 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
       </div>
     </div>
   </section>
+<div class="btn-primary" style="display: flex; width: fit-content; margin-left: auto; margin-bottom: 25px; margin-right: 25px;">
+  <a href="#top" style="color:inherit;">Back to top ↑</a>
+</div>
+
 
   <!-- ============== FOOTER ============== -->
   <footer class="site-footer">
@@ -400,19 +404,17 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
         </ul>
       </div>
       <div class="footer-col">
-        <h4>Support</h4>
+        <h4>System Support</h4>
         <ul>
           <li><a href="forgot_password.php">Forgot password</a></li>
           <li><button type="button" class="linklike" id="openReportModal">Report an issue</button></li>
-          <li><a href="mailto:<?php echo htmlspecialchars($SCHOOL_EMAIL); ?>"><?php echo htmlspecialchars($SCHOOL_EMAIL); ?></a></li>
-          <li><a href="tel:<?php echo htmlspecialchars($SCHOOL_PHONE); ?>"><?php echo htmlspecialchars($SCHOOL_PHONE); ?></a></li>
+          <li><a href="mailto:<?php echo htmlspecialchars($DEV_EMAIL); ?>"><?php echo htmlspecialchars($DEV_EMAIL); ?></a></li>
+          <li><a href="tel:<?php echo htmlspecialchars($DEV_PHONE); ?>"><?php echo htmlspecialchars($DEV_PHONE); ?></a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
       <span><?php echo htmlspecialchars($SCHOOL_NAME); ?> Classroom Management System &middot; <?php echo date('Y'); ?></span>
-      <span>System support: <a href="mailto:<?php echo htmlspecialchars($DEV_EMAIL); ?>" style="color:inherit;"><?php echo htmlspecialchars($DEV_EMAIL); ?></a> &middot; <?php echo htmlspecialchars($DEV_PHONE); ?></span>
-      <a href="#top" style="color:inherit;">Back to top ↑</a>
     </div>
   </footer>
 
