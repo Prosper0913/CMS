@@ -565,7 +565,7 @@ $total_in_sections = $tis->get_result()->fetch_assoc()['c'];
           </span>
         </p>
         <?php if (empty($section_students_list)): ?>
-          <p style="font-size:13px;color:var(--text3);">Add students to this section first before enrolling them into a subject.</p>
+          <p style="font-size:13px;color:var(--text7);">Add students to this section first before enrolling them into a subject.</p>
         <?php else: ?>
         <form method="POST">
           <input type="hidden" name="sec_id" value="<?php echo $active_sec_id; ?>">

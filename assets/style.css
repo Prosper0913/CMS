@@ -2610,7 +2610,7 @@ transform: scale(1.05);
   background: var(--bg5);
   border-radius:5px;
   padding:24px 32px;
-  margin-bottom:5px;
+  margin-bottom:25px;
   display:flex;
   align-items:center;
   justify-content:space-between;

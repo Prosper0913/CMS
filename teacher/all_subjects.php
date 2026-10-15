@@ -265,7 +265,7 @@ function qs($overrides = []) {
       <i class="ti ti-refresh"></i> Reset Filters
     </a>
         <a href="add_subject.php" class="btn btn-primary" style="display:inline-flex;margin-top:15px; max-width: 50%">
-      <i class="ti ti-refresh"></i> Add a Subject
+      <i class="ti ti-plus"></i> Add a Subject
     </a>
   </div>
   <?php else: ?>
