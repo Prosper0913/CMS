@@ -17,18 +17,15 @@ $teacher_id  = $_SESSION['user_id'];
 $success_msg = '';
 $error_msg   = '';
 
-// Pick up a flash message left by the POST/redirect/GET below, if any.
-if (!empty($_SESSION['biometric_flash'])) {
-    $success_msg = $_SESSION['biometric_flash']['success'] ?? '';
-    $error_msg   = $_SESSION['biometric_flash']['error']   ?? '';
-    unset($_SESSION['biometric_flash']);
-}
-
 // ══════════════════════════════════════════════════════════════
 //  POST HANDLERS
 // ══════════════════════════════════════════════════════════════
 
 // ── Register a new device ─────────────────────────────────────
+// bio_devices is fingerprint-ESP32-only. The RFID path below is a
+// plug-and-play USB HID card reader — it isn't a network device and
+// has nothing to register here (see the "Enroll via RFID Card"
+// panel instead).
 if (isset($_POST['register_device'])) {
     $dk    = trim($_POST['device_key']);
     $label = trim($_POST['device_label']);
@@ -90,20 +87,6 @@ if (isset($_POST['cancel_enroll'])) {
 
     if (!$row) {
         $error_msg = "That enrollment is no longer pending — it may have just finished.";
-        // Even though the queue row is already gone, still clear any stale
-        // bulk-enroll chain on this device. Without this, a leftover
-        // bulk_enroll_students list from an earlier/abandoned section
-        // enrollment can silently re-queue the "next" student the moment
-        // the device reports its current enrollment done — which looks
-        // like the device refusing to stop enrolling.
-        $dev_id_raw = (int)($_POST['dev_id'] ?? 0);
-        if ($dev_id_raw > 0) {
-            $clr = $conn->prepare(
-                "UPDATE bio_devices SET bulk_enroll_students=NULL, bulk_enroll_index=0 WHERE id=?"
-            );
-            $clr->bind_param('i', $dev_id_raw);
-            $clr->execute();
-        }
     } else {
         $del = $conn->prepare("DELETE FROM bio_enroll_queue WHERE id=?");
         $del->bind_param('i', $queue_id);
@@ -144,18 +127,6 @@ if (isset($_POST['queue_enroll'])) {
         );
         $clr->bind_param('i', $dev_id);
         $clr->execute();
-
-        // This is a single, one-off enrollment — not a section bulk-enroll —
-        // so make sure no stale bulk_enroll_students chain from an earlier
-        // (possibly abandoned) section enrollment survives on this device.
-        // Without this, bio_enroll_done.php sees that leftover list once
-        // this enrollment finishes and silently re-queues whoever's next
-        // in it, which looks like the device refusing to stop enrolling.
-        $clrBulk = $conn->prepare(
-            "UPDATE bio_devices SET bulk_enroll_students=NULL, bulk_enroll_index=0 WHERE id=?"
-        );
-        $clrBulk->bind_param('i', $dev_id);
-        $clrBulk->execute();
 
         // Upsert: if a 'pending' or 'enrolling' row already exists for
         // this device, overwrite it with the new student (teacher changed mind).
@@ -241,10 +212,12 @@ if (isset($_GET['ajax_section_students'])) {
     $sec_id = (int)$_GET['ajax_section_students'];
     $sq = $conn->prepare(
         "SELECT ss.student_id, s.last_name, s.first_name,
-                (ft.id IS NOT NULL) AS has_template
+                (ft.id IS NOT NULL) AS has_template,
+                (rc.id IS NOT NULL) AS has_card
          FROM section_students ss
          JOIN students s ON s.student_id COLLATE utf8mb4_unicode_ci = ss.student_id COLLATE utf8mb4_unicode_ci
          LEFT JOIN fingerprint_templates ft ON ft.student_id COLLATE utf8mb4_unicode_ci = ss.student_id COLLATE utf8mb4_unicode_ci
+         LEFT JOIN rfid_cards rc ON rc.student_id COLLATE utf8mb4_unicode_ci = ss.student_id COLLATE utf8mb4_unicode_ci
          WHERE ss.section_id = ?
          ORDER BY s.last_name ASC"
     );
@@ -305,26 +278,16 @@ if (isset($_POST['clear_template'])) {
     $success_msg = "Fingerprint template cleared for <strong>" . htmlspecialchars($student_id) . "</strong>.";
 }
 
-after_handlers:
-
-// ── Post/Redirect/Get ───────────────────────────────────────────
-// This page had no redirect after any POST — it just re-rendered itself
-// in place. That meant the browser's "current page" stayed a POST
-// response, and this page also auto-reloads itself every ~15s
-// (scheduleLogRefresh() below) to keep the scan log fresh. JS's
-// location.reload() replays the page's last navigation verbatim, so on
-// a page that was last loaded by submitting "Queue Enrollment", that
-// 15s auto-refresh was silently RESUBMITTING the same queue_enroll POST
-// — re-queuing the exact same student again on its own, which is why a
-// finished enrollment kept jumping back to "1/4 Center" with no one
-// touching anything. Redirecting to a plain GET after every POST here
-// fixes it at the root: there's never a POST left sitting as the
-// "current page" for an auto-reload to replay.
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $_SESSION['biometric_flash'] = ['success' => $success_msg, 'error' => $error_msg];
-    header('Location: biometric.php');
-    exit;
+// ── Clear enrolled RFID card ───────────────────────────────────
+if (isset($_POST['clear_card'])) {
+    $student_id = trim($_POST['student_id']);
+    $del = $conn->prepare("DELETE FROM rfid_cards WHERE student_id=?");
+    $del->bind_param('s', $student_id);
+    $del->execute();
+    $success_msg = "RFID card cleared for <strong>" . htmlspecialchars($student_id) . "</strong>.";
 }
+
+after_handlers:
 
 // ══════════════════════════════════════════════════════════════
 //  DATA
@@ -372,11 +335,15 @@ if ($my_subj_ids) {
         "SELECT DISTINCT s.student_id, s.last_name, s.first_name,
                 ft.id AS has_template,
                 ft.updated_at AS enrolled_at,
+                rc.id AS has_card,
+                rc.card_uid AS card_uid,
+                rc.enrolled_at AS card_enrolled_at,
                 sub.subject_code, sub.section
          FROM subject_enrollments se
          JOIN students s ON s.student_id COLLATE utf8mb4_unicode_ci = se.student_id COLLATE utf8mb4_unicode_ci
          JOIN subjects sub ON sub.id = se.subject_id
          LEFT JOIN fingerprint_templates ft ON ft.student_id COLLATE utf8mb4_unicode_ci = s.student_id COLLATE utf8mb4_unicode_ci
+         LEFT JOIN rfid_cards rc ON rc.student_id COLLATE utf8mb4_unicode_ci = s.student_id COLLATE utf8mb4_unicode_ci
          WHERE se.subject_id IN ($ph)
          ORDER BY s.last_name ASC, s.first_name ASC"
     );
@@ -384,11 +351,13 @@ if ($my_subj_ids) {
     $sq->bind_param($types, ...$my_subj_ids);
     $sq->execute();
     $students = $sq->get_result()->fetch_all(MYSQLI_ASSOC);
-    // Deduplicate by student_id (keep row with template if available)
+    // Deduplicate by student_id (keep the row that has the most enrollment
+    // info — either biometric method counts, since a student can have a
+    // fingerprint, an RFID card, both, or neither)
     $seen = [];
     $deduped = [];
     foreach ($students as $st) {
-        if (!isset($seen[$st['student_id']]) || $st['has_template']) {
+        if (!isset($seen[$st['student_id']]) || $st['has_template'] || $st['has_card']) {
             $seen[$st['student_id']] = true;
             $deduped[$st['student_id']] = $st;
         }
@@ -398,6 +367,7 @@ if ($my_subj_ids) {
 
 $enrolled_count  = count($students);
 $template_count  = count(array_filter($students, fn($s) => $s['has_template']));
+$card_count      = count(array_filter($students, fn($s) => $s['has_card']));
 
 // Pending enrollment queue
 $queue_res = $conn->query(
@@ -493,8 +463,8 @@ $type_cfg  = [
   <!-- PAGE HEADER -->
   <div class="page-header with-actions">
     <div>
-      <h1><i class="ti ti-fingerprint text-accent"></i> Biometric Attendance</h1>
-      <p>Register devices, enroll student fingerprints, and monitor live attendance.</p>
+      <h1><i class="ti ti-fingerprint text-accent"></i> Biometric | RFID Enrollment</h1>
+      <p>Register devices, enroll student fingerprints & student IDs, and monitor live attendance.</p>
     </div>
     <button class="btn btn-primary" onclick="openModal('registerModal')">
       <i class="ti ti-plus"></i> Register Device
@@ -522,8 +492,12 @@ $type_cfg  = [
       <div class="stat-chip-val"><?php echo $template_count; ?></div>
       <div class="stat-chip-lbl">Enrolled Fingers</div>
     </div>
+    <div class="stat-chip g">
+      <div class="stat-chip-val"><?php echo $card_count; ?></div>
+      <div class="stat-chip-lbl">Enrolled Cards</div>
+    </div>
     <div class="stat-chip y">
-      <div class="stat-chip-val"><?php echo $enrolled_count - $template_count; ?></div>
+      <div class="stat-chip-val"><?php echo count(array_filter($students, fn($s) => !$s['has_template'] && !$s['has_card'])); ?></div>
       <div class="stat-chip-lbl">Pending Enrollment</div>
     </div>
     <div class="stat-chip p">
@@ -538,10 +512,11 @@ $type_cfg  = [
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
       <?php
       $steps = [
-        ['1','Register Device','Click "Register Device" above. Enter the DEVICE_KEY you flashed into the Arduino sketch and assign it to a subject.','ti-cpu'],
+        ['1','Register Fingerprint Device','Click "Register Device" above, enter the DEVICE_KEY you flashed into the ESP32 sketch, and assign it to a subject. (Skip this if you\'re only using the RFID reader.)','ti-cpu'],
         ['2','Verify Connection','The device must connect to your WiFi and call bio_config.php on boot. The LCD shows the subject code if config loaded OK.','ti-wifi'],
-        ['3','Enroll Students','Use the "Enroll Fingerprint" panel below. Select a device and student → click Queue. The student then places their finger on the device.','ti-fingerprint'],
-        ['4','Attendance is Automatic','Students place their finger when entering class. The device matches locally and calls bio_record.php. Grades update instantly.','ti-checks'],
+        ['3','Or Plug In the RFID Reader','No setup needed — it\'s a USB card reader. Just plug it into this computer; Windows sees it as a keyboard.','ti-id-badge-2'],
+        ['4','Enroll Students','Fingerprint: use the "Enroll" panel below, select a device and student, then place a finger. RFID: use the "Enroll via RFID Card" panel and tap a card.','ti-fingerprint'],
+        ['5','Attendance is Automatic','Students place their finger or tap their card when entering class. The server matches and records attendance instantly. Grades update right away.','ti-checks'],
       ];
       foreach ($steps as [$n,$title,$desc,$icon]): ?>
       <div style="display:flex;gap:12px;align-items:flex-start;">
@@ -581,7 +556,7 @@ $type_cfg  = [
         ?>
         <div class="device-card <?php echo $is_online ? 'online' : 'offline'; ?>">
           <div class="device-header">
-            <div class="device-icon"><i class="ti ti-cpu"></i></div>
+            <div class="device-icon"><i class="ti ti-fingerprint"></i></div>
             <div style="flex:1;">
               <div class="device-name"><?php echo htmlspecialchars($dev['label']); ?></div>
               <div class="device-key"><?php echo htmlspecialchars($dev['device_key']); ?></div>
@@ -602,8 +577,12 @@ $type_cfg  = [
           </div>
           <div class="device-meta">
             <span class="device-pill">
-              <span class="last-seen-dot" style="background:<?php echo $is_online ? 'var(--green)' : 'var(--text7)'; ?>;"></span>
+              <span class="last-seen-dot" style="background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;"></span>
               <?php echo $is_online ? 'Online' : $last_seen_str; ?>
+            </span>
+            <span class="device-pill">
+              <i class="ti ti-fingerprint" style="font-size:11px;"></i>
+              Fingerprint
             </span>
             <?php if ($dev['subject_code'] ?? ''): ?>
             <span class="device-pill">
@@ -628,7 +607,7 @@ $type_cfg  = [
 
         <?php if (empty($devices)): ?>
         <div class="alert alert-info" style="margin-bottom:0;">
-          <i class="ti ti-info-circle"></i> Register a device first before enrolling fingerprints.
+          <i class="ti ti-info-circle"></i> Register a device first before enrolling students.
         </div>
         <?php elseif (empty($students)): ?>
         <div class="alert alert-info" style="margin-bottom:0;">
@@ -648,7 +627,7 @@ $type_cfg  = [
 
         <!-- ── Single student enroll ── -->
         <div id="enrollSinglePanel">
-          <form method="POST" onsubmit="return confirmSingleEnroll(this)">
+          <form method="POST">
             <div class="form-group">
               <label>Device <span class="text-red">*</span></label>
               <select name="dev_id" class="form-control" required>
@@ -660,6 +639,7 @@ $type_cfg  = [
                 </option>
                 <?php endforeach; ?>
               </select>
+              <small class="text-muted">Queueing prompts the device to wait for a finger.</small>
             </div>
             <div class="form-group">
               <label>Student <span class="text-red">*</span></label>
@@ -669,15 +649,14 @@ $type_cfg  = [
                 style="height:auto;padding:4px;" required>
                 <?php foreach ($students as $st): ?>
                 <option value="<?php echo htmlspecialchars($st['student_id']); ?>"
-                  data-label="<?php echo strtolower($st['last_name'].' '.$st['first_name'].' '.$st['student_id']); ?>"
-                  data-has-template="<?php echo $st['has_template'] ? '1' : '0'; ?>"
-                  data-name="<?php echo htmlspecialchars($st['last_name'].', '.$st['first_name']); ?>">
+                  data-label="<?php echo strtolower($st['last_name'].' '.$st['first_name'].' '.$st['student_id']); ?>">
                   <?php echo htmlspecialchars($st['last_name'].', '.$st['first_name'].' ('.$st['student_id'].')'); ?>
-                  <?php echo $st['has_template'] ? ' ✓' : ''; ?>
+                  <?php echo $st['has_template'] ? ' ✓FP' : ''; ?>
+                  <?php echo $st['has_card'] ? ' ✓RFID' : ''; ?>
                 </option>
                 <?php endforeach; ?>
               </select>
-              <small class="text-muted">✓ = already has a template (will be overwritten)</small>
+              <small class="text-muted">✓FP / ✓RFID = already enrolled with that method (re-enrolling overwrites it)</small>
             </div>
             <button type="submit" name="queue_enroll" class="btn btn-primary btn-full">
               <i class="ti ti-fingerprint"></i> Queue Enrollment
@@ -706,7 +685,7 @@ $type_cfg  = [
             <i class="ti ti-info-circle"></i> No sections found. Assign students to sections in the Sections panel.
           </div>
           <?php else: ?>
-          <form method="POST" onsubmit="return confirmSectionEnroll()">
+          <form method="POST">
             <div class="form-group">
               <label>Device <span class="text-red">*</span></label>
               <select name="dev_id" class="form-control" required>
@@ -768,7 +747,6 @@ $type_cfg  = [
           <form method="POST" style="margin:0;"
                 onsubmit="return confirm('Cancel enrollment for <?php echo htmlspecialchars(addslashes($qr['last_name'].', '.$qr['first_name']), ENT_QUOTES); ?>?');">
             <input type="hidden" name="queue_id" value="<?php echo (int)$qr['id']; ?>">
-            <input type="hidden" name="dev_id" value="<?php echo (int)$qr['device_id']; ?>">
             <button type="submit" name="cancel_enroll" class="btn btn-sm btn-delete" title="Cancel this enrollment">
               <i class="ti ti-x"></i>
             </button>
@@ -779,6 +757,60 @@ $type_cfg  = [
 
         <?php endif; ?>
       </div>
+
+      <!-- ── ENROLL VIA RFID CARD ── -->
+      <!-- The USB reader is plug-and-play: no device to register, no
+           queue to poll. Pick a student, click Start Capture, tap
+           their card — the reader types the UID straight into the
+           focused input below and this panel saves it immediately. -->
+      <div class="card">
+        <p class="card-title"><i class="ti ti-id-badge-2 text-green"></i> Enroll via RFID Card</p>
+
+        <?php if (empty($students)): ?>
+        <div class="alert alert-info" style="margin-bottom:0;">
+          <i class="ti ti-info-circle"></i> No students enrolled in your subjects yet.
+        </div>
+        <?php else: ?>
+
+        <div class="form-group">
+          <label>Student <span class="text-red">*</span></label>
+          <input type="text" id="rfidEnrollSearch" class="form-control"
+            placeholder="Type to filter…" oninput="filterRfidEnrollList()" style="margin-bottom:6px;">
+          <select id="rfidEnrollSelect" class="form-control" size="5" style="height:auto;padding:4px;">
+            <?php foreach ($students as $st): ?>
+            <option value="<?php echo htmlspecialchars($st['student_id']); ?>"
+              data-label="<?php echo strtolower($st['last_name'].' '.$st['first_name'].' '.$st['student_id']); ?>">
+              <?php echo htmlspecialchars($st['last_name'].', '.$st['first_name'].' ('.$st['student_id'].')'); ?>
+              <?php echo $st['has_template'] ? ' ✓FP' : ''; ?>
+              <?php echo $st['has_card'] ? ' ✓RFID' : ''; ?>
+            </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <button type="button" id="rfidStartCaptureBtn" class="btn btn-primary btn-full" onclick="startRfidCapture()">
+          <i class="ti ti-id-badge-2"></i> Start Capture
+        </button>
+
+        <div id="rfidCapturePanel" style="display:none;margin-top:10px;">
+          <div class="alert alert-info" style="padding:10px 12px;font-size:12px;margin-bottom:10px;">
+            <i class="ti ti-id-badge-2"></i>
+            Tap <strong id="rfidCaptureStudentName"></strong>'s card on the USB reader now.
+          </div>
+          <input type="text" id="rfidEnrollCaptureInput" class="form-control" autocomplete="off"
+            placeholder="Waiting for tap…" style="text-align:center;font-family:var(--font-mono);">
+          <div id="rfidEnrollResult" style="margin-top:8px;font-size:12px;min-height:18px;"></div>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="cancelRfidCapture()">
+            <i class="ti ti-x"></i> Cancel
+          </button>
+        </div>
+        <?php endif; ?>
+      </div>
+
+    </div><!-- end left column -->
+
+    <!-- RIGHT COLUMN -->
+    <div>
 
       <!-- ── SESSION CONTROL ── -->
       <div class="card">
@@ -792,10 +824,11 @@ $type_cfg  = [
           $sess = $active_sessions[$dev['id']] ?? null;
           $is_online = $dev['last_seen'] && (time() - strtotime($dev['last_seen']) < 120);
         ?>
-        <div style="background:var(--bg5);border:1px solid <?php echo $sess ? 'rgba(52,211,153,.25)' : 'var(--border2)'; ?>;border-radius:var(--radius);padding:14px;margin-bottom:12px;">
+        <div style="background:var(--bg);border:1px solid <?php echo $sess ? 'rgba(52,211,153,.25)' : 'var(--border2)'; ?>;border-radius:var(--radius);padding:14px;margin-bottom:12px;">
           <!-- Device header -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text7)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
+            <i class="ti ti-fingerprint" style="font-size:13px;color:var(--text3);"></i>
             <div style="font-weight:600;font-size:13px;flex:1;"><?php echo htmlspecialchars($dev['label']); ?></div>
             <?php if ($sess): ?>
             <span class="badge badge-green">ACTIVE</span>
@@ -868,24 +901,20 @@ $type_cfg  = [
         <?php endif; ?>
       </div>
 
-    </div><!-- end left column -->
 
-    <!-- RIGHT COLUMN -->
-    <div>
-
-      <!-- ── FINGERPRINT ROSTER ── -->
+      <!-- ── STUDENT ENROLLMENT ROSTER ── -->
       <div class="card">
         <p class="card-title">
-          <i class="ti ti-users"></i> Student Fingerprint Roster
+          <i class="ti ti-users"></i> Student Enrollment Roster
           <span class="card-title-right" style="font-size:11px;font-weight:400;color:var(--text3);">
-            <?php echo $template_count; ?> / <?php echo $enrolled_count; ?> enrolled
+            <?php echo $template_count; ?> FP + <?php echo $card_count; ?> RFID / <?php echo $enrolled_count; ?> students
           </span>
         </p>
 
         <?php if (empty($students)): ?>
         <div class="empty-state">
           <i class="ti ti-users-off"></i>
-          <p style="color: var(--text7);">No students in your subjects yet.</p>
+          <p>No students in your subjects yet.</p>
         </div>
         <?php else: ?>
         <div class="search-wrap">
@@ -900,7 +929,7 @@ $type_cfg  = [
                 <th>Student</th>
                 <th>Subject</th>
                 <th>Fingerprint</th>
-                <th>Enrolled</th>
+                <th>RFID Card</th>
                 <th></th>
               </tr>
             </thead>
@@ -917,20 +946,39 @@ $type_cfg  = [
                 <td>
                   <?php if ($st['has_template']): ?>
                   <span class="badge badge-green"><i class="ti ti-check"></i> Enrolled</span>
+                  <div style="font-size:10px;color:var(--text7);margin-top:2px;">
+                    <?php echo $st['enrolled_at'] ? date('M d, Y', strtotime($st['enrolled_at'])) : ''; ?>
+                  </div>
                   <?php else: ?>
                   <span class="badge badge-gray">Not enrolled</span>
                   <?php endif; ?>
                 </td>
-                <td style="font-size:11px;color:var(--text7);">
-                  <?php echo $st['enrolled_at'] ? date('M d, Y', strtotime($st['enrolled_at'])) : '—'; ?>
+                <td>
+                  <?php if ($st['has_card']): ?>
+                  <span class="badge badge-green"><i class="ti ti-check"></i> Enrolled</span>
+                  <div style="font-size:10px;color:var(--text7);margin-top:2px;">
+                    <?php echo htmlspecialchars($st['card_uid'] ?? ''); ?>
+                  </div>
+                  <?php else: ?>
+                  <span class="badge badge-gray">Not enrolled</span>
+                  <?php endif; ?>
                 </td>
-                <td style="text-align:right;">
+                <td style="text-align:right;white-space:nowrap;">
                   <?php if ($st['has_template']): ?>
                   <form method="POST" style="display:inline;"
                     onsubmit="return confirm('Delete fingerprint for <?php echo addslashes($st['first_name']); ?>? They must re-enroll.')">
                     <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($st['student_id']); ?>">
-                    <button type="submit" name="clear_template" class="btn btn-xs btn-danger">
-                      <i class="ti ti-trash"></i> Clear
+                    <button type="submit" name="clear_template" class="btn btn-xs btn-danger" title="Clear fingerprint">
+                      <i class="ti ti-fingerprint"></i>
+                    </button>
+                  </form>
+                  <?php endif; ?>
+                  <?php if ($st['has_card']): ?>
+                  <form method="POST" style="display:inline;"
+                    onsubmit="return confirm('Delete RFID card for <?php echo addslashes($st['first_name']); ?>? They must re-enroll a card.')">
+                    <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($st['student_id']); ?>">
+                    <button type="submit" name="clear_card" class="btn btn-xs btn-danger" title="Clear RFID card">
+                      <i class="ti ti-id-badge-2"></i>
                     </button>
                   </form>
                   <?php endif; ?>
@@ -1010,8 +1058,11 @@ $type_cfg  = [
 <!-- Register Device -->
 <div class="modal-overlay" id="registerModal">
   <div class="modal">
-    <h3><i class="ti ti-cpu text-accent"></i> Register Device</h3>
-    <p class="modal-sub">Enter the DEVICE_KEY you flashed into the Arduino sketch.</p>
+    <h3><i class="ti ti-cpu text-accent"></i> Register Fingerprint Device</h3>
+    <p class="modal-sub">
+      Enter the DEVICE_KEY you flashed into the ESP32 sketch.<br>
+      <span style="color:var(--text6);">(This is only for the fingerprint sensor — the USB RFID reader needs no registration; see "Enroll via RFID Card" below.)</span>
+    </p>
     <form method="POST">
       <div class="form-group">
         <label>Device Key <span class="text-red">*</span></label>
@@ -1114,6 +1165,73 @@ function filterEnrollList(){
   });
 }
 
+// ── RFID enrollment (synchronous — no device, no queue) ─────────
+// The USB reader is a keyboard-emulation HID device: tapping a card
+// types its UID into whatever input has focus, then presses Enter.
+function filterRfidEnrollList(){
+  const q=document.getElementById('rfidEnrollSearch').value.toLowerCase();
+  document.querySelectorAll('#rfidEnrollSelect option').forEach(o=>{
+    o.style.display=o.dataset.label.includes(q)?'':'none';
+  });
+}
+
+let _rfidEnterHandler = null;
+
+function startRfidCapture(){
+  const sel = document.getElementById('rfidEnrollSelect');
+  if (!sel.value) { alert('Choose a student first.'); return; }
+  const label = sel.options[sel.selectedIndex].textContent.trim();
+
+  document.getElementById('rfidCaptureStudentName').textContent = label;
+  document.getElementById('rfidCapturePanel').style.display = '';
+  document.getElementById('rfidStartCaptureBtn').style.display = 'none';
+  const input = document.getElementById('rfidEnrollCaptureInput');
+  const result = document.getElementById('rfidEnrollResult');
+  result.textContent = '';
+  input.value = '';
+  input.focus();
+
+  _rfidEnterHandler = function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const uid = input.value.trim();
+    input.value = '';
+    if (!uid) return;
+
+    result.textContent = 'Saving…';
+    result.style.color = 'var(--text6)';
+
+    fetch('/classroomv2/api/rfid_enroll.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: sel.value, card_uid: uid })
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.status === 'ok') {
+          result.textContent = `✓ Card saved for ${d.student}`;
+          result.style.color = 'var(--green)';
+          setTimeout(() => location.reload(), 900);
+        } else {
+          result.textContent = d.message || 'Failed to save card';
+          result.style.color = '#f87171';
+        }
+      })
+      .catch(() => {
+        result.textContent = 'Network error — card not saved';
+        result.style.color = '#f87171';
+      });
+  };
+  input.addEventListener('keydown', _rfidEnterHandler);
+}
+
+function cancelRfidCapture(){
+  const input = document.getElementById('rfidEnrollCaptureInput');
+  if (_rfidEnterHandler) input.removeEventListener('keydown', _rfidEnterHandler);
+  document.getElementById('rfidCapturePanel').style.display = 'none';
+  document.getElementById('rfidStartCaptureBtn').style.display = '';
+}
+
 // Enroll tab switching
 function switchEnrollTab(tab) {
   const single  = document.getElementById('enrollSinglePanel');
@@ -1134,12 +1252,10 @@ function switchEnrollTab(tab) {
 }
 
 // Load section students preview via AJAX
-let sectionAlreadyEnrolled = [];   // names of students the bulk run would overwrite — used by confirmSectionEnroll()
 function loadSectionStudents(secId) {
   const preview = document.getElementById('sectionPreview');
   const list    = document.getElementById('sectionStudentList');
   const note    = document.getElementById('sectionEnrollNote');
-  sectionAlreadyEnrolled = [];
   if (!secId) { preview.style.display='none'; return; }
   list.innerHTML = '<span style="color:var(--text3);">Loading…</span>';
   preview.style.display = '';
@@ -1147,41 +1263,21 @@ function loadSectionStudents(secId) {
     .then(r => r.json())
     .then(data => {
       if (!data.length) { list.innerHTML='<span style="color:var(--text3);">No students found.</span>'; return; }
-      sectionAlreadyEnrolled = data.filter(s => s.has_template).map(s => `${s.last_name}, ${s.first_name}`);
-      const enrolled = sectionAlreadyEnrolled.length;
+      const enrolledFp   = data.filter(s => s.has_template).length;
+      const enrolledCard = data.filter(s => s.has_card).length;
       list.innerHTML = data.map(s =>
         `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);">
           <span style="flex:1;">${s.last_name}, ${s.first_name}</span>
-          ${s.has_template
-            ? '<span class="badge badge-green" style="font-size:9px;">✓ Enrolled</span>'
-            : '<span class="badge badge-gray" style="font-size:9px;">Not enrolled</span>'}
+          ${s.has_template ? '<span class="badge badge-green" style="font-size:9px;">✓ FP</span>' : ''}
+          ${s.has_card     ? '<span class="badge badge-green" style="font-size:9px;">✓ RFID</span>' : ''}
+          ${(!s.has_template && !s.has_card)
+            ? '<span class="badge badge-gray" style="font-size:9px;">Not enrolled</span>'
+            : ''}
         </div>`
       ).join('');
-      note.innerHTML = `<span style="color:var(--text3);">${enrolled} / ${data.length} already have templates — they will be <strong>re-enrolled</strong> (overwritten).</span>`;
+      note.innerHTML = `<span style="color:var(--text3);">${enrolledFp} already have a fingerprint and ${enrolledCard} already have an RFID card — enrolling again on the chosen device's method will <strong>overwrite</strong> that one.</span>`;
     })
     .catch(() => { list.innerHTML='<span class="text-red">Failed to load.</span>'; });
-}
-
-// Single-student enroll: confirm before silently overwriting an existing template.
-function confirmSingleEnroll(form) {
-  const sel = form.querySelector('#enrollSelect');
-  const opt = sel.options[sel.selectedIndex];
-  if (opt && opt.dataset.hasTemplate === '1') {
-    return confirm(`${opt.dataset.name} already has a fingerprint enrolled.\n\nRe-enroll and overwrite it?`);
-  }
-  return true;
-}
-
-// Section bulk enroll: confirm before silently overwriting any already-enrolled
-// students in the chosen section (uses the preview loaded by loadSectionStudents()).
-function confirmSectionEnroll() {
-  if (sectionAlreadyEnrolled.length === 0) return true;
-  const names = sectionAlreadyEnrolled.length <= 6
-    ? sectionAlreadyEnrolled.join('\n')
-    : sectionAlreadyEnrolled.slice(0, 6).join('\n') + `\n…and ${sectionAlreadyEnrolled.length - 6} more`;
-  return confirm(
-    `${sectionAlreadyEnrolled.length} student(s) in this section already have a fingerprint enrolled:\n\n${names}\n\nRe-enroll and overwrite them too?`
-  );
 }
 
 // Spinner keyframe

@@ -235,7 +235,7 @@ $comp_colors = [
           <div style="font-weight:600;font-size:13.5px;color:var(--text6);">Add students to that section</div>
           <div style="font-size:12.5px;color:var(--text7);margin-top:2px;">
             Go to <strong>Students</strong> → add them one at a time, or use
-            <em>Import from CSV/Excel</em> to bring in a whole class list at once.
+            <em>Import from CSV/Excel</em> to bring in a whole class list at once. It is advisable to download the CSV template to avoid errors.
           </div>
         </div>
       </div>
@@ -266,9 +266,6 @@ $comp_colors = [
       <a href="/classroomv2/teacher/manage_sections.php" class="btn btn-primary" style="display:inline-flex;">
         <i class="ti ti-building-community"></i> Start: Create a Section
       </a>
-      <a href="/classroomv2/teacher/add_subject.php" class="btn btn-outline" style="display:inline-flex;">
-        <i class="ti ti-book-plus"></i> Or Create a Subject First
-      </a>
     </div>
 
     <p style="font-size:11.5px;color:var(--text7);margin-top:14px;margin-bottom:0;">
@@ -295,7 +292,7 @@ $comp_colors = [
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">2</div>
-        <div style="font-size:12.5px;color:var(--text7);"><strong style="color:var(--text6);">Add students</strong> to that section, one at a time or via <em>Import from CSV/Excel</em>.</div>
+        <div style="font-size:12.5px;color:var(--text7);"><strong style="color:var(--text6);">Add students</strong> to that section, one at a time or via <em>Import from CSV/Excel</em>. It is advisable to download the CSV template to avoid errors.</div>
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">3</div>

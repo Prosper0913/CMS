@@ -25,27 +25,13 @@ $teacher_id = $_SESSION['user_id'];
 $subject_id = (int)($_GET['id'] ?? 0);
 if (!$subject_id) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
-// Note: intentionally NOT filtered to is_active=1 — an inactive (archived)
-// subject must still be reachable so its teacher can view/correct past
-// grades and attendance. See markEditedIfInactive() below.
 $sub_stmt = $conn->prepare(
-    "SELECT * FROM subjects WHERE id = ? AND teacher_id = ?"
+    "SELECT * FROM subjects WHERE id = ? AND teacher_id = ? AND is_active = 1"
 );
 $sub_stmt->bind_param("ii", $subject_id, $teacher_id);
 $sub_stmt->execute();
 $subject = $sub_stmt->get_result()->fetch_assoc();
 if (!$subject) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
-
-// ── Stamp a note whenever grades/attendance are touched while the
-//    subject is marked inactive (semester already ended) — surfaced
-//    in the UI as "edited after being marked inactive". ──────────
-function markEditedIfInactive($conn, $subject) {
-    if (empty($subject['is_active'])) {
-        $m = $conn->prepare("UPDATE subjects SET last_edited_while_inactive_at = NOW() WHERE id = ?");
-        $m->bind_param("i", $subject['id']);
-        $m->execute();
-    }
-}
 
 $active_tab = $_GET['tab'] ?? 'overview';
 $valid_tabs = ['overview','written','exams','performance','attendance','biometric','grades','announcements','settings'];
@@ -119,15 +105,16 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
     $aq = $conn->prepare(
         "SELECT s.student_id, s.last_name, s.first_name,
                 a.status AS att_status, a.time_in, a.source,
-                (ft.student_id IS NOT NULL) AS has_template
+                (ft.id IS NOT NULL) AS has_template,
+                (rc.id IS NOT NULL) AS has_card
          FROM subject_enrollments se
          JOIN students s USING(student_id)
          LEFT JOIN attendance a
                ON  a.subject_id = se.subject_id
                AND a.student_id = se.student_id
                AND a.date = ?
-         LEFT JOIN (SELECT DISTINCT student_id FROM fingerprint_templates) ft
-               ON ft.student_id = s.student_id
+         LEFT JOIN fingerprint_templates ft ON ft.student_id = s.student_id
+         LEFT JOIN rfid_cards rc ON rc.student_id = s.student_id
          WHERE se.subject_id = ?
          ORDER BY s.last_name ASC, s.first_name ASC"
     );
@@ -161,7 +148,6 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
 
 // ── ADD score entry (written / exam / performance) ───────────
 if (isset($_POST['add_score'])) {
-     markEditedIfInactive($conn, $subject);
      $component  = $_POST['component'];
      $entry_name = trim($_POST['entry_name']);
      $date_given = $_POST['date_given'];
@@ -265,7 +251,6 @@ if (isset($_GET['del_score'])) {
     $row = $del_stmt->get_result()->fetch_assoc();
 
     if ($row) {
-        markEditedIfInactive($conn, $subject);
         $d = $conn->prepare("DELETE FROM score_entries WHERE id = ? AND subject_id = ?");
         $d->bind_param("ii", $score_id, $subject_id);
         $d->execute();
@@ -283,7 +268,6 @@ if (isset($_GET['deleted'])) $success_msg = "Entry deleted and grades updated.";
 
 // ── BULK EDIT scores (whole quiz/activity, tab-through-students) ──
 if (isset($_POST['bulk_edit_scores'])) {
-    markEditedIfInactive($conn, $subject);
     $bulk_component  = $_POST['bulk_component']  ?? '';
     $bulk_entry_name = trim($_POST['bulk_entry_name'] ?? '');
     $bulk_scores     = $_POST['bulk_scores'] ?? []; // [score_id => new value]
@@ -332,7 +316,6 @@ if (isset($_POST['bulk_edit_scores'])) {
 
 // ── BULK DELETE a whole quiz/activity ────────────────────────
 if (isset($_POST['delete_quiz'])) {
-    markEditedIfInactive($conn, $subject);
     $del_component  = $_POST['del_component']  ?? '';
     $del_entry_name = trim($_POST['del_entry_name'] ?? '');
     $valid_components = ['Major Exam', 'Written Work', 'Performance Task'];
@@ -366,7 +349,6 @@ if (isset($_POST['delete_quiz'])) {
 
 // ── SAVE bulk attendance ─────────────────────────────────────
 if (isset($_POST['save_attendance'])) {
-    markEditedIfInactive($conn, $subject);
     $att_date = $_POST['att_date'];
     $statuses = $_POST['att_status'] ?? [];
     foreach ($statuses as $sid => $status) {
@@ -433,7 +415,6 @@ if (isset($_GET['ann_deleted'])) $success_msg = "Announcement deleted.";
 
 // ── BULK EDIT attendance for one day (tab-through-students) ──
 if (isset($_POST['bulk_edit_attendance'])) {
-    markEditedIfInactive($conn, $subject);
     $bea_date     = $_POST['bea_date'] ?? '';
     $bea_statuses = $_POST['bea_status']  ?? [];
     $bea_times    = $_POST['bea_time_in'] ?? [];
@@ -482,7 +463,6 @@ if (isset($_GET['att_deleted'])) $success_msg = "Attendance record deleted and g
 
 // ── BULK DELETE a whole day's attendance ─────────────────────
 if (isset($_POST['delete_attendance_day'])) {
-    markEditedIfInactive($conn, $subject);
     $dad_date = $_POST['dad_date'] ?? '';
     if ($dad_date === '') {
         $error_msg = "Invalid day to delete.";
@@ -509,6 +489,12 @@ if (isset($_POST['delete_attendance_day'])) {
 }
 
 // ── START biometric session ───────────────────────────────────
+// dev_id = 0 is a valid choice: "No device — RFID / manual only".
+// A session is fundamentally scoped to a subject, not a device — a
+// fingerprint ESP32 and the USB RFID reader (if one is tapped on
+// this page) can both feed attendance into the same open session,
+// and a subject with no fingerprint device at all can still run
+// attendance purely over RFID.
 if (isset($_POST['start_bio_session'])) {
     $dev_id = (int)$_POST['bio_device_id'];
     $hours  = (int)($_POST['bio_expire_hours'] ?? 2);
@@ -516,29 +502,32 @@ if (isset($_POST['start_bio_session'])) {
     $late_raw = trim($_POST['late_after_minutes'] ?? '');
     $late_minutes = (ctype_digit($late_raw) && (int)$late_raw > 0) ? (int)$late_raw : null;
 
-    if ($dev_id <= 0) {
-        $error_msg = "Please select a device.";
-    } elseif ($late_minutes === null) {
+    if ($late_minutes === null) {
         $error_msg = "Please enter how many minutes after the session starts a scan counts as Late (a whole number greater than 0).";
     } else {
-        // End any active session on this device first
+        // End any other active session for THIS SUBJECT first (not
+        // just this device) — a subject only ever has one open
+        // attendance window at a time, however it's being fed.
         $es = $conn->prepare(
             "UPDATE bio_sessions SET status='ended', ended_at=NOW()
-             WHERE device_id=? AND status='active'"
+             WHERE subject_id=? AND status='active'"
         );
-        $es->bind_param('i', $dev_id); $es->execute();
+        $es->bind_param('i', $subject_id); $es->execute();
 
         $expire = $hours > 0 ? date('Y-m-d H:i:s', strtotime("+{$hours} hours")) : null;
 
+        $dev_param = $dev_id > 0 ? $dev_id : null;
         $ins = $conn->prepare(
             "INSERT INTO bio_sessions
                 (device_id, subject_id, started_by, auto_expire_at, late_after_minutes, status)
              VALUES (?,?,?,?,?,'active')"
         );
-        $ins->bind_param('iiisi', $dev_id, $subject_id, $teacher_id, $expire, $late_minutes);
+        $ins->bind_param('iiisi', $dev_param, $subject_id, $teacher_id, $expire, $late_minutes);
         $ins->execute();
 
-        $success_msg = "Biometric session started. Device is now live for this subject.";
+        $success_msg = $dev_id > 0
+            ? "Biometric session started. Device is now live for this subject."
+            : "Attendance session started (RFID / manual only — no fingerprint device selected).";
     }
 }
 // ── STOP biometric session ────────────────────────────────────
@@ -618,41 +607,9 @@ if (isset($_POST['update_subject_meta'])) {
     }
 }
 
-// ── DEACTIVATE / REACTIVATE this subject ─────────────────────
-// Deactivating just hides it from the active "My Schedule" / dashboard
-// views and from new-enrollment pickers — nothing is deleted. The
-// section's own student masterlist (section_students) is untouched,
-// so re-activating later brings back the exact same roster. Students
-// can still see the subject under their own subject history either way.
-if (isset($_POST['toggle_subject_active'])) {
-    if ((int)$subject['is_active'] === 1) {
-        $t = $conn->prepare("UPDATE subjects SET is_active = 0, deactivated_at = NOW() WHERE id = ? AND teacher_id = ?");
-        $t->bind_param("ii", $subject_id, $teacher_id);
-        $t->execute();
-        $success_msg = "Subject marked inactive. Its roster and records are kept — reactivate any time.";
-    } else {
-        $t = $conn->prepare("UPDATE subjects SET is_active = 1, deactivated_at = NULL, last_edited_while_inactive_at = NULL WHERE id = ? AND teacher_id = ?");
-        $t->bind_param("ii", $subject_id, $teacher_id);
-        $t->execute();
-        $success_msg = "Subject reactivated.";
-    }
-    $sub_stmt->execute();
-    $subject = $sub_stmt->get_result()->fetch_assoc();
-}
-
 // ── ENROLL entire section ────────────────────────────────────
 if (isset($_POST['enroll_section'])) {
     $sec_id = (int)$_POST['enroll_section_id'];
-    // Only one of THIS teacher's own sections can be enrolled — the
-    // dropdown only lists them, but a POST can carry any section_id.
-    $own_sec = $conn->prepare("SELECT id FROM sections WHERE id = ? AND teacher_id = ? LIMIT 1");
-    $own_sec->bind_param('ii', $sec_id, $teacher_id);
-    $own_sec->execute();
-    $own_sec_ok = $own_sec->get_result()->num_rows > 0;
-    if (!$own_sec_ok) {
-        $error_msg = "You can only enroll sections that you own.";
-        $sec_id = 0;
-    }
     $sq = $conn->prepare("SELECT student_id FROM section_students WHERE section_id = ?");
     $sq->bind_param('i', $sec_id);
     $sq->execute();
@@ -672,7 +629,7 @@ if (isset($_POST['enroll_section'])) {
         $e2->execute();
         $added++;
     }
-    if ($own_sec_ok) $success_msg = "Enrolled <strong>{$added}</strong> student(s) from section.";
+    $success_msg = "Enrolled <strong>{$added}</strong> student(s) from section.";
     // ── Push to tooltrack: we have sec_id directly, so push this
     // specific section+subject pair. Non-FPST sections are a no-op
     // inside push_section_subject_to_tooltrack. Failures never break
@@ -695,11 +652,6 @@ if (isset($_POST['enroll_single'])) {
     $sid = trim($_POST['single_student_id']);
     if ($sid === '') {
         $error_msg = "Please select a student.";
-    } elseif (!teacherOwnsStudent($conn, $teacher_id, $sid)) {
-        // Irregular students: anyone already on one of YOUR section rosters (or
-        // in one of your subjects) can be put into this subject individually.
-        // Someone who isn't yours yet must be added from the Students page first.
-        $error_msg = "That student isn't in any of your sections. Add them from the Students page first.";
     } else {
         $chk = $conn->prepare(
             "SELECT id FROM subject_enrollments WHERE subject_id=? AND student_id=? LIMIT 1"
@@ -840,31 +792,25 @@ if ($active_tab === 'settings') {
     while ($er = $enrolled_list->fetch_assoc()) $enrolled_ids[] = $er['student_id'];
     $enrolled_list->data_seek(0);
 
-    // Only students who are already MINE (on one of my section rosters or in one
-    // of my subjects) and not yet in this subject — never the whole school.
-    $mine_sql = "SELECT s.student_id, s.last_name, s.first_name FROM students s
-                 WHERE (EXISTS (SELECT 1 FROM section_students ss JOIN sections sec ON sec.id = ss.section_id
-                                WHERE ss.student_id = s.student_id AND sec.teacher_id = ?)
-                     OR EXISTS (SELECT 1 FROM subject_enrollments se JOIN subjects sub ON sub.id = se.subject_id
-                                WHERE se.student_id = s.student_id AND sub.teacher_id = ?))";
     if ($enrolled_ids) {
         $ph    = implode(',', array_fill(0, count($enrolled_ids), '?'));
-        $ne    = $conn->prepare($mine_sql . " AND s.student_id NOT IN ($ph) ORDER BY s.last_name ASC");
-        $types = 'ii' . str_repeat('s', count($enrolled_ids));
-        $bind  = array_merge([$teacher_id, $teacher_id], $enrolled_ids);
-        $ne->bind_param($types, ...$bind);
+        $ne    = $conn->prepare(
+            "SELECT student_id, last_name, first_name FROM students
+             WHERE student_id NOT IN ($ph) ORDER BY last_name ASC"
+        );
+        $types = str_repeat('s', count($enrolled_ids));
+        $ne->bind_param($types, ...$enrolled_ids);
     } else {
-        $ne = $conn->prepare($mine_sql . " ORDER BY s.last_name ASC");
-        $ne->bind_param('ii', $teacher_id, $teacher_id);
+        $ne = $conn->prepare(
+            "SELECT student_id, last_name, first_name FROM students ORDER BY last_name ASC"
+        );
     }
     $ne->execute();
     $ne_result = $ne->get_result();
     while ($r = $ne_result->fetch_assoc()) $not_enrolled_list[] = $r;
 
-    $sec_q = $conn->prepare("SELECT id, section_name FROM sections WHERE teacher_id = ? ORDER BY section_name ASC");
-    $sec_q->bind_param('i', $teacher_id);
-    $sec_q->execute();
-    $sections_list = $sec_q->get_result()->fetch_all(MYSQLI_ASSOC);
+    $sec_res = $conn->query("SELECT id, section_name FROM sections ORDER BY section_name ASC");
+    while ($sr = $sec_res->fetch_assoc()) $sections_list[] = $sr;
 }
 
 // Type colors
@@ -880,6 +826,8 @@ $active_nav        = 'subject_view';
 $active_subject_id = $subject_id;
 
 // ── Biometric: devices + active session ───────────────────────
+// bio_devices is fingerprint-ESP32-only (RFID has no "device" row —
+// it's a USB peripheral on whichever computer the teacher is using).
 $bio_devices_res = $conn->query("SELECT id, label, last_seen FROM bio_devices ORDER BY label ASC");
 $bio_devices = $bio_devices_res ? $bio_devices_res->fetch_all(MYSQLI_ASSOC) : [];
 
@@ -889,11 +837,13 @@ $conn->query(
      WHERE status='active' AND auto_expire_at IS NOT NULL AND auto_expire_at < NOW()"
 );
 
+// LEFT JOIN: an RFID-only session has device_id = NULL, so it must
+// still show up here (an INNER JOIN would silently hide it).
 $bsq = $conn->prepare(
     "SELECT bs.id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at,
-            bd.label AS device_label
+            COALESCE(bd.label, 'RFID / Manual (no device)') AS device_label
      FROM bio_sessions bs
-     JOIN bio_devices bd ON bd.id = bs.device_id
+     LEFT JOIN bio_devices bd ON bd.id = bs.device_id
      WHERE bs.subject_id = ? AND bs.status = 'active'
      ORDER BY bs.started_at DESC LIMIT 1"
 );
@@ -943,23 +893,8 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
 <div class="subject-hero">
   <div class="hero-top">
     <div class="hero-left">
-      <div class="hero-code">
-        <?php echo htmlspecialchars($subject['subject_code']); ?>
-        <?php if (!$subject['is_active']): ?>
-        <span style="margin-left:8px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;background:rgba(117,115,115,.15);color:var(--text7);border:1px solid var(--border2);vertical-align:middle;">
-          <i class="ti ti-archive"></i> Inactive
-        </span>
-        <?php endif; ?>
-      </div>
+      <div class="hero-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
       <div class="hero-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-      <?php if (!$subject['is_active']): ?>
-      <div style="font-size:12px;color:var(--text7);margin:4px 0 2px;">
-        Marked inactive on <?php echo date('M d, Y', strtotime($subject['deactivated_at'])); ?> — roster and records are kept.
-        <?php if (!empty($subject['last_edited_while_inactive_at'])): ?>
-        <strong style="color:var(--text6);">Edited after being marked inactive (last: <?php echo date('M d, Y g:i A', strtotime($subject['last_edited_while_inactive_at'])); ?>).</strong>
-        <?php endif; ?>
-      </div>
-      <?php endif; ?>
       <div class="hero-meta">
         <span class="hero-meta-item">
           <i class="ti ti-users"></i>
@@ -973,7 +908,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
           <i class="ti ti-calendar"></i>
           <?php echo htmlspecialchars($subject['school_year']); ?> — <?php echo $subject['semester']; ?> Sem
         </span>
-        <span class="type-badge" style="color:var(--subject-color);border-color:var(--subject-color);background:color-mix(in srgb, var(--subject-color) 8%, transparent);">
+        <span class="type-badge" style="color:var(--subject-color);border-color:var(--subject-color);background:rgba(91,141,238,.08);">
           <?php echo htmlspecialchars($subject['subject_type']); ?>
         </span>
       </div>
@@ -995,19 +930,6 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
         <i class="ti ti-calendar-check" style="font-size:11px;"></i>
         Attendance <?php echo (int)$subject['attendance_pct']; ?>%
       </div>
-      <form method="POST" style="margin:0;"
-        onsubmit="return confirm('<?php echo $subject['is_active']
-          ? 'Mark this subject inactive? It will be hidden from your active schedule, but all records and the roster are kept, and students can still view their history.'
-          : 'Reactivate this subject? It will reappear in your active schedule.'; ?>');">
-        <input type="hidden" name="toggle_subject_active">
-        <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;white-space:nowrap;">
-          <?php if ($subject['is_active']): ?>
-            <i class="ti ti-archive"></i> Mark Inactive
-          <?php else: ?>
-            <i class="ti ti-rotate-clockwise"></i> Reactivate
-          <?php endif; ?>
-        </button>
-      </form>
     </div>
   </div>
 
@@ -1046,7 +968,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
     ['exams',       'ti-file-certificate',  'Major Exams',    null],
     ['performance', 'ti-star',              'Performance',    null],
     ['attendance',  'ti-calendar-check',    'Attendance',     null],
-    ['biometric',   'ti-fingerprint',       'Biometric',      null],
+    ['biometric',   'ti-fingerprint',       'Biometric/RFID',      null],
     ['grades',      'ti-chart-bar',         'Grades',         null],
     ['announcements','ti-speakerphone',     'Announcements',  null],
     ['settings',    'ti-settings',          'Settings',       null],
@@ -1178,9 +1100,9 @@ if ($sv_latest_activity) {
 }
 
 $sv_comp_colors = [
-    'Major Exam'       => ['color'=>'var(--text7)','icon'=>'ti-file-certificate'],
-    'Written Work'     => ['color'=>'var(--text7)','icon'=>'ti-pencil'],
-    'Performance Task' => ['color'=>'var(--text7)','icon'=>'ti-star'],
+    'Major Exam'       => ['color'=>'#7aa3ff','icon'=>'ti-file-certificate'],
+    'Written Work'     => ['color'=>'#34d399','icon'=>'ti-pencil'],
+    'Performance Task' => ['color'=>'#fbbf24','icon'=>'ti-star'],
 ];
 ?>
 
@@ -1221,7 +1143,7 @@ $sv_comp_colors = [
   <!-- Top & Lowest performers (latest activity in this subject) -->
   <div class="card">
     <p class="card-title">
-      <i class="ti ti-trophy text-muted"></i>
+      <i class="ti ti-trophy text-muted" style="color: var(--yellow2);"></i>
       Top &amp; Lowest Performers
     </p>
     <?php if (!$sv_latest_activity): ?>
@@ -1262,7 +1184,7 @@ $sv_comp_colors = [
         <i class="ti ti-arrow-down"></i> Lowest Performers
       </div>
       <?php if (empty($sv_perf_bottom)): ?>
-        <p style="font-size:12px;color:var(--text3);">Not enough separate scores yet to list lowest performers.</p>
+        <p style="font-size:12px;color:var(--text7);">Not enough separate scores yet to list lowest performers.</p>
       <?php else: ?>
         <?php foreach ($sv_perf_bottom as $r):
           $sv_pct      = $r['total_items'] > 0 ? round($r['score'] / $r['total_items'] * 100, 1) : 0;
@@ -1296,7 +1218,7 @@ $sv_comp_colors = [
       </div>
     <?php else: ?>
       <?php while ($r = $sv_recent->fetch_assoc()):
-        $sv_cc  = $sv_comp_colors[$r['component']] ?? ['color'=>'var(--text7)','icon'=>'ti-pencil'];
+        $sv_cc  = $sv_comp_colors[$r['component']] ?? ['color'=>'#7aa3ff','icon'=>'ti-pencil'];
         $sv_pct = $r['total_items'] > 0 ? round($r['score']/$r['total_items']*100,1) : 0;
       ?>
       <div class="recent-item">
@@ -1329,7 +1251,7 @@ $sv_comp_colors = [
         <div class="grade-comp-card">
           <div class="gc-pct" style="color:var(--text6);"><?php echo (int)$subject['exam_pct']; ?>%</div>
           <div class="gc-label">Major Exams</div>
-          <!-- <div class="gc-weight">Class avg: <?php echo number_format($st['avg'] ?? 0, 1); ?>%</div> -->
+          <div class="gc-weight">Class avg: <?php echo number_format($st['avg'] ?? 0, 1); ?>%</div>
         </div>
         <div class="grade-comp-card">
           <div class="gc-pct" style="color:var(--text6);"><?php echo (int)$subject['written_pct']; ?>%</div>
@@ -1355,9 +1277,9 @@ $sv_comp_colors = [
 elseif (in_array($active_tab, ['written','exams','performance'])):
     $comp_label = $current_component;
     $comp_color = match($current_component) {
-        'Major Exam'       => 'var(--bg)',
-        'Written Work'     => 'var(--bg)',
-        'Performance Task' => 'var(--bg)',
+        'Major Exam'       => '#7aa3ff',
+        'Written Work'     => '#34d399',
+        'Performance Task' => '#fbbf24',
         default            => 'var(--subject-color)',
     };
     $comp_icon = match($current_component) {
@@ -1459,7 +1381,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
         </div>
         <?php endif; ?>
 
-        <button type="submit" name="add_score" class="btn btn-primary" style="margin-top:16px;background:<?php echo $comp_color; ?>;">
+        <button type="submit" name="add_score" class="btn btn-primary" style="margin-top:16px;">
           <i class="ti ti-device-floppy"></i> Save <?php echo $comp_label; ?>
         </button>
       </form>
@@ -1578,7 +1500,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
                       value="<?php echo $r['score']; ?>" data-original="<?php echo $r['score']; ?>"
                       min="0" max="<?php echo $r['total_items']; ?>" step="1"
                       oninput="clampEditInput(this)" onblur="clampEditInput(this)">
-                    <!-- <span style="font-size:12px;color:var(--text);">/ <?php echo $r['total_items']; ?></span> -->
+                    <span style="font-size:12px;color:var(--text7);">/ <?php echo $r['total_items']; ?></span>
                   </td>
                   <td>
                     <div class="score-bar-wrap">
@@ -1685,7 +1607,7 @@ elseif ($active_tab === 'attendance'):
   <div>
     <div class="card">
       <p class="card-title">
-        <i class="ti ti-calendar-check" style="color:var(--bg);"></i>
+        <i class="ti ti-calendar-check" style="color:var(--purple);"></i>
         Manual Attendance
         <span style="font-size:11px;font-weight:400;color:var(--text7);margin-left:4px;">
           (<?php echo (int)$subject['attendance_pct']; ?>% of final grade)
@@ -1760,7 +1682,7 @@ elseif ($active_tab === 'attendance'):
           <?php endwhile; ?>
         </div>
         <button type="submit" name="save_attendance"
-          class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;background:var(--bg);">
+          class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;">
           <i class="ti ti-device-floppy"></i>
           Save Attendance for <?php echo date('M d, Y', strtotime($view_att_date)); ?>
         </button>
@@ -1800,7 +1722,7 @@ elseif ($active_tab === 'attendance'):
               <p style="font-weight:600;font-size:13px;">
                 <?php echo date('M d, Y', strtotime($d)); ?>
                 <?php if ($is_today): ?>
-                <span style="font-size:9px;font-weight:700;color:var(--text7);"> TODAY</span>
+                <span style="font-size:9px;font-weight:700; color:var(--text7);"> TODAY</span>
                 <?php endif; ?>
               </p>
               <div style="display:flex;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap;">
@@ -1964,15 +1886,16 @@ elseif ($active_tab === 'biometric'):
     $bio_init_q = $conn->prepare(
         "SELECT s.student_id, s.last_name, s.first_name,
                 a.status AS att_status, a.time_in, a.source,
-                (ft.student_id IS NOT NULL) AS has_template
+                (ft.id IS NOT NULL) AS has_template,
+                (rc.id IS NOT NULL) AS has_card
          FROM subject_enrollments se
          JOIN students s USING(student_id)
          LEFT JOIN attendance a
                ON  a.subject_id = se.subject_id
                AND a.student_id = se.student_id
                AND a.date = ?
-         LEFT JOIN (SELECT DISTINCT student_id FROM fingerprint_templates) ft
-               ON ft.student_id = s.student_id
+         LEFT JOIN fingerprint_templates ft ON ft.student_id = s.student_id
+         LEFT JOIN rfid_cards rc ON rc.student_id = s.student_id
          WHERE se.subject_id = ?
          ORDER BY s.last_name ASC, s.first_name ASC"
     );
@@ -2059,16 +1982,6 @@ elseif ($active_tab === 'biometric'):
         </button>
       </form>
 
-      <?php elseif (empty($bio_devices)): ?>
-      <div class="empty-state" style="padding:20px;">
-        <i class="ti ti-cpu-off text-muted"></i>
-        <p class="text-muted">No devices assigned to this subject.<br>
-          <a href="/classroomv2/teacher/biometric.php" class="text-accent">
-            Biometric Setup →
-          </a>
-        </p>
-      </div>
-
       <?php else: ?>
       <div style="background:var(--bg6);border:1px solid var(--border2);
                   border-radius:var(--radius);padding:14px;">
@@ -2078,9 +1991,9 @@ elseif ($active_tab === 'biometric'):
         </p>
         <form method="POST">
           <div class="form-group">
-            <label>Device</label>
-            <select name="bio_device_id" class="form-control" required>
-              <option value="">— Choose device —</option>
+            <label>Fingerprint Device (optional)</label>
+            <select name="bio_device_id" class="form-control">
+              <option value="0">No device — RFID / manual only</option>
               <?php foreach ($bio_devices as $bd):
                 $online = $bd['last_seen'] && (time() - strtotime($bd['last_seen']) < 120);
               ?>
@@ -2089,6 +2002,10 @@ elseif ($active_tab === 'biometric'):
               </option>
               <?php endforeach; ?>
             </select>
+            <p style="font-size:11px;color:var(--text6);margin-top:4px;">
+              Leave this on "No device" to run attendance with just the USB RFID card
+              reader below — no fingerprint sensor needed.
+            </p>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="form-group">
@@ -2108,7 +2025,7 @@ elseif ($active_tab === 'biometric'):
           </div>
           <button type="submit" name="start_bio_session"
             class="btn btn-primary btn-sm"
-            style="width:100%;justify-content:center;background:var(--bg);margin-top:4px;">
+            style="width:100%;justify-content:center;background:var(--green);margin-top:4px;">
             <i class="ti ti-player-play"></i> Start Session
           </button>
         </form>
@@ -2131,6 +2048,7 @@ elseif ($active_tab === 'biometric'):
         <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;
           background:<?php echo $online ? 'var(--green)' : 'var(--text7)'; ?>;
           <?php echo $online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
+        <i class="ti ti-fingerprint" style="font-size:13px;color:var(--text3);"></i>
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:500;"><?php echo htmlspecialchars($bd['label']); ?></div>
         </div>
@@ -2144,6 +2062,26 @@ elseif ($active_tab === 'biometric'):
           <i class="ti ti-settings"></i> Manage Devices &amp; Enrollment
         </a>
       </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- RFID card reader — a plug-and-play USB HID device, not a
+         network device. It only works while a session is active, and
+         it rides along on whatever session is open for this subject
+         (fingerprint-started or device-less), since both methods feed
+         the same attendance window. Tapping a card "types" its UID
+         into the input below (the reader emulates a keyboard), so the
+         input just needs to stay focused while this tab is open. -->
+    <?php if ($active_bio_session): ?>
+    <div class="card" id="rfidCard">
+      <p class="card-title"><i class="ti ti-id-badge-2"></i> RFID Card Reader</p>
+      <p style="font-size:11px;color:var(--text6);margin-bottom:10px;">
+        Plug the USB reader into this computer, keep this tab focused,
+        then tap a student's card.
+      </p>
+      <input type="text" id="rfidCaptureInput" class="form-control" autocomplete="off"
+        placeholder="Tap a card…" style="text-align:center;font-family:var(--font-mono);">
+      <div id="rfidResult" style="margin-top:10px;font-size:12px;min-height:18px;"></div>
     </div>
     <?php endif; ?>
   </div>
@@ -2192,7 +2130,7 @@ elseif ($active_tab === 'biometric'):
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Student</th><th>Fingerprint</th>
+            <th>#</th><th>Student</th><th>ID Method</th>
             <th>Status</th>
             <!-- <th>Time In</th> -->
             <th>Source</th>
@@ -2230,14 +2168,21 @@ elseif ($active_tab === 'biometric'):
   }
   function sourceBadge(src) {
     if (!src) return '';
-    return src === 'Biometric'
-      ? badge('<i class="ti ti-fingerprint" style="font-size:9px;"></i> Bio','#5b8dee','rgba(91,141,238,.12)')
-      : badge('Manual','#dcd6d6','#eb14348e');
+    if (src === 'Biometric')
+      return badge('<i class="ti ti-fingerprint" style="font-size:9px;"></i> Bio','#5b8dee','rgba(91,141,238,.12)');
+    if (src === 'RFID')
+      return badge('<i class="ti ti-id-badge-2" style="font-size:9px;"></i> RFID','#a78bfa','rgba(167,139,250,.12)');
+    return badge('Manual','#dcd6d6','#eb14348e');
   }
-  function fpBadge(has) {
-    return has
-      ? badge('✓ Enrolled','#34d399','rgba(52,211,153,.12)')
-      : badge('✗ None','#dcd6d6','#eb14348e');
+  // Shows BOTH enrollment methods for a student — a student can have a
+  // fingerprint, an RFID card, both, or neither; this isn't an
+  // either/or like the attendance source is.
+  function idMethodBadges(hasTemplate, hasCard) {
+    if (!hasTemplate && !hasCard) return badge('✗ None','#dcd6d6','#eb14348e');
+    let out = '';
+    if (hasTemplate) out += badge('<i class="ti ti-fingerprint" style="font-size:9px;"></i> FP','#34d399','rgba(52,211,153,.12)');
+    if (hasCard)     out += ' ' + badge('<i class="ti ti-id-badge-2" style="font-size:9px;"></i> RFID','#34d399','rgba(52,211,153,.12)');
+    return out;
   }
 
   function renderRoster(students) {
@@ -2256,7 +2201,7 @@ elseif ($active_tab === 'biometric'):
           <div style="font-weight:500;">${s.last_name}, ${s.first_name}</div>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--text7);">${s.student_id}</div>
         </td>
-        <td>${fpBadge(s.has_template)}</td>
+        <td>${idMethodBadges(s.has_template, s.has_card)}</td>
         <td>${statusBadge(s.att_status)}</td>
 
         <!-- <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">
@@ -2286,10 +2231,74 @@ elseif ($active_tab === 'biometric'):
         const el = document.getElementById('bioLastUpdated');
         if (el) el.textContent = 'Updated ' + d.time;
       })
-      .catch(err => console.error('[bio roster poll] failed:', err));
+      .catch(() => {});
   }
 
   setInterval(pollLive, POLL_MS);
+
+  // ── RFID USB reader capture ──────────────────────────────────
+  // The reader is a USB HID keyboard-emulation device: tapping a
+  // card types its UID into whatever input is focused, then presses
+  // Enter. So all this needs to do is keep rfidCaptureInput focused
+  // and watch for Enter — no polling, no device protocol.
+  const rfidInput = document.getElementById('rfidCaptureInput');
+  if (rfidInput) {
+    const rfidResult = document.getElementById('rfidResult');
+    // Only steal focus back when nothing else (search box, a button,
+    // etc.) legitimately has it — never fight the teacher for focus
+    // while they're typing somewhere else on the page.
+    const FOCUSABLE = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'];
+    const refocus = () => {
+      const a = document.activeElement;
+      if (a === rfidInput) return;
+      if (a && FOCUSABLE.includes(a.tagName) && a !== document.body) return;
+      rfidInput.focus();
+    };
+
+    rfidInput.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const uid = rfidInput.value.trim();
+      rfidInput.value = '';
+      if (!uid) return;
+
+      rfidResult.textContent = 'Checking…';
+      rfidResult.style.color = 'var(--text6)';
+
+      fetch('/classroomv2/api/rfid_scan.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject_id: SUBJECT_ID, card_uid: uid })
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.status === 'present' || d.status === 'late') {
+            rfidResult.textContent = `✓ ${d.student} — ${d.action}`;
+            rfidResult.style.color = 'var(--green)';
+            pollLive();
+          } else if (d.status === 'dup') {
+            rfidResult.textContent = `${d.student} already marked today`;
+            rfidResult.style.color = 'var(--text6)';
+          } else if (d.status === 'ok' && d.result === 'NO_MATCH') {
+            rfidResult.textContent = 'Unrecognized card — not enrolled to any student';
+            rfidResult.style.color = '#fbbf24';
+          } else {
+            rfidResult.textContent = d.message || 'Scan failed';
+            rfidResult.style.color = '#f87171';
+          }
+        })
+        .catch(() => {
+          rfidResult.textContent = 'Network error — scan not recorded';
+          rfidResult.style.color = '#f87171';
+        });
+    });
+
+    // Keep focus on the capture input while this tab is visible, so a
+    // tap always lands there even if the teacher clicked elsewhere.
+    document.addEventListener('click', refocus);
+    refocus();
+    setInterval(refocus, 2000);
+  }
 
   window.filterBioRoster = function () {
     bioSearch = document.getElementById('bioRosterSearch').value;
@@ -2366,10 +2375,10 @@ elseif ($active_tab === 'grades'):
         <tr>
           <th>#</th>
           <th>Student</th>
-          <th style="color:var(--text6);">Exam Avg <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
-          <th style="color:var(--text6);">Written Avg <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
-          <th style="color:var(--text6);">Perf. Task <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['performance_pct']; ?>%)</span></th>
-          <th style="color:var(--text6);">Attendance <span style="font-weight:400;color:var(--text6);">(<?php echo (int)$subject['attendance_pct']; ?>%)</span></th>
+          <th>Exam Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['exam_pct']; ?>%)</span></th>
+          <th>Written Avg <span style="font-weight:400;color:var(--text7);">(<?php echo (int)$subject['written_pct']; ?>%)</span></th>
+          <th>Perf. Task</th>
+          <th>Attendance</th>
           <th>Final Grade</th>
           <th>Letter</th>
         </tr>
@@ -2398,17 +2407,17 @@ elseif ($active_tab === 'grades'):
             <div class="td-mono"><?php echo htmlspecialchars($r['student_id']); ?></div>
           </td>
           <?php foreach ([
-            [$r['exam_avg'],        'var(--text7)'],
-            [$r['written_avg'],     'var(--text7)'],
-            [$r['performance_avg'], 'var(--text7)'],
-            [$r['attendance_rate'], 'var(--text7)'],
+            [$r['exam_avg'],        '#7aa3ff'],
+            [$r['written_avg'],     '#34d399'],
+            [$r['performance_avg'], '#fbbf24'],
+            [$r['attendance_rate'], '#a78bfa'],
           ] as [$val, $color]):
               $v = (float)$val;
           ?>
           <td>
             <div class="score-bar-wrap">
               <div class="score-bar-track">
-                <div class="score-bar-fill" style="width:<?php echo min($v,100); ?>%;background:<?php echo $color; ?>;opacity:.7;"></div>
+                <div class="score-bar-fill" style="width:<?php echo min($v,100); ?>%;"></div>
               </div>
               <span style="font-size:12px;min-width:40px;text-align:right;color:<?php echo $v >= 75 ? 'var(--green)' : ($v > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
                 <?php echo $v > 0 ? number_format($v,1) . '%' : '—'; ?>
@@ -2423,7 +2432,7 @@ elseif ($active_tab === 'grades'):
           </td>
           <td>
             <?php if ($fg > 0): ?>
-              <span class="badge <?php echo $letter_color; ?>" style="font-size:18px;padding:3px 10px;">
+              <span class="badge <?php echo $letter_color; ?>" style="font-size:15px;padding:3px 10px;">
                 <?php echo $r['letter_grade']; ?>
               </span>
               <span style="font-size:11px;color:<?php echo $pass ? 'var(--green)' : 'var(--red)'; ?>;display:block;margin-top:3px;">
@@ -2513,7 +2522,7 @@ elseif ($active_tab === 'settings'):
 <div class="settings-wrap">
 
   <!-- 1. Subject Details -->
-   <div style="display:grid;grid-template-columns:500px 1fr;gap:20px;align-items:start;">
+   <div style="display:grid;grid-template-columns:580px 1fr;gap:20px;align-items:start;">
 
   <div class="card" style="max-width:600px;margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-pencil"></i> Edit Subject Details</p>
@@ -2793,6 +2802,7 @@ elseif ($active_tab === 'settings'):
 
 </div><!-- end page-body -->
 
+
 <script>
 // ── Navbar dropdown ──────────────────────────────────
 function toggleDD() {
@@ -3013,8 +3023,8 @@ function filterEnrollees() {
 
 // ── Grade distribution chart ─────────────────────────
 <?php if ($active_tab === 'overview' && !empty($chart_labels)): ?>
-Chart.defaults.color = '#757373';
-Chart.defaults.borderColor = '#dcdcdc';
+Chart.defaults.color = '#7d8aaa';
+Chart.defaults.borderColor = '#252a3d';
 Chart.defaults.font.family = 'DM Sans';
 new Chart(document.getElementById('gradeChart'), {
   type: 'bar',
@@ -3031,7 +3041,7 @@ new Chart(document.getElementById('gradeChart'), {
     responsive: true,
     plugins: { legend: { display: false } },
     scales: {
-      y: { beginAtZero: true, max: 100, grid: { color: '#e7e7e7' } },
+      y: { beginAtZero: true, max: 100, grid: { color: '#1a1e2b' } },
       x: { grid: { display: false }, ticks: { font: { size: 11 } } }
     }
   }

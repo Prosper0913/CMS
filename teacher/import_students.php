@@ -54,7 +54,7 @@ if (isset($_GET['template'])) {
     header('Content-Disposition: attachment; filename="student_import_template.csv"');
     $out = fopen('php://output', 'w');
     fputcsv($out, ['student_id','last_name','first_name','middle_name','email','contact_number','gender','course','section']);
-    fputcsv($out, ['2023-00123','Dela Cruz','Juan','P','juan.delacruz@example.com','09171234567','Male','BSIT','BSIT 3A']);
+    fputcsv($out, ['202222644','Dances','Jess Anthony','V','jessdances@example.com','09171234567','Male','BSIT','BSIT 3A']);
     fclose($out);
     exit;
 }
@@ -311,6 +311,7 @@ if (isset($_POST['import_csv'])) {
                             $results['errors'][] = "$label: course is required.";
                             continue;
                         }
+                        $course = strtoupper($course);
                         if (!in_array($course, IMPORT_STUDENT_COURSES, true)) {
                             $results['errors'][] = "$label: \"$course\" is not a recognized course — use one of " . implode(', ', IMPORT_STUDENT_COURSES) . ".";
                             continue;

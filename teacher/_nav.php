@@ -18,10 +18,10 @@ function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ?
   </a>
   <nav class="sidebar-links">
     <a href="/classroomv2/teacher/dashboard.php" class="<?php echo _nav_class('dashboard', $active_nav); ?>"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></a>
-    <a href="/classroomv2/teacher/all_subjects.php" class="<?php echo _nav_class('subjects', $active_nav); ?>"><i class="ti ti-books"></i><span>My Schedule</span></a>
+        <a href="/classroomv2/teacher/manage_sections.php" class="<?php echo _nav_class('sections', $active_nav); ?>"><i class="ti ti-building-community"></i><span>Sections</span></a>
     <a href="/classroomv2/teacher/students.php" class="<?php echo _nav_class('students', $active_nav); ?>"><i class="ti ti-users"></i><span>Students</span></a>
-    <a href="/classroomv2/teacher/manage_sections.php" class="<?php echo _nav_class('sections', $active_nav); ?>"><i class="ti ti-building-community"></i><span>Sections</span></a>
-    <a href="/classroomv2/teacher/biometric.php" class="<?php echo _nav_class('biometric', $active_nav); ?>"><i class="ti ti-fingerprint"></i><span>Biometric</span></a>
+        <a href="/classroomv2/teacher/all_subjects.php" class="<?php echo _nav_class('subjects', $active_nav); ?>"><i class="ti ti-books"></i><span>My Schedule</span></a>
+    <a href="/classroomv2/teacher/biometric.php" class="<?php echo _nav_class('biometric', $active_nav); ?>"><i class="ti ti-fingerprint"></i><span>Enroll Students</span></a>
     <a href="/classroomv2/teacher/settings.php" class="<?php echo _nav_class('settings', $active_nav); ?>"><i class="ti ti-settings"></i><span>Settings</span></a>
   </nav>
   <div class="sidebar-footer">

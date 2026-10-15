@@ -373,7 +373,7 @@ body {
 }
 
 .card-title i {
-  color: var(--bg8);
+  /* color: var(--bg8); */
   font-size: 15px;
 }
 
@@ -832,7 +832,7 @@ tbody td {
 .score-bar-fill {
   height: 100%;
   border-radius: 99px;
-  background: var(--accent);
+  background: var(--bg);
 }
 
 /* ── EMPTY STATE ─────────────────────────────────────────── */ .empty-state {
