@@ -540,7 +540,7 @@ $active_nav = 'students';
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
               <span class="badge badge-green"><?php echo count($results['created']); ?> created</span>
               <span class="badge badge-blue"><?php echo count($results['attached']); ?> attached</span>
-              <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(234,179,8,.12);color:var(--yellow);border:1px solid rgba(234,179,8,.25);">
+              <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(234,179,8,.12);color:var(--text7);border:1px solid rgba(234,179,8,.25);">
                 <?php echo count($results['skipped']); ?> skipped
               </span>
               <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25);">
@@ -566,7 +566,7 @@ $active_nav = 'students';
             <?php endif; ?>
 
             <?php if (!empty($results['skipped'])): ?>
-              <p style="font-size:12px;font-weight:600;color:var(--yellow);margin-bottom:6px;">SKIPPED</p>
+              <p style="font-size:12px;font-weight:600;color:var(--text7);margin-bottom:6px;">SKIPPED</p>
               <ul style="font-size:12.5px;line-height:1.8;padding-left:18px;margin:0 0 14px;">
                 <?php foreach ($results['skipped'] as $line): ?><li><?php echo htmlspecialchars($line); ?></li><?php endforeach; ?>
               </ul>
