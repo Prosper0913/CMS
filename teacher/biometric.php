@@ -761,6 +761,98 @@ $type_cfg  = [
 
         <?php endif; ?>
       </div>
+    </div><!-- end left column -->
+    <!-- RIGHT COLUMN -->
+    <div>
+
+      <!-- ── STUDENT ENROLLMENT ROSTER ── -->
+      <div class="card">
+        <p class="card-title">
+          <i class="ti ti-users"></i> Student Enrollment Roster
+          <span class="card-title-right" style="font-size:11px;font-weight:400;color:var(--text3);">
+            <?php echo $template_count; ?> FP + <?php echo $card_count; ?> RFID / <?php echo $enrolled_count; ?> students
+          </span>
+        </p>
+
+        <?php if (empty($students)): ?>
+        <div class="empty-state">
+          <i class="ti ti-users-off"></i>
+          <p>No students in your subjects yet.</p>
+        </div>
+        <?php else: ?>
+        <div class="search-wrap">
+          <i class="ti ti-search"></i>
+          <input type="text" id="rosterSearch" class="form-control"
+            placeholder="Search students…" oninput="filterRoster()">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Subject</th>
+                <th>Fingerprint</th>
+                <th>RFID Card</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="rosterTable">
+              <?php foreach ($students as $st): ?>
+              <tr data-name="<?php echo strtolower($st['last_name'].' '.$st['first_name'].' '.$st['student_id']); ?>">
+                <td>
+                  <div style="font-weight:500;"><?php echo htmlspecialchars($st['last_name'].', '.$st['first_name']); ?></div>
+                  <div class="td-mono"><?php echo htmlspecialchars($st['student_id']); ?></div>
+                </td>
+                <td style="font-size:12px;color:var(--text7);">
+                  <?php echo htmlspecialchars($st['subject_code'].' '.$st['section']); ?>
+                </td>
+                <td>
+                  <?php if ($st['has_template']): ?>
+                  <span class="badge badge-green"><i class="ti ti-check"></i> Enrolled</span>
+                  <div style="font-size:10px;color:var(--text7);margin-top:2px;">
+                    <?php echo $st['enrolled_at'] ? date('M d, Y', strtotime($st['enrolled_at'])) : ''; ?>
+                  </div>
+                  <?php else: ?>
+                  <span class="badge badge-gray">Not enrolled</span>
+                  <?php endif; ?>
+                </td>
+                <td>
+                  <?php if ($st['has_card']): ?>
+                  <span class="badge badge-green"><i class="ti ti-check"></i> Enrolled</span>
+                  <div style="font-size:10px;color:var(--text7);margin-top:2px;">
+                    <?php echo htmlspecialchars($st['card_uid'] ?? ''); ?>
+                  </div>
+                  <?php else: ?>
+                  <span class="badge badge-gray">Not enrolled</span>
+                  <?php endif; ?>
+                </td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <?php if ($st['has_template']): ?>
+                  <form method="POST" style="display:inline;"
+                    onsubmit="return confirm('Delete fingerprint for <?php echo addslashes($st['first_name']); ?>? They must re-enroll.')">
+                    <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($st['student_id']); ?>">
+                    <button type="submit" name="clear_template" class="btn btn-xs btn-danger" title="Clear fingerprint">
+                      <i class="ti ti-fingerprint"></i>
+                    </button>
+                  </form>
+                  <?php endif; ?>
+                  <?php if ($st['has_card']): ?>
+                  <form method="POST" style="display:inline;"
+                    onsubmit="return confirm('Delete RFID card for <?php echo addslashes($st['first_name']); ?>? They must re-enroll a card.')">
+                    <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($st['student_id']); ?>">
+                    <button type="submit" name="clear_card" class="btn btn-xs btn-danger" title="Clear RFID card">
+                      <i class="ti ti-id-badge-2"></i>
+                    </button>
+                  </form>
+                  <?php endif; ?>
+                </td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php endif; ?>
+      </div>
 
       <!-- ── ENROLL VIA RFID CARD ── -->
       <!-- The USB reader is plug-and-play: no device to register, no
@@ -878,189 +970,6 @@ $type_cfg  = [
           <?php endif; ?>
         </div>
 
-        <?php endif; ?>
-      </div>
-
-      <!-- ── SESSION CONTROL ── -->
-      <div class="card">
-        <p class="card-title"><i class="ti ti-player-play text-green"></i> Session Control</p>
-        <?php if (empty($devices)): ?>
-        <div class="alert alert-info" style="margin-bottom:0;">
-          <i class="ti ti-info-circle"></i> Register a device first.
-        </div>
-        <?php else: ?>
-        <?php foreach ($devices as $dev):
-          $sess = $active_sessions[$dev['id']] ?? null;
-          $is_online = $dev['last_seen'] && (time() - strtotime($dev['last_seen']) < 120);
-        ?>
-        <div style="background:var(--bg);border:1px solid <?php echo $sess ? 'rgba(52,211,153,.25)' : 'var(--border2)'; ?>;border-radius:var(--radius);padding:14px;margin-bottom:12px;">
-          <!-- Device header -->
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_online ? 'var(--green)' : 'var(--text3)'; ?>;flex-shrink:0;<?php echo $is_online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
-            <i class="ti ti-fingerprint" style="font-size:13px;color:var(--text3);"></i>
-            <div style="font-weight:600;font-size:13px;flex:1;"><?php echo htmlspecialchars($dev['label']); ?></div>
-            <?php if ($sess): ?>
-            <span class="badge badge-green">ACTIVE</span>
-            <?php else: ?>
-            <span class="badge badge-gray">IDLE</span>
-            <?php endif; ?>
-          </div>
-
-          <?php if ($sess): ?>
-          <!-- Active session info -->
-          <div style="background:var(--bg4);border-radius:6px;padding:10px;margin-bottom:10px;font-size:12px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text2);">Subject</span>
-              <span style="font-weight:600;"><?php echo htmlspecialchars($sess['subject_code'].' — '.$sess['section']); ?></span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text2);">Late after</span>
-              <span style="font-family:var(--font-mono);"><?php echo (int)$sess['late_after_minutes']; ?> min</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="color:var(--text2);">Started</span>
-              <span style="font-family:var(--font-mono);"><?php echo date('H:i', strtotime($sess['started_at'])); ?></span>
-            </div>
-            <div style="display:flex;justify-content:space-between;">
-              <span style="color:var(--text2);">Expires</span>
-              <span style="font-family:var(--font-mono);"><?php echo $sess['auto_expire_at'] ? date('H:i', strtotime($sess['auto_expire_at'])) : 'Manual'; ?></span>
-            </div>
-          </div>
-          <form method="POST">
-            <input type="hidden" name="dev_id" value="<?php echo $dev['id']; ?>">
-            <button type="submit" name="stop_session" class="btn btn-danger btn-sm btn-full"
-              onclick="return confirm('Stop the active session for <?php echo addslashes($dev['label']); ?>?')">
-              <i class="ti ti-player-stop"></i> Stop Session
-            </button>
-          </form>
-
-          <?php else: ?>
-          <!-- Start session form -->
-          <form method="POST">
-            <input type="hidden" name="dev_id" value="<?php echo $dev['id']; ?>">
-            <div class="form-group" style="margin-bottom:8px;">
-              <label>Subject</label>
-              <select name="session_subject" class="form-control" required>
-                <option value="">— Choose —</option>
-                <?php foreach ($my_subjects as $s): ?>
-                <option value="<?php echo $s['id']; ?>"
-                  <?php echo ($dev['subject_id'] ?? 0) == $s['id'] ? 'selected' : ''; ?>>
-                  <?php echo htmlspecialchars($s['subject_code'].' — '.$s['section']); ?>
-                </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="form-row" style="margin-bottom:8px;">
-              <div class="form-group" style="margin-bottom:0;">
-                <label>Late After</label>
-                <input type="number" name="late_after_minutes" class="form-control" value="15" min="1" step="1" required>
-              </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label>Duration (min)</label>
-                <input type="number" name="duration_min" class="form-control" value="90" min="10" max="480" required>
-              </div>
-            </div>
-            <button type="submit" name="start_session" class="btn btn-green btn-sm btn-full">
-              <i class="ti ti-player-play"></i> Start Session
-            </button>
-          </form>
-          <?php endif; ?>
-        </div>
-        <?php endforeach; ?>
-        <?php endif; ?>
-      </div>
-
-    </div><!-- end left column -->
-
-    <!-- RIGHT COLUMN -->
-    <div>
-
-      <!-- ── STUDENT ENROLLMENT ROSTER ── -->
-      <div class="card">
-        <p class="card-title">
-          <i class="ti ti-users"></i> Student Enrollment Roster
-          <span class="card-title-right" style="font-size:11px;font-weight:400;color:var(--text3);">
-            <?php echo $template_count; ?> FP + <?php echo $card_count; ?> RFID / <?php echo $enrolled_count; ?> students
-          </span>
-        </p>
-
-        <?php if (empty($students)): ?>
-        <div class="empty-state">
-          <i class="ti ti-users-off"></i>
-          <p>No students in your subjects yet.</p>
-        </div>
-        <?php else: ?>
-        <div class="search-wrap">
-          <i class="ti ti-search"></i>
-          <input type="text" id="rosterSearch" class="form-control"
-            placeholder="Search students…" oninput="filterRoster()">
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Subject</th>
-                <th>Fingerprint</th>
-                <th>RFID Card</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="rosterTable">
-              <?php foreach ($students as $st): ?>
-              <tr data-name="<?php echo strtolower($st['last_name'].' '.$st['first_name'].' '.$st['student_id']); ?>">
-                <td>
-                  <div style="font-weight:500;"><?php echo htmlspecialchars($st['last_name'].', '.$st['first_name']); ?></div>
-                  <div class="td-mono"><?php echo htmlspecialchars($st['student_id']); ?></div>
-                </td>
-                <td style="font-size:12px;color:var(--text7);">
-                  <?php echo htmlspecialchars($st['subject_code'].' '.$st['section']); ?>
-                </td>
-                <td>
-                  <?php if ($st['has_template']): ?>
-                  <span class="badge badge-green"><i class="ti ti-check"></i> Enrolled</span>
-                  <div style="font-size:10px;color:var(--text7);margin-top:2px;">
-                    <?php echo $st['enrolled_at'] ? date('M d, Y', strtotime($st['enrolled_at'])) : ''; ?>
-                  </div>
-                  <?php else: ?>
-                  <span class="badge badge-gray">Not enrolled</span>
-                  <?php endif; ?>
-                </td>
-                <td>
-                  <?php if ($st['has_card']): ?>
-                  <span class="badge badge-green"><i class="ti ti-check"></i> Enrolled</span>
-                  <div style="font-size:10px;color:var(--text7);margin-top:2px;">
-                    <?php echo htmlspecialchars($st['card_uid'] ?? ''); ?>
-                  </div>
-                  <?php else: ?>
-                  <span class="badge badge-gray">Not enrolled</span>
-                  <?php endif; ?>
-                </td>
-                <td style="text-align:right;white-space:nowrap;">
-                  <?php if ($st['has_template']): ?>
-                  <form method="POST" style="display:inline;"
-                    onsubmit="return confirm('Delete fingerprint for <?php echo addslashes($st['first_name']); ?>? They must re-enroll.')">
-                    <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($st['student_id']); ?>">
-                    <button type="submit" name="clear_template" class="btn btn-xs btn-danger" title="Clear fingerprint">
-                      <i class="ti ti-fingerprint"></i>
-                    </button>
-                  </form>
-                  <?php endif; ?>
-                  <?php if ($st['has_card']): ?>
-                  <form method="POST" style="display:inline;"
-                    onsubmit="return confirm('Delete RFID card for <?php echo addslashes($st['first_name']); ?>? They must re-enroll a card.')">
-                    <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($st['student_id']); ?>">
-                    <button type="submit" name="clear_card" class="btn btn-xs btn-danger" title="Clear RFID card">
-                      <i class="ti ti-id-badge-2"></i>
-                    </button>
-                  </form>
-                  <?php endif; ?>
-                </td>
-              </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
         <?php endif; ?>
       </div>
 

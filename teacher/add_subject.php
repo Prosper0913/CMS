@@ -58,6 +58,38 @@ if (isset($_POST['save_subject'])) {
         $error_msg = "Attendance % must be greater than 0.";
     } elseif ($attendance_pct >= $performance_pct) {
         $error_msg = "Attendance % ({$attendance_pct}%) must be less than Performance % ({$performance_pct}%).";
+    } elseif ($conflict = (function() use ($conn, $teacher_id, $schedule_days, $schedule_start, $schedule_end) {
+        // ── Timetable overlap check ──────────────────────────────
+        // A teacher can't be in two classes at once, so no two of
+        // their currently active subjects may share a day AND an
+        // overlapping time range, regardless of section. Inactive
+        // (archived) subjects don't count — they're off the live
+        // timetable. Standard interval-overlap test: two ranges
+        // overlap iff startA < endB AND endA > startB.
+        $new_days = explode(',', $schedule_days);
+        $ov = $conn->prepare(
+            "SELECT subject_code, subject_name, section, schedule_days,
+                    schedule_start_time, schedule_end_time
+             FROM subjects WHERE teacher_id = ? AND is_active = 1"
+        );
+        $ov->bind_param('i', $teacher_id);
+        $ov->execute();
+        $res = $ov->get_result();
+        while ($row = $res->fetch_assoc()) {
+            $shared = array_intersect($new_days, explode(',', $row['schedule_days']));
+            if (!$shared) continue;
+            if ($schedule_start < $row['schedule_end_time'] && $schedule_end > $row['schedule_start_time']) {
+                $row['_shared_days'] = $shared;
+                return $row;
+            }
+        }
+        return null;
+    })()) {
+        $days_txt = implode(', ', $conflict['_shared_days']);
+        $error_msg = "Time already has a subject or schedule — conflicts with "
+                   . "<strong>" . htmlspecialchars($conflict['subject_code'] . ' — ' . $conflict['subject_name']) . "</strong> "
+                   . "(" . htmlspecialchars($conflict['section']) . ") on {$days_txt}, "
+                   . substr($conflict['schedule_start_time'],0,5) . "–" . substr($conflict['schedule_end_time'],0,5) . ".";
     } else {
         $conn->begin_transaction();
         try {

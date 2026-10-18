@@ -25,8 +25,14 @@ $teacher_id = $_SESSION['user_id'];
 $subject_id = (int)($_GET['id'] ?? 0);
 if (!$subject_id) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
+// NOTE: intentionally no "AND is_active = 1" here — this page must still
+// be able to load an inactive subject (the Settings tab has a whole
+// "Inactive Subject" / Reactivate branch built for exactly that, and a
+// teacher can still open, correct, and reactivate an inactive subject's
+// records from here). Filtering out inactive subjects belongs on the
+// dashboard/listing pages, not here.
 $sub_stmt = $conn->prepare(
-    "SELECT * FROM subjects WHERE id = ? AND teacher_id = ? AND is_active = 1"
+    "SELECT * FROM subjects WHERE id = ? AND teacher_id = ?"
 );
 $sub_stmt->bind_param("ii", $subject_id, $teacher_id);
 $sub_stmt->execute();
@@ -39,6 +45,16 @@ if (!in_array($active_tab, $valid_tabs)) $active_tab = 'overview';
 
 $success_msg = '';
 $error_msg   = '';
+
+// ── Inactive = read-only history record ──────────────────────
+// Once a subject is marked inactive (semester's done), nothing on it
+// may be added, edited, or deleted — the only action still allowed is
+// reactivating it (toggle_subject_active handles that one itself and
+// is NOT gated by this flag). Every other mutating POST handler below
+// checks $subject_locked first and refuses with an error instead of
+// touching the DB.
+$subject_locked = !$subject['is_active'];
+$LOCKED_MSG = "This subject is inactive — it's a read-only history record. Reactivate it in Settings to make changes.";
 
 
 //----------------------------
@@ -147,7 +163,9 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
 }
 
 // ── ADD score entry (written / exam / performance) ───────────
-if (isset($_POST['add_score'])) {
+if (isset($_POST['add_score']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['add_score'])) {
      $component  = $_POST['component'];
      $entry_name = trim($_POST['entry_name']);
      $date_given = $_POST['date_given'];
@@ -267,7 +285,9 @@ if (isset($_GET['deleted'])) $success_msg = "Entry deleted and grades updated.";
 // edit and a multi-row edit both go through the same save path.
 
 // ── BULK EDIT scores (whole quiz/activity, tab-through-students) ──
-if (isset($_POST['bulk_edit_scores'])) {
+if (isset($_POST['bulk_edit_scores']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['bulk_edit_scores'])) {
     $bulk_component  = $_POST['bulk_component']  ?? '';
     $bulk_entry_name = trim($_POST['bulk_entry_name'] ?? '');
     $bulk_scores     = $_POST['bulk_scores'] ?? []; // [score_id => new value]
@@ -315,7 +335,9 @@ if (isset($_POST['bulk_edit_scores'])) {
 }
 
 // ── BULK DELETE a whole quiz/activity ────────────────────────
-if (isset($_POST['delete_quiz'])) {
+if (isset($_POST['delete_quiz']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['delete_quiz'])) {
     $del_component  = $_POST['del_component']  ?? '';
     $del_entry_name = trim($_POST['del_entry_name'] ?? '');
     $valid_components = ['Major Exam', 'Written Work', 'Performance Task'];
@@ -348,7 +370,9 @@ if (isset($_POST['delete_quiz'])) {
 }
 
 // ── SAVE bulk attendance ─────────────────────────────────────
-if (isset($_POST['save_attendance'])) {
+if (isset($_POST['save_attendance']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['save_attendance'])) {
     $att_date = $_POST['att_date'];
     $statuses = $_POST['att_status'] ?? [];
     foreach ($statuses as $sid => $status) {
@@ -375,7 +399,9 @@ if (isset($_POST['save_attendance'])) {
 }
 
 // ── POST announcement ─────────────────────────────────────────
-if (isset($_POST['post_announcement'])) {
+if (isset($_POST['post_announcement']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['post_announcement'])) {
     $ann_title   = trim($_POST['ann_title'] ?? '');
     $ann_message = trim($_POST['ann_message'] ?? '');
     if ($ann_title === '' || $ann_message === '') {
@@ -414,7 +440,9 @@ if (isset($_GET['ann_deleted'])) $success_msg = "Announcement deleted.";
 // single edit and a multi-row edit both go through the same save path.
 
 // ── BULK EDIT attendance for one day (tab-through-students) ──
-if (isset($_POST['bulk_edit_attendance'])) {
+if (isset($_POST['bulk_edit_attendance']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['bulk_edit_attendance'])) {
     $bea_date     = $_POST['bea_date'] ?? '';
     $bea_statuses = $_POST['bea_status']  ?? [];
     $bea_times    = $_POST['bea_time_in'] ?? [];
@@ -462,7 +490,9 @@ if (isset($_GET['del_attendance'])) {
 if (isset($_GET['att_deleted'])) $success_msg = "Attendance record deleted and grade updated.";
 
 // ── BULK DELETE a whole day's attendance ─────────────────────
-if (isset($_POST['delete_attendance_day'])) {
+if (isset($_POST['delete_attendance_day']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['delete_attendance_day'])) {
     $dad_date = $_POST['dad_date'] ?? '';
     if ($dad_date === '') {
         $error_msg = "Invalid day to delete.";
@@ -495,7 +525,9 @@ if (isset($_POST['delete_attendance_day'])) {
 // this page) can both feed attendance into the same open session,
 // and a subject with no fingerprint device at all can still run
 // attendance purely over RFID.
-if (isset($_POST['start_bio_session'])) {
+if (isset($_POST['start_bio_session']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['start_bio_session'])) {
     $dev_id = (int)$_POST['bio_device_id'];
     $hours  = (int)($_POST['bio_expire_hours'] ?? 2);
 
@@ -531,7 +563,9 @@ if (isset($_POST['start_bio_session'])) {
     }
 }
 // ── STOP biometric session ────────────────────────────────────
-if (isset($_POST['stop_bio_session'])) {
+if (isset($_POST['stop_bio_session']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['stop_bio_session'])) {
     $sess_id = (int)$_POST['session_id'];
     $st = $conn->prepare(
         "UPDATE bio_sessions SET status='ended', ended_at=NOW()
@@ -540,13 +574,17 @@ if (isset($_POST['stop_bio_session'])) {
     $st->bind_param('ii', $sess_id, $subject_id); $st->execute();
     $success_msg = "Biometric session ended.";
 }
-if (isset($_POST['recompute'])) {
+if (isset($_POST['recompute']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['recompute'])) {
     recalcAllStudentsInSubject($conn, $subject_id);
     $success_msg = "All grades recomputed.";
 }
 
 // ── UPDATE subject weights ───────────────────────────────────
-if (isset($_POST['update_weights'])) {
+if (isset($_POST['update_weights']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['update_weights'])) {
     $ep = (float)$_POST['exam_pct'];
     $wp = (float)$_POST['written_pct'];
     $pp = (float)$_POST['performance_pct'];
@@ -570,7 +608,9 @@ if (isset($_POST['update_weights'])) {
 }
 
 // ── UPDATE subject metadata ──────────────────────────────────
-if (isset($_POST['update_subject_meta'])) {
+if (isset($_POST['update_subject_meta']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['update_subject_meta'])) {
     $sname = trim($_POST['subject_name']);
     $scode = trim($_POST['subject_code']);
     $ssect = trim($_POST['section']);
@@ -607,8 +647,30 @@ if (isset($_POST['update_subject_meta'])) {
     }
 }
 
+// ── TOGGLE Active / Inactive ─────────────────────────────────
+// This had no handler at all before — the Settings-tab button posted
+// "toggle_subject_active" but nothing on this page ever checked for
+// it, so clicking it did nothing. (The subject-fetch query above was
+// also hardcoded to "is_active = 1", which would have hidden an
+// inactive subject from this very page the moment it got deactivated.)
+if (isset($_POST['toggle_subject_active'])) {
+    $new_active = $subject['is_active'] ? 0 : 1;
+    if ($new_active) {
+        $tog = $conn->prepare("UPDATE subjects SET is_active=1, deactivated_at=NULL WHERE id=? AND teacher_id=?");
+    } else {
+        $tog = $conn->prepare("UPDATE subjects SET is_active=0, deactivated_at=NOW() WHERE id=? AND teacher_id=?");
+    }
+    $tog->bind_param('ii', $subject_id, $teacher_id);
+    $tog->execute();
+    $sub_stmt->execute();
+    $subject = $sub_stmt->get_result()->fetch_assoc();
+    $success_msg = $new_active ? "Subject reactivated." : "Subject marked inactive.";
+}
+
 // ── ENROLL entire section ────────────────────────────────────
-if (isset($_POST['enroll_section'])) {
+if (isset($_POST['enroll_section']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['enroll_section'])) {
     $sec_id = (int)$_POST['enroll_section_id'];
     $sq = $conn->prepare("SELECT student_id FROM section_students WHERE section_id = ?");
     $sq->bind_param('i', $sec_id);
@@ -648,7 +710,9 @@ if (isset($_POST['enroll_section'])) {
 }
 
 // ── ENROLL single student ────────────────────────────────────
-if (isset($_POST['enroll_single'])) {
+if (isset($_POST['enroll_single']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['enroll_single'])) {
     $sid = trim($_POST['single_student_id']);
     if ($sid === '') {
         $error_msg = "Please select a student.";
@@ -692,7 +756,9 @@ if (isset($_POST['enroll_single'])) {
 }
 
 // ── UNENROLL student ─────────────────────────────────────────
-if (isset($_POST['unenroll_student'])) {
+if (isset($_POST['unenroll_student']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['unenroll_student'])) {
     $sid = trim($_POST['unenroll_sid']);
     $del = $conn->prepare(
         "DELETE FROM subject_enrollments WHERE subject_id=? AND student_id=?"
@@ -994,6 +1060,12 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
 <?php endif; ?>
 <?php if ($error_msg): ?>
 <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?php echo $error_msg; ?></div>
+<?php endif; ?>
+<?php if ($subject_locked): ?>
+<div class="alert" style="background:rgba(117,115,115,.12);border:1px solid rgba(117,115,115,.35);color:var(--text6);">
+  <i class="ti ti-archive"></i> This subject is <strong>inactive</strong> — it's a read-only history record.
+  Nothing on it can be added, edited, or deleted. Go to <strong>Settings</strong> to reactivate it.
+</div>
 <?php endif; ?>
 
 <?php

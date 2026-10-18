@@ -33,12 +33,25 @@
 // ============================================================
 
 session_start();
-require_once '../includes/auth.php';
-requireRole('teacher');
 require_once '../config/db.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 header('Content-Type: application/json');
+
+// ── Auth (AJAX-safe) ─────────────────────────────────────────────
+// Deliberately NOT using includes/auth.php's requireRole() here: on an
+// expired/invalid session that redirects (header Location: login.php)
+// instead of returning JSON. This endpoint is hit via fetch() from a
+// biometric tab that's often left open for an entire class period, so
+// once the session lapses, requireRole()'s redirect would send the
+// browser off to fetch the login page's HTML — r.json() then throws
+// trying to parse it, which the page's .catch() reports as a generic
+// "Network error — scan not recorded", even though the card itself was
+// perfectly fine. Return a proper JSON 401 instead.
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'teacher') {
+    http_response_code(401);
+    die(json_encode(['status' => 'error', 'message' => 'Your session has expired — refresh the page and log in again.']));
+}
 
 $teacher_id = $_SESSION['user_id'];
 
@@ -63,12 +76,23 @@ if ($card_uid === '') {
 }
 
 // ── Verify this teacher owns the subject ───────────────────────
-$ov = $conn->prepare("SELECT id FROM subjects WHERE id=? AND teacher_id=? LIMIT 1");
+$ov = $conn->prepare("SELECT id, is_active FROM subjects WHERE id=? AND teacher_id=? LIMIT 1");
 $ov->bind_param('ii', $subject_id, $teacher_id);
-$ov->execute(); $ov->store_result();
-if ($ov->num_rows === 0) {
+$ov->execute();
+$ov_row = $ov->get_result()->fetch_assoc();
+if (!$ov_row) {
     http_response_code(403);
     die(json_encode(['status' => 'error', 'message' => 'Not your subject']));
+}
+// Subject went inactive (history record) mid-session — a session could
+// already be running the moment it got deactivated. Treat it the same
+// as no session: end it and refuse the scan, rather than quietly
+// recording attendance on a closed-out subject.
+if (!$ov_row['is_active']) {
+    $endq = $conn->prepare("UPDATE bio_sessions SET status='ended', ended_at=NOW() WHERE subject_id=? AND status='active'");
+    $endq->bind_param('i', $subject_id);
+    $endq->execute();
+    die(json_encode(['status' => 'error', 'message' => 'This subject is now inactive. Attendance session ended.']));
 }
 
 // ── Auto-expire sessions (same housekeeping as bio_config.php / bio_record.php) ─

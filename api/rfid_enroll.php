@@ -22,8 +22,6 @@
 // ============================================================
 
 session_start();
-require_once '../includes/auth.php';
-requireRole('teacher');
 require_once '../config/db.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
@@ -33,6 +31,16 @@ function fail($msg, $httpCode = 400) {
     http_response_code($httpCode);
     echo json_encode(['status' => 'error', 'message' => $msg]);
     exit;
+}
+
+// ── Auth (AJAX-safe) ─────────────────────────────────────────────
+// Deliberately NOT using includes/auth.php's requireRole() here: on an
+// expired/invalid session that redirects (header Location: login.php)
+// instead of returning JSON, which breaks a fetch()-based caller just
+// like it does in api/rfid_scan.php (see the comment there). Return a
+// proper JSON 401 instead.
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'teacher') {
+    fail('Your session has expired — refresh the page and log in again.', 401);
 }
 
 $teacher_id = $_SESSION['user_id'];

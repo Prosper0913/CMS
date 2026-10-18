@@ -78,9 +78,10 @@ if (isset($_POST['add_student'])) {
     $section_id = (int)($_POST['section_id'] ?? 0);
 
     // The chosen section must be one of this teacher's own.
-    $sec_ok = false;
+    $sec_ok     = false;
+    $sec_course = '';
     foreach ($my_sections_list as $sec) {
-        if ((int)$sec['id'] === $section_id) { $sec_ok = true; break; }
+        if ((int)$sec['id'] === $section_id) { $sec_ok = true; $sec_course = $sec['course']; break; }
     }
 
     if ($student_id === '') {
@@ -122,12 +123,14 @@ if (isset($_POST['add_student'])) {
             $gender         = trim($_POST['gender'] ?? '');
             $contact_db     = $contact !== '' ? $contact : null;
             $gender_db      = $gender  !== '' ? $gender  : null;
-            $course         = trim($_POST['course'] ?? '');
+            // No separate "course" field in this form — the chosen section
+            // already has a course (shown right in its dropdown label), so
+            // the new student's course is just inherited from that section
+            // rather than asked for twice.
+            $course         = $sec_course;
 
             if ($last_name === '' || $first_name === '') {
                 $error_msg = "Last name and first name are required for a new student.";
-            } elseif (!in_array($course, STUDENT_COURSES, true)) {
-                $error_msg = "Please select a valid course.";
             } elseif (($contact_err = student_contact_error($contact)) !== '') {
                 $error_msg = $contact_err;
             } elseif (!in_array($gender, ['', 'Male', 'Female'], true)) {
@@ -439,15 +442,6 @@ $active_nav = "students";
                 <option value="">Select gender</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Course <span class="text-red">*</span></label>
-              <select name="course" class="form-control">
-                <option value="">Select course</option>
-                <?php foreach (STUDENT_COURSES as $c): ?>
-                <option value="<?php echo $c; ?>"><?php echo $c; ?></option>
-                <?php endforeach; ?>
               </select>
             </div>
             <p style="font-size:11px;color:var(--text7);margin-top:-8px;margin-bottom:14px;">

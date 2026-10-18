@@ -55,10 +55,12 @@ $conn->query(
 
 // ── Find active session ───────────────────────────────────────
 $sq = $conn->prepare(
-    "SELECT id AS session_id, subject_id, started_at, late_after_minutes
-     FROM bio_sessions
-     WHERE device_id=? AND status='active'
-     ORDER BY started_at DESC LIMIT 1"
+    "SELECT bs.id AS session_id, bs.subject_id, bs.started_at, bs.late_after_minutes,
+            s.is_active AS subject_active
+     FROM bio_sessions bs
+     JOIN subjects s ON s.id = bs.subject_id
+     WHERE bs.device_id=? AND bs.status='active'
+     ORDER BY bs.started_at DESC LIMIT 1"
 );
 $sq->bind_param('i', $device_id);
 $sq->execute();
@@ -72,6 +74,20 @@ $session_id         = (int)$session['session_id'];
 $subject_id         = (int)$session['subject_id'];
 $session_started_at = $session['started_at'];
 $late_after_minutes = (int)$session['late_after_minutes'];
+
+// ── Subject went inactive (history record) mid-session ─────────
+// The teacher can no longer START a session on an inactive subject,
+// but one could already be running the moment it got deactivated.
+// Treat that the same as no session: end it and refuse the scan,
+// rather than quietly recording attendance on a closed-out subject.
+if (!$session['subject_active']) {
+    $endq = $conn->prepare("UPDATE bio_sessions SET status='ended', ended_at=NOW() WHERE id=?");
+    $endq->bind_param('i', $session_id);
+    $endq->execute();
+    writelog($conn, $device_id, $session_id, $student_id, $subject_id, "$scan_date $scan_time", $ip,
+             'subject_inactive', 'Subject is inactive — session auto-ended, scan not recorded');
+    die(json_encode(['status'=>'error','message'=>'This subject is now inactive. Attendance session ended.']));
+}
 
 // ── Validate student ──────────────────────────────────────────
 if ($student_id === '') {
