@@ -38,7 +38,7 @@ function auth_page_start(string $title, string $kicker, string $heading): void {
     body{
       margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
       padding:32px 20px;font-family:'DM Sans',sans-serif;
-      background:linear-gradient(160deg,var(--school-bg) 0%,#123d32 100%);
+      /* background:linear-gradient(160deg,var(--school-bg) 24%,#123d32 100%); */
       color:var(--school-text6);
     }
     .ap-card{

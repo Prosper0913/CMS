@@ -195,8 +195,7 @@ auth_page_start('Forgot password', 'Account recovery', 'Forgot your password?');
           placeholder="e.g. your section, and how the admin can reach you to confirm it's you"></textarea>
       </div>
     </div>
-    <button type="submit" name="method" value="admin" class="btn-main"
-            style="background:transparent;border:1px solid var(--border-on-light);color:var(--school-text6);">
+    <button type="submit" name="method" value="admin" class="btn-main">
       <i class="ti ti-send"></i> Request admin help instead
     </button>
   </form>

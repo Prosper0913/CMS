@@ -1,18 +1,7 @@
 <?php
-// ============================================================
-//  loginv2.php — Sign-in page, v2
-//  Same auth logic as login.php (kept as-is / unused for now).
-//  Differences from login.php:
-//    - no left "showcase" panel — just the login form, centered
-//    - the page scrolls: below the fold there's a school-location
-//      section, mission & vision, and a footer with legal links +
-//      a "Report an Issue" form
-//    - the login form itself is now CSRF-protected
-// ============================================================
 session_start();
 require_once 'config/db.php';
 require_once 'includes/audit.php';
-require_once 'includes/csrf.php';
 
 if (isset($_SESSION['role'])) {
     header("Location: " . match ($_SESSION['role']) {
@@ -26,9 +15,6 @@ if (isset($_SESSION['role'])) {
 $error = '';
 $notice = isset($_GET['reset']) ? "Your password was updated. Please sign in with your new password." : '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!csrf_verify()) {
-        $error = "Your session expired. Please try signing in again.";
-    } else {
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['password'] ?? '');
     if ($username===''||$password==='') {
@@ -62,30 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Invalid Student ID / username or password.";
         }
     }
-    }
 }
-
-// ── Easy-to-edit school info — update these to your actual details ──
-$SCHOOL_NAME     = "College of Maasin";
-$SCHOOL_ADDRESS  = "Maasin City, Southern Leyte, Philippines";
-$SCHOOL_LAT      = "10.134692065956623";
-$SCHOOL_LNG      = "124.83862468701554";
-$SCHOOL_MAP_QUERY = urlencode($SCHOOL_LAT . ',' . $SCHOOL_LNG);
-$SCHOOL_EMAIL    = "collegeofmaasin1925@yahoo.com";
-$SCHOOL_PHONE    = "00000000000";
-$DEV_EMAIL       = "anthonyvdances@gmail.com";
-$DEV_PHONE       = "00000000000";
-$SCHOOL_MISSION  = "The College of Maasin, with the dynamic integration of instruction, research, "
-                  . "and extension, commits itself to seek a life of faith, learning and action to "
-                  . "develop people into becoming God-loving citizens with integrity in character, "
-                  . "intellectually competent and honest, morally and ethically sensitive, excellent "
-                  . "in work performance, creatively aware and responsive to the needs and "
-                  . "aspirations of people for the realization of a just, free and responsible "
-                  . "Christian social order.";
-$SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, commits its life "
-                  . "resources and ministry toward the development of persons, nurtured by faith "
-                  . "in God and the liberating process of excellent learning toward holistic and "
-                  . "creative action for social renewal.";
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -98,16 +61,19 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
+  <!-- <link rel="stylesheet" href="/classroomv2/assets/style.css"> -->
 
   <style>
     :root{
-      --school-bg:  #1e5f4e;
-      --school-text: #FFFFFF;
-      --school-text6: #050505ec;
-      --school-text7: #6B7280;
-      --school-bg5: #FFFFFF;
+      /* school brand tokens — pulled from the site's own variables */
+      --school-bg:  var(--bg, #1e5f4e);   /* school green */
+      --school-text: var(--text, #FFFFFF); /* white */
+      --school-text6: var(--text6, #000000); /* black */
+      --school-text7: var(--text7, #6B7280); /* grey */
+      --school-bg5: var(--bg5, #FFFFFF);  /* white */
 
       --muted-on-dark: rgba(255,255,255,.75);
+      --border-on-dark: rgba(255,255,255,.18);
       --border-on-light: color-mix(in srgb, var(--school-text7) 30%, transparent);
       --surface-tint: color-mix(in srgb, var(--school-bg5) 93%, var(--school-text7) 7%);
 
@@ -115,184 +81,529 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
       --role-student: #00c22a;
       --role-instructor: #E3A857;
       --role-admin: #d42937;
+
       --role-accent: var(--role-default);
     }
 
     *{box-sizing:border-box;}
-    html{scroll-behavior:smooth;}
 
     body.page-login{
       margin:0;
-      background:var(--school-bg5);
-      color:var(--school-text6);
+      min-height:100vh;
+      background:var(--school-bg);
+      color:var(--school-text);
       font-family:'DM Sans',sans-serif;
+      display:flex;
+      align-items:stretch;
+      justify-content:center;
+    }
+    .auth-shell{
+      width:100%;
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:minmax(0,3fr) minmax(0,2fr);
     }
 
-    /* ---------- HERO (login only, no showcase panel) ---------- */
-    .hero{
-      min-height:100vh;
+    /* ---------- LEFT SHOWCASE PANEL ---------- */
+    .showcase-panel{
+      /* colours tuned for a dark background (the role pills on the right keep their own) */
+      --accent-default:#8fe0c0;
+      --role-default:var(--accent-default);
+      --role-student:#4be27a;
+      --role-instructor:#f2bd6b;
+      --role-admin:#ff7d88;
+      --role-accent:var(--accent-default);
+
+      position:relative;
+      overflow:hidden;
+      isolation:isolate;
+      display:flex;
+      flex-direction:column;
+      padding:44px 56px 40px;
+      color:#fff;
+      background:linear-gradient(155deg,#17614e 0%,#0f4437 48%,#082a21 100%);
+    }
+
+    /* soft coloured glows — the active role tints them */
+    .showcase-bg{position:absolute;inset:0;z-index:0;}
+    .bg-layer{
+      position:absolute;inset:0;
+      opacity:0;
+      transition:opacity .75s cubic-bezier(.4,0,.2,1);
+    }
+    .bg-layer[data-role="default"]{
+      background:
+        radial-gradient(60% 55% at 12% 0%, rgba(143,224,192,.22) 0%, transparent 70%),
+        radial-gradient(55% 50% at 100% 100%, rgba(242,189,107,.14) 0%, transparent 70%);
+    }
+    .bg-layer[data-role="student"]{
+      background:
+        radial-gradient(60% 55% at 92% 94%, color-mix(in srgb, var(--role-student) 30%, transparent) 0%, transparent 70%),
+        radial-gradient(50% 45% at 8% 6%,  color-mix(in srgb, var(--role-student) 16%, transparent) 0%, transparent 70%);
+    }
+    .bg-layer[data-role="instructor"]{
+      background:
+        radial-gradient(60% 55% at 92% 8%,  color-mix(in srgb, var(--role-instructor) 28%, transparent) 0%, transparent 70%),
+        radial-gradient(50% 45% at 8% 92%,  color-mix(in srgb, var(--role-instructor) 14%, transparent) 0%, transparent 70%);
+    }
+    .bg-layer[data-role="admin"]{
+      background:
+        radial-gradient(60% 55% at 50% 100%, color-mix(in srgb, var(--role-admin) 26%, transparent) 0%, transparent 70%),
+        radial-gradient(50% 45% at 88% 12%,  color-mix(in srgb, var(--role-admin) 14%, transparent) 0%, transparent 70%);
+    }
+    .bg-layer.is-active{opacity:1;}
+
+    /* fine grid + concentric rings for depth */
+    .showcase-grid{
+      position:absolute;inset:0;z-index:1;pointer-events:none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size:56px 56px;
+      -webkit-mask-image:radial-gradient(ellipse 85% 75% at 30% 35%, #000 20%, transparent 78%);
+              mask-image:radial-gradient(ellipse 85% 75% at 30% 35%, #000 20%, transparent 78%);
+    }
+    .showcase-ring{
+      position:absolute;z-index:1;pointer-events:none;
+      right:-170px;top:-170px;width:460px;height:460px;border-radius:50%;
+      border:1px solid rgba(255,255,255,.09);
+      box-shadow:0 0 0 70px rgba(255,255,255,.02), 0 0 0 140px rgba(255,255,255,.012);
+    }
+
+    /* brand lockup (top-left) */
+    .brand{position:relative;z-index:2;display:flex;align-items:center;gap:12px;}
+    .brand-mark{
+      width:44px;height:44px;border-radius:12px;
+      display:grid;place-items:center;
+      font-size:23px;color:#fff;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.20);
+    }
+    .brand-text{display:flex;flex-direction:column;line-height:1.2;}
+    .brand-text strong{font-family:'Syne',sans-serif;font-weight:800;font-size:17px;letter-spacing:.04em;}
+    .brand-text small{font-size:12.5px;color:var(--muted-on-dark);}
+
+    /* the area that swaps content when a role is hovered */
+    .showcase-inner{
+      position:relative;z-index:2;flex:1;
+      display:grid;align-items:center;
+      padding:36px 0;
+    }
+    .showcase-idle,
+    .showcase-stage{grid-area:1/1;}
+    .showcase-idle{pointer-events:none;max-width:540px;}
+    .showcase-stage{display:grid;max-width:540px;}
+    .showcase-slide{grid-area:1/1;align-self:center;pointer-events:none;}
+    .showcase-slide.is-active{pointer-events:auto;}
+
+    /* headline + supporting text (shared by the default view and the role views) */
+    .showcase-idle h1,
+    .showcase-slide h1{
+      font-family:'Syne',sans-serif;
+      font-weight:700;
+      font-size:clamp(28px,2.7vw,38px);
+      line-height:1.12;
+      letter-spacing:-.015em;
+      margin:0 0 16px;
+    }
+    .showcase-idle .lead{
+      font-size:16px;line-height:1.65;
+      color:var(--muted-on-dark);
+      margin:0 0 28px;max-width:470px;
+    }
+
+    .eyebrow-pill,
+    .showcase-slide .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 13px;border-radius:99px;
+      font-size:12px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
+      margin-bottom:20px;
+    }
+    .eyebrow-pill{
+      color:var(--muted-on-dark);
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.14);
+    }
+    .eyebrow-pill .dot{
+      width:7px;height:7px;border-radius:50%;
+      background:var(--accent-default);
+      box-shadow:0 0 0 4px rgba(143,224,192,.2);
+    }
+    .showcase-slide .eyebrow{
+      color:var(--role-accent);
+      background:color-mix(in srgb, var(--role-accent) 14%, transparent);
+      border:1px solid color-mix(in srgb, var(--role-accent) 38%, transparent);
+      transition:color .5s ease, background .5s ease, border-color .5s ease;
+    }
+    .showcase-slide .eyebrow i{font-size:15px;}
+
+    /* default view: three feature cards */
+    .feature-cards{display:grid;gap:12px;max-width:500px;}
+    .feature-card{
+      display:flex;align-items:flex-start;gap:14px;
+      padding:15px 17px;border-radius:14px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.11);
+      -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    }
+    .fc-icon{
+      flex:0 0 40px;height:40px;border-radius:11px;
+      display:grid;place-items:center;
+      font-size:20px;color:var(--accent-default);
+      background:rgba(143,224,192,.12);
+      border:1px solid rgba(143,224,192,.22);
+    }
+    .feature-card h3{margin:1px 0 3px;font-size:15px;font-weight:600;letter-spacing:.005em;}
+    .feature-card p{margin:0;font-size:13.5px;line-height:1.5;color:var(--muted-on-dark);}
+
+    /* role views: feature rows */
+    .feature-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;max-width:480px;}
+    .feature-list li{
+      display:flex;align-items:flex-start;gap:12px;
+      padding:11px 15px;border-radius:12px;
+      font-size:14.5px;line-height:1.5;
+      color:rgba(255,255,255,.88);
+      background:rgba(255,255,255,.055);
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .feature-list li i{
+      color:var(--role-accent);
+      transition:color .5s ease;
+      font-size:18px;
+      margin-top:1px;
+      flex-shrink:0;
+    }
+
+    /* trust chips (bottom) */
+    .panel-foot{position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:10px;}
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:7px 13px;border-radius:99px;
+      font-size:12.5px;color:var(--muted-on-dark);
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.11);
+    }
+    .chip i{font-size:15px;color:var(--role-accent);transition:color .5s ease;}
+
+    /* animation: children rise in with a stagger, and snap out when leaving */
+    .showcase-idle > *,
+    .showcase-slide > *{
+      opacity:0;
+      transform:translateY(16px);
+      filter:blur(6px);
+      transition:opacity .5s cubic-bezier(.22,1,.36,1), transform .5s cubic-bezier(.22,1,.36,1), filter .5s cubic-bezier(.22,1,.36,1);
+    }
+    .showcase-idle.is-active > *,
+    .showcase-slide.is-active > *{opacity:1;transform:translateY(0);filter:blur(0);}
+    .showcase-idle.is-active > *:nth-child(1), .showcase-slide.is-active > *:nth-child(1){transition-delay:.04s;}
+    .showcase-idle.is-active > *:nth-child(2), .showcase-slide.is-active > *:nth-child(2){transition-delay:.11s;}
+    .showcase-idle.is-active > *:nth-child(3), .showcase-slide.is-active > *:nth-child(3){transition-delay:.18s;}
+    .showcase-idle.is-active > *:nth-child(4){transition-delay:.25s;}
+
+    .showcase-slide .feature-list li{
+      opacity:0;transform:translateY(12px);filter:blur(5px);
+      transition:opacity .4s cubic-bezier(.22,1,.36,1), transform .4s cubic-bezier(.22,1,.36,1), filter .4s cubic-bezier(.22,1,.36,1);
+    }
+    .showcase-slide.is-active .feature-list li{opacity:1;transform:translateY(0);filter:blur(0);}
+    .showcase-slide.is-active .feature-list li:nth-child(1){transition-delay:.24s;}
+    .showcase-slide.is-active .feature-list li:nth-child(2){transition-delay:.30s;}
+    .showcase-slide.is-active .feature-list li:nth-child(3){transition-delay:.36s;}
+    .showcase-slide.is-active .feature-list li:nth-child(4){transition-delay:.42s;}
+    .showcase-slide.is-active .feature-list li:nth-child(5){transition-delay:.48s;}
+
+    .showcase-idle.is-leaving > *,
+    .showcase-slide.is-leaving > *,
+    .showcase-slide.is-leaving .feature-list li{
+      transition-delay:0s !important;
+      opacity:0;
+      transform:translateY(-14px);
+      filter:blur(9px);
+      transition-duration:.28s;
+    }
+
+    /* ---------- RIGHT AUTH PANEL ---------- */
+    .auth-panel{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:40px 32px;
+      background:var(--school-bg5);
+      color:var(--school-text6);
+    }
+
+    .auth-card{width:100%;max-width:380px;}
+
+    .auth-card .kicker{
+      font-size:12px;
+      font-weight:500;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--school-text7);
+      margin-bottom:8px;
+    }
+    .auth-card h2{
+      font-family:'Syne',sans-serif;
+      font-size:26px;
+      font-weight:700;
+      margin:0 0 28px;
+      color:var(--school-text6);
+    }
+
+    .role-strip{display:flex;gap:8px;margin-bottom:28px;}
+    .role-pill{
+      flex:1;
       display:flex;
       flex-direction:column;
       align-items:center;
-      justify-content:center;
-      padding:48px 24px;
-      background:var(--school-bg);
-      color:var(--school-text);
-      position:relative;
-      isolation:isolate;
+      gap:6px;
+      padding:12px 6px;
+      border-radius:12px;
+      border:1px solid var(--border-on-light);
+      background:var(--school-bg5);
+      color:var(--school-text7);
+      cursor:pointer;
+      font-family:'DM Sans',sans-serif;
+      font-size:12.5px;
+      font-weight:500;
+      transition:border-color .3s ease, background .3s ease, color .3s ease, transform .3s ease;
     }
-    .hero::before{
-      content:'';
-      position:absolute;inset:0;z-index:-1;
-      background: #fffefed0;
-    }
-
-    .scroll-hint{
-      margin-top:34px;
-      display:flex;flex-direction:column;align-items:center;gap:4px;
-      color:var(--muted-on-dark);
-      font-size:12px;letter-spacing:.08em;text-transform:uppercase;
-      text-decoration:none;
-    }
-    .scroll-hint i{font-size:20px;animation:bob 1.8s ease-in-out infinite;}
-    @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(5px);}}
-
-    /* ---------- AUTH CARD ---------- */
-    .auth-card{width:100%;max-width:380px;background:var(--school-bg5);color:var(--school-text6);
-      border-radius:18px;padding:36px 32px;box-shadow:0 24px 60px rgba(0,0,0,.35);}
-
-    .auth-card .kicker{font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
-      color:var(--school-text7);margin-bottom:8px;}
-    .auth-card h2{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;margin:0 0 28px;color:var(--school-text6);}
-
-    .role-strip{display:flex;gap:8px;margin-bottom:28px;}
-    .role-pill{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;
-      border-radius:12px;border:1px solid var(--border-on-light);background:var(--school-bg5);
-      color:var(--school-text7);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;
-      transition:border-color .3s ease, background .3s ease, color .3s ease, transform .3s ease;}
     .role-pill i{font-size:19px;transition:color .3s ease;}
-    .role-pill:hover,.role-pill:focus-visible{color:var(--school-text6);border-color:var(--pill-color, var(--role-default));
-      background:var(--surface-tint);transform:translateY(-2px);outline:none;}
-    .role-pill:hover i,.role-pill:focus-visible i{color:var(--pill-color, var(--role-default));}
+    .role-pill:hover,
+    .role-pill:focus-visible{
+      color:var(--school-text6);
+      border-color:var(--pill-color, var(--role-default));
+      background:var(--surface-tint);
+      transform:translateY(-2px);
+      outline:none;
+    }
+    .role-pill:hover i,
+    .role-pill:focus-visible i{color:var(--pill-color, var(--role-default));}
     .role-pill[data-role="student"]{--pill-color:var(--role-student);}
     .role-pill[data-role="instructor"]{--pill-color:var(--role-instructor);}
     .role-pill[data-role="admin"]{--pill-color:var(--role-admin);}
 
     .auth-card form{display:flex;flex-direction:column;gap:18px;}
-    .form-group label{display:block;font-size:12.5px;font-weight:500;color:var(--school-text7);margin-bottom:7px;}
-    .input-wrap{position:relative;display:flex;align-items:center;gap:10px;background:var(--surface-tint);
-      border:1px solid var(--border-on-light);border-radius:10px;padding:12px 14px;transition:border-color .25s ease;}
+
+    .form-group label{
+      display:block;
+      font-size:12.5px;
+      font-weight:500;
+      color:var(--school-text7);
+      margin-bottom:7px;
+    }
+    .input-wrap{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      background:var(--surface-tint);
+      border:1px solid var(--border-on-light);
+      border-radius:10px;
+      padding:12px 14px;
+      transition:border-color .25s ease;
+    }
     .input-wrap:focus-within{border-color:var(--school-bg);}
     .input-wrap i{color:var(--school-text7);font-size:17px;}
-    .input-wrap input{flex:1;background:transparent;border:none;outline:none;color:var(--school-text6);
-      font-family:'DM Sans',sans-serif;font-size:14.5px;}
+    .input-wrap input{
+      flex:1;
+      background:transparent;
+      border:none;
+      outline:none;
+      color:var(--school-text6);
+      font-family:'DM Sans',sans-serif;
+      font-size:14.5px;
+    }
     .input-wrap input::placeholder{color:color-mix(in srgb, var(--school-text7) 75%, transparent);}
     #pw-input{padding-right:30px;}
-    .pw-toggle-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;
-      color:var(--school-text7);cursor:pointer;display:flex;align-items:center;padding:0;z-index:2;}
+    .pw-toggle-btn{
+      position:absolute;
+      right:14px;
+      top:50%;
+      transform:translateY(-50%);
+      background:none;
+      border:none;
+      color:var(--school-text7);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      padding:0;
+      z-index:2;
+    }
     .pw-toggle-btn i{font-size:17px;}
     .pw-toggle-btn:hover{color:var(--school-text6);}
 
-    .btn-login{margin-top:6px;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;
-      border-radius:10px;border:none;background:var(--school-bg);color:var(--school-text);font-family:'DM Sans',sans-serif;
-      font-weight:600;font-size:14.5px;cursor:pointer;transition:filter .2s ease, transform .2s ease;}
+    .btn-login{
+      margin-top:6px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding:13px;
+      border-radius:10px;
+      border:none;
+      background:var(--school-bg);
+      color:var(--school-text);
+      font-family:'DM Sans',sans-serif;
+      font-weight:600;
+      font-size:14.5px;
+      cursor:pointer;
+      transition:filter .2s ease, transform .2s ease;
+    }
     .btn-login:hover{filter:brightness(1.12);transform:translateY(-1px);}
 
-    .alert{display:flex;align-items:center;gap:8px;background:rgba(224,97,109,.1);border:1px solid rgba(224,97,109,.35);
-      color:#B3232E;padding:11px 14px;border-radius:10px;font-size:13.5px;margin-bottom:20px;}
-    .alert.ok{background:rgba(30,95,78,.1);border-color:rgba(30,95,78,.35);color:#175040;}
+    .alert{
+      display:flex;align-items:center;gap:8px;
+      background:rgba(224,97,109,.1);
+      border:1px solid rgba(224,97,109,.35);
+      color:#B3232E;
+      padding:11px 14px;
+      border-radius:10px;
+      font-size:13.5px;
+      margin-bottom:20px;
+    }
+
+    .alert.ok{
+      background:rgba(30,95,78,.1);
+      border-color:rgba(30,95,78,.35);
+      color:#175040;
+    }
     .forgot-row{text-align:right;margin-top:-6px;}
     .forgot-row a{font-size:12.5px;color:var(--school-text7);text-decoration:none;}
     .forgot-row a:hover{color:var(--school-bg);text-decoration:underline;}
 
-    /* honeypot — hidden from real users, left reachable for bots */
-    .hp-field{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
+    .auth-footer{margin-top:28px;font-size:12px;color:var(--school-text7);text-align:center;}
 
-    /* ---------- PUBLIC SECTIONS BELOW THE FOLD ---------- */
-    .pub-section{padding:72px 24px;}
-    .pub-wrap{max-width:980px;margin:0 auto;}
-    .pub-eyebrow{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--school-bg);
-      margin-bottom:10px;}
-    .pub-section h2{font-family:'Syne',sans-serif;font-size:clamp(24px,3vw,32px);margin:0 0 14px;}
-    .pub-section p{line-height:1.7;color:var(--school-text7);max-width:680px;}
-
-    .visit-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;align-items:start;margin-top:28px;}
-    .visit-details{display:flex;flex-direction:column;gap:16px;}
-    .visit-row{display:flex;gap:14px;align-items:flex-start;}
-    .visit-row i{font-size:20px;color:var(--school-bg);margin-top:2px;flex-shrink:0;}
-    .visit-row strong{display:block;font-size:14.5px;margin-bottom:2px;}
-    .visit-row span{color:var(--school-text7);font-size:14px;line-height:1.5;}
-    .map-frame{border-radius:16px;overflow:hidden;border:1px solid var(--border-on-light);
-      box-shadow:0 10px 30px rgba(0,0,0,.08);aspect-ratio:4/3;}
-    .map-frame iframe{width:100%;height:100%;border:0;display:block;}
-
-    .pub-section.alt{background:var(--surface-tint);}
-    .mv-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;margin-top:28px;}
-    .mv-card{background:var(--school-bg5);border:1px solid var(--border-on-light);border-radius:16px;padding:28px 26px;}
-    .mv-card .mv-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:21px;
-      color:var(--school-bg);background:color-mix(in srgb, var(--school-bg) 12%, transparent);margin-bottom:16px;}
-    .mv-card h3{font-family:'Syne',sans-serif;font-size:18px;margin:0 0 10px;}
-    .mv-card p{margin:0;font-size:14.5px;color:var(--school-text7);}
-
-    /* ---------- FOOTER ---------- */
-    .site-footer{background:#0f4437;color:rgba(255,255,255,.82);padding:52px 24px 28px;}
-    .footer-grid{max-width:980px;margin:0 auto;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:36px;}
-    .footer-brand{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-    .footer-brand img{width:34px;height:34px;border-radius:8px;}
-    .footer-brand strong{font-family:'Syne',sans-serif;font-size:15.5px;}
-    .footer-grid p{font-size:13px;line-height:1.6;color:rgba(255,255,255,.6);max-width:280px;}
-    .footer-col h4{font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-      color:rgba(255,255,255,.55);margin:0 0 14px;}
-    .footer-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
-    .footer-col a,.footer-col button.linklike{color:rgba(255,255,255,.82);text-decoration:none;font-size:13.5px;
-      background:none;border:none;padding:0;cursor:pointer;font-family:'DM Sans',sans-serif;text-align:left;}
-    .footer-col a:hover,.footer-col button.linklike:hover{color:#fff;text-decoration:underline;}
-    .footer-bottom{max-width:980px;margin:36px auto 0;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);
-      font-size:12.5px;color:rgba(255,255,255,.5);display:flex;justify-content:center;flex-wrap:wrap;gap:10px;}
-
-    /* ---------- REPORT-AN-ISSUE MODAL ---------- */
-    .modal-overlay{position:fixed;inset:0;background:rgba(5,20,16,.55);display:none;align-items:center;
-      justify-content:center;padding:20px;z-index:1000;}
-    .modal-overlay.is-open{display:flex;}
-    .modal-box{width:100%;max-width:440px;background:#fff;color:var(--school-text6);border-radius:16px;
-      padding:28px 26px;box-shadow:0 30px 70px rgba(0,0,0,.4);max-height:90vh;overflow-y:auto;}
-    .modal-box h3{font-family:'Syne',sans-serif;font-size:19px;margin:0 0 4px;}
-    .modal-box .modal-sub{font-size:13px;color:var(--school-text7);margin:0 0 20px;}
-    .modal-box .form-group{margin-bottom:14px;}
-    .modal-box label{display:block;font-size:12.5px;font-weight:500;color:var(--school-text7);margin-bottom:6px;}
-    .modal-box select,.modal-box textarea,.modal-box input[type=text],.modal-box input[type=email]{
-      width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--border-on-light);
-      font-family:'DM Sans',sans-serif;font-size:13.5px;background:var(--surface-tint);color:var(--school-text6);}
-    .modal-box textarea{resize:vertical;min-height:90px;}
-    .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
-    .btn-ghost{padding:10px 16px;border-radius:9px;border:1px solid var(--border-on-light);background:none;
-      color:var(--school-text7);font-size:13.5px;cursor:pointer;}
-    .btn-primary{padding:10px 18px;border-radius:9px;border:none;background:var(--school-bg);color:#FFFFFF;
-      font-size:13.5px;font-weight:600;cursor:pointer;}
-    .btn-primary:disabled{opacity:.6;cursor:default;}
-    .modal-msg{font-size:13px;padding:10px 12px;border-radius:9px;margin-bottom:14px;display:none;}
-    .modal-msg.ok{display:block;background:rgba(30,95,78,.1);color:#175040;}
-    .modal-msg.err{display:block;background:rgba(224,97,109,.1);color:#B3232E;}
-
-    @media (max-width:760px){
-      .visit-grid,.mv-grid{grid-template-columns:1fr;}
-      .footer-grid{grid-template-columns:1fr;}
-      .footer-bottom{flex-direction:column;}
+    /* ---------- RESPONSIVE ---------- */
+    @media (max-width:920px){
+      .auth-shell{grid-template-columns:1fr;}
+      .showcase-panel{padding:24px 24px 22px;}
+      .showcase-inner{padding:22px 0 4px;}
+      .showcase-idle h1,
+      .showcase-slide h1{font-size:26px;margin-bottom:0;}
+      .showcase-idle .lead,
+      .feature-cards,
+      .feature-list,
+      .panel-foot,
+      .showcase-ring{display:none;}
+      .eyebrow-pill,
+      .showcase-slide .eyebrow{margin-bottom:14px;}
+      .auth-panel{padding:32px 24px 48px;}
     }
-    @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto;} .scroll-hint i{animation:none;} }
+
+    @media (prefers-reduced-motion:reduce){
+      .bg-layer,
+      .showcase-idle > *,
+      .showcase-slide > *,
+      .showcase-slide .feature-list li{transition:opacity .2s linear !important;transform:none !important;filter:none !important;transition-delay:0s !important;}
+    }
   </style>
 </head>
 <body class="page-login">
 
-  <!-- ============== HERO: login form only ============== -->
-  <section class="hero" id="top">
-    <div class="auth-card">
-      <div style="text-align:center;">
-        <img src="assets/images/TCM logo (2).png" alt="TCM Logo" width="96" height="96" style="display:block;margin:0 auto 16px;">
-      </div>
-      <div class="kicker">Welcome back</div>
-      <h2>Sign in to your account</h2>
+<div class="auth-shell">
 
+  <!-- LEFT: showcase panel -->
+  <div class="showcase-panel" id="showcasePanel">
+    <div class="showcase-bg" id="showcaseBg" aria-hidden="true">
+      <span class="bg-layer is-active" data-role="default"></span>
+      <span class="bg-layer" data-role="student"></span>
+      <span class="bg-layer" data-role="instructor"></span>
+      <span class="bg-layer" data-role="admin"></span>
+    </div>
+    <div class="showcase-grid" aria-hidden="true"></div>
+    <div class="showcase-ring" aria-hidden="true"></div>
+
+    <div class="brand">
+      <span class="brand-mark"><i class="ti ti-school"></i></span>
+      <span class="brand-text">
+        <strong>TCM</strong>
+        <small>Classroom Management System</small>
+      </span>
+    </div>
+
+    <div class="showcase-inner">
+      <!-- default view (shown until a role is hovered) -->
+      <div class="showcase-idle is-active" id="showcaseIdle">
+        <span class="eyebrow-pill"><span class="dot"></span> One platform &middot; every role</span>
+        <h1>Manage your classroom<br>with confidence.</h1>
+        <p class="lead">Grades, attendance, class records and reports &mdash; organised in one secure place for students, instructors and administrators.</p>
+        <div class="feature-cards">
+          <div class="feature-card">
+            <span class="fc-icon"><i class="ti ti-chart-bar"></i></span>
+            <div><h3>Live grades</h3><p>Scores and averages update the moment they are recorded.</p></div>
+          </div>
+          <div class="feature-card">
+            <span class="fc-icon"><i class="ti ti-fingerprint"></i></span>
+            <div><h3>Biometric attendance</h3><p>A fingerprint scan marks attendance automatically.</p></div>
+          </div>
+          <div class="feature-card">
+            <span class="fc-icon"><i class="ti ti-file-export"></i></span>
+            <div><h3>Reports &amp; exports</h3><p>Class records ready to download whenever you need them.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- role views (shown when a role button on the right is hovered) -->
+      <div class="showcase-stage" id="showcaseStage">
+        <div class="showcase-slide" data-role="student">
+          <span class="eyebrow"><i class="ti ti-backpack"></i> For Students</span>
+          <h1>Track your progress<br>at a glance.</h1>
+          <ul class="feature-list">
+            <li><i class="ti ti-chart-bar"></i> Check grades in real time.</li>
+            <li><i class="ti ti-eye"></i> View all outputs -- Quiz, Exam, Attendance, Activity</li>
+            <li><i class="ti ti-calendar-event"></i> See your weekly class schedule on your home screen.</li>
+            <li><i class="ti ti-speakerphone"></i> Read announcements from your instructors.</li>
+            <li><i class="ti ti-bell"></i> Get notified as soon as new scores are posted.</li>
+            <!-- <li><i class="ti ti-calendar-event"></i> See section schedules and requirements.</li> -->
+          </ul>
+        </div>
+
+        <div class="showcase-slide" data-role="instructor">
+          <span class="eyebrow"><i class="ti ti-chalkboard"></i> For Instructors</span>
+          <h1>Run your classroom<br>on the cloud</h1>
+          <ul class="feature-list">
+            <li><i class="ti ti-clipboard-check"></i> Create subjects and manipulate grade weights. </li>
+            <li><i class="ti ti-clipboard-check"></i> Record grades and manage class lists.</li>
+            <li><i class="ti ti-report"></i> Generate reports across every class.</li>
+            <li><i class="ti ti-fingerprint"></i> Take attendance automatically via biometric scan.</li>
+            <li><i class="ti ti-report"></i> Export class records anytime.</li>
+            <li><i class="ti ti-speakerphone"></i> Post class announcements and notify students of new scores.</li>
+            <li><i class="ti ti-building-community"></i> Request access to sections through admin approval.</li>
+          </ul>
+        </div>
+
+        <div class="showcase-slide" data-role="admin">
+          <span class="eyebrow"><i class="ti ti-shield-lock"></i> For Admins</span>
+          <h1>Oversee the whole<br>system, in one place.</h1>
+          <ul class="feature-list">
+            <li><i class="ti ti-users"></i> Manage accounts, students, and access requests.</li>
+            <li><i class="ti ti-history"></i> Audit every sign-in by IP address and device.</li>
+            <li><i class="ti ti-lock-open"></i> Approve password recovery with one-time reset links.</li>
+            <li><i class="ti ti-device-desktop"></i> Monitor biometric devices and system health.</li>
+            <li><i class="ti ti-file-spreadsheet"></i> Import students in bulk from CSV or Excel.</li>
+            <li><i class="ti ti-key"></i> Issue API keys for connected systems.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-foot">
+      <span class="chip"><i class="ti ti-shield-lock"></i> Secure sign-in</span>
+      <span class="chip"><i class="ti ti-users"></i> Role-based access</span>
+      <span class="chip"><i class="ti ti-history"></i> Audited activity</span>
+    </div>
+  </div>
+
+  <!-- RIGHT: auth panel -->
+  <div class="auth-panel">
+    <div class="auth-card">
+      <div style="align-items: center;">
+        <img src="assets/images/TCM logo (2).png" alt="TCM Logo" width="120" height="120" justify-content="center" style="display: block; margin: 0 auto 16px;">
+      </div>
+    <div class="kicker">Welcome back</div>
+  <h2>Sign in to your account</h2>
+  
+      
       <?php if ($error): ?>
       <div class="alert"><i class="ti ti-alert-circle"></i> <?php echo htmlspecialchars($error); ?></div>
       <?php endif; ?>
@@ -300,14 +611,26 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
       <div class="alert ok"><i class="ti ti-circle-check"></i> <?php echo htmlspecialchars($notice); ?></div>
       <?php endif; ?>
 
+      <div class="role-strip" id="roleStrip">
+        <button type="button" class="role-pill" data-role="student">
+          <i class="ti ti-backpack" ></i> Student
+        </button>
+        <button type="button" class="role-pill" data-role="instructor">
+          <i class="ti ti-chalkboard"></i> Instructor
+        </button>
+        <button type="button" class="role-pill" data-role="admin">
+          <i class="ti ti-shield-lock"></i> Admin
+        </button>
+      </div>
+
       <form method="POST" autocomplete="off">
-        <?php echo csrf_field(); ?>
         <div class="form-group">
           <label>Student ID / Username</label>
           <div class="input-wrap">
             <i class="ti ti-user"></i>
             <input type="text" name="username" placeholder="Students: enter your Student ID"
-              value="<?php echo htmlspecialchars($_POST['username']??''); ?>" required autofocus>
+              value="<?php echo htmlspecialchars($_POST['username']??''); ?>"
+              required autofocus>
           </div>
         </div>
         <div class="form-group">
@@ -321,146 +644,22 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
           </div>
         </div>
         <div class="forgot-row"><a href="forgot_password.php">Forgot password?</a></div>
-        <button type="submit" class="btn-login"><i class="ti ti-login"></i> Sign In</button>
+        <button type="submit" class="btn-login">
+          <i class="ti ti-login"></i> Sign In
+        </button>
       </form>
-    </div>
 
-    <a href="#visit" class="scroll-hint"><span style="color: var(--school-text6);">Learn more about <?php echo htmlspecialchars($SCHOOL_NAME); ?></span><i class="ti ti-chevron-down" style="color: var(--school-text6);"></i></a>
-  </section>
-
-  <!-- ============== VISIT US ============== -->
-  <section class="pub-section" id="visit">
-    <div class="pub-wrap">
-      <div class="pub-eyebrow">Find us</div>
-      <h2>Visit <?php echo htmlspecialchars($SCHOOL_NAME); ?></h2>
-      <p>Stop by during school hours — our administrative office can help with enrollment, records requests, and general inquiries.</p>
-      <div class="visit-grid">
-        <div class="visit-details">
-          <div class="visit-row">
-            <i class="ti ti-map-pin"></i>
-            <div><strong>Address</strong><span><?php echo htmlspecialchars($SCHOOL_ADDRESS); ?></span></div>
-          </div>
-          <div class="visit-row">
-            <i class="ti ti-clock"></i>
-            <div><strong>Office Hours</strong><span>Monday – Friday, 8:00 AM – 5:00 PM</span></div>
-          </div>
-          <div class="visit-row">
-            <i class="ti ti-mail"></i>
-            <div><strong>Email</strong><span><?php echo htmlspecialchars($SCHOOL_EMAIL); ?></span></div>
-          </div>
-          <div class="visit-row">
-            <i class="ti ti-phone"></i>
-            <div><strong>Phone</strong><span><?php echo htmlspecialchars($SCHOOL_PHONE); ?></span></div>
-          </div>
-        </div>
-        <div class="map-frame">
-          <iframe
-            src="https://www.google.com/maps?q=<?php echo $SCHOOL_MAP_QUERY; ?>&output=embed"
-            loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-            title="Map showing <?php echo htmlspecialchars($SCHOOL_NAME); ?>"></iframe>
-        </div>
+      <div class="auth-footer">
+        TCM Classroom Management System &nbsp;·&nbsp; <?php echo date('Y'); ?>
+        <br>
+        <a href="/classroomv2/privacy.php" style="color:inherit;opacity:.8;">Privacy Policy</a> &nbsp;·&nbsp;
+        <a href="/classroomv2/terms.php" style="color:inherit;opacity:.8;">Terms &amp; Conditions</a> &nbsp;·&nbsp;
+        <a href="/classroomv2/cookie_policy.php" style="color:inherit;opacity:.8;">Cookie Policy</a>
       </div>
-    </div>
-  </section>
-
-  <!-- ============== MISSION & VISION ============== -->
-  <section class="pub-section alt" id="about">
-    <div class="pub-wrap">
-      <div class="pub-eyebrow">Who we are</div>
-      <h2>Our Mission &amp; Vision</h2>
-      <div class="mv-grid">
-        <div class="mv-card">
-          <h3>Mission</h3>
-          <p><?php echo htmlspecialchars($SCHOOL_MISSION); ?></p>
-        </div>
-        <div class="mv-card">
-          <h3>Vision</h3>
-          <p><?php echo htmlspecialchars($SCHOOL_VISION); ?></p>
-        </div>
-      </div>
-    </div>
-  </section>
-<div class="btn-primary" style="display: flex; width: fit-content; margin-left: auto; margin-bottom: 25px; margin-right: 25px;">
-  <a href="#top" style="color:inherit;">Back to top ↑</a>
-</div>
-
-
-  <!-- ============== FOOTER ============== -->
-  <footer class="site-footer">
-    <div class="footer-grid">
-      <div>
-        <div class="footer-brand">
-          <img src="assets/images/TCM logo (2).png" alt="TCM logo">
-          <strong><?php echo htmlspecialchars($SCHOOL_NAME); ?></strong>
-        </div>
-        <p>Classroom Management System — grades, attendance, and class records in one secure place for students, teachers, and administrators.</p>
-      </div>
-      <div class="footer-col">
-        <h4>Legal</h4>
-        <ul>
-          <li><a href="/classroomv2/privacy.php">Privacy Policy</a></li>
-          <li><a href="/classroomv2/terms.php">Terms &amp; Conditions</a></li>
-          <li><a href="/classroomv2/cookie_policy.php">Cookie Policy</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>System Support</h4>
-        <ul>
-          <li><a href="forgot_password.php">Forgot password</a></li>
-          <li><button type="button" class="linklike" id="openReportModal">Report an issue</button></li>
-          <li><a href="mailto:<?php echo htmlspecialchars($DEV_EMAIL); ?>"><?php echo htmlspecialchars($DEV_EMAIL); ?></a></li>
-          <li><a href="tel:<?php echo htmlspecialchars($DEV_PHONE); ?>"><?php echo htmlspecialchars($DEV_PHONE); ?></a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <span><?php echo htmlspecialchars($SCHOOL_NAME); ?> Classroom Management System &middot; <?php echo date('Y'); ?></span>
-    </div>
-  </footer>
-
-  <!-- ============== REPORT AN ISSUE MODAL ============== -->
-  <div class="modal-overlay" id="reportOverlay" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
-    <div class="modal-box">
-      <h3 id="reportTitle">Report an Issue</h3>
-      <p class="modal-sub">Having trouble signing in or spotted a bug? Let us know and the system administrator will follow up.</p>
-
-      <div class="modal-msg" id="reportMsg"></div>
-
-      <form id="reportForm">
-        <?php echo csrf_field(); ?>
-        <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off">
-        <input type="hidden" name="page" value="loginv2.php">
-
-        <div class="form-group">
-          <label>Category</label>
-          <select name="category">
-            <option value="login">Can't sign in</option>
-            <option value="bug">Something looks broken</option>
-            <option value="account">Account / record issue</option>
-            <option value="performance">Slow or unresponsive</option>
-            <option value="other" selected>Other</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Your name (optional)</label>
-          <input type="text" name="name" placeholder="So we know who to follow up with">
-        </div>
-        <div class="form-group">
-          <label>Your email (optional, for a reply)</label>
-          <input type="email" name="email" placeholder="you@example.com">
-        </div>
-        <div class="form-group">
-          <label>What happened?</label>
-          <textarea name="message" required placeholder="Describe the issue — what you expected, and what happened instead."></textarea>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn-ghost" id="closeReportModal">Cancel</button>
-          <button type="submit" class="btn-primary" id="reportSubmitBtn">Send Report</button>
-        </div>
-      </form>
     </div>
   </div>
+
+</div>
 
 <script>
 (function(){
@@ -470,63 +669,67 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
   if(!pw||!ic||!btn) return;
   btn.addEventListener('click', function(e){
     e.preventDefault();
-    if(pw.type==='password'){ pw.type='text'; ic.className='ti ti-eye-off'; btn.setAttribute('aria-label','Hide password'); }
-    else { pw.type='password'; ic.className='ti ti-eye'; btn.setAttribute('aria-label','Show password'); }
+    if(pw.type==='password'){
+      pw.type='text';
+      ic.className='ti ti-eye-off';
+      btn.setAttribute('aria-label','Hide password');
+    } else {
+      pw.type='password';
+      ic.className='ti ti-eye';
+      btn.setAttribute('aria-label','Show password');
+    }
   });
 })();
 
 (function(){
-  // Role pills here are just a visual hint (no showcase panel to drive
-  // anymore) — kept for the hover color accent on the card border.
-  const pills = document.querySelectorAll('.role-pill');
+  const pills   = document.querySelectorAll('.role-pill');
+  const idle    = document.getElementById('showcaseIdle');
+  let currentRole = 'default';
+  let leaveTimer  = null;
+  let idleTimer   = null;
+
+  function setRole(role){
+    if(role === currentRole) return;
+    clearTimeout(leaveTimer);
+    clearTimeout(idleTimer);
+
+    const activeSlide = document.querySelector('.showcase-slide.is-active');
+    const nextSlide    = role === 'default' ? null : document.querySelector('.showcase-slide[data-role="'+role+'"]');
+    const activeLayer  = document.querySelector('.bg-layer.is-active');
+    const nextLayer    = document.querySelector('.bg-layer[data-role="'+role+'"]');
+
+    if(activeSlide && activeSlide !== nextSlide){
+      activeSlide.classList.remove('is-active');
+      activeSlide.classList.add('is-leaving');
+      leaveTimer = setTimeout(()=> activeSlide.classList.remove('is-leaving'), 320);
+    }
+    if(nextSlide) nextSlide.classList.add('is-active');
+
+    if(role === 'default'){
+      idle.classList.remove('is-leaving');
+      idle.classList.add('is-active');
+    } else if(idle.classList.contains('is-active')){
+      idle.classList.remove('is-active');
+      idle.classList.add('is-leaving');
+      idleTimer = setTimeout(()=> idle.classList.remove('is-leaving'), 320);
+    }
+
+    if(activeLayer && activeLayer !== nextLayer) activeLayer.classList.remove('is-active');
+    if(nextLayer) nextLayer.classList.add('is-active');
+
+    document.getElementById('showcasePanel').style.setProperty('--role-accent', 'var(--role-'+role+')');
+    currentRole = role;
+  }
+
   pills.forEach(pill=>{
     const role = pill.dataset.role;
-    pill.addEventListener('mouseenter', ()=>{
-      document.querySelector('.auth-card').style.setProperty('--role-accent', 'var(--role-'+role+')');
-    });
+    pill.addEventListener('mouseenter', ()=> setRole(role));
+    pill.addEventListener('focus', ()=> setRole(role));
   });
-})();
 
-(function(){
-  const overlay = document.getElementById('reportOverlay');
-  const openBtn = document.getElementById('openReportModal');
-  const closeBtn = document.getElementById('closeReportModal');
-  const form = document.getElementById('reportForm');
-  const msg = document.getElementById('reportMsg');
-  const submitBtn = document.getElementById('reportSubmitBtn');
-  if(!overlay||!openBtn) return;
-
-  function open(){ overlay.classList.add('is-open'); msg.className='modal-msg'; msg.textContent=''; }
-  function close(){ overlay.classList.remove('is-open'); }
-
-  openBtn.addEventListener('click', open);
-  closeBtn.addEventListener('click', close);
-  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) close(); });
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && overlay.classList.contains('is-open')) close(); });
-
-  form.addEventListener('submit', async function(e){
-    e.preventDefault();
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending...';
-    try {
-      const res = await fetch('api/report_issue.php', { method:'POST', body:new FormData(form) });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        msg.className = 'modal-msg ok';
-        msg.textContent = data.message || 'Thanks — your report was sent.';
-        form.reset();
-        setTimeout(close, 1800);
-      } else {
-        msg.className = 'modal-msg err';
-        msg.textContent = data.message || 'Something went wrong — please try again.';
-      }
-    } catch (err) {
-      msg.className = 'modal-msg err';
-      msg.textContent = 'Network error — please check your connection and try again.';
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Send Report';
-    }
+  document.getElementById('roleStrip').addEventListener('mouseleave', ()=> setRole('default'));
+  document.getElementById('roleStrip').addEventListener('focusout', (e)=>{
+    if(!e.currentTarget.contains(e.relatedTarget)) setRole('default');
   });
 })();
 </script>

@@ -3,7 +3,7 @@
 
 :root {
   /* ── Surfaces (dark green, matches the app screenshots) ── */
-  --bg:       #1e5f4e;   /* hover state one step lighter than bg3 */
+  --bg:       #1e5f4e;   /* hover state one step lighter than bg3 #0B301A */
   --bg2:      #0b3327;   /* page background fallback / gradient start */
   --bg3:      #123f30;   /* navbar, cards, modals */
   --bg4:      #164134;   /* nested surfaces (table hover, inputs) */
