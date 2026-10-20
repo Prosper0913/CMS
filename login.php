@@ -165,8 +165,8 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
 
     .auth-card .kicker{font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
       color:var(--school-text7);margin-bottom:8px;}
-    .auth-card h2{font-family:'Syne',sans-serif;font-size:23px;font-weight:700;margin:0 0 28px;color:var(--school-text6);text-transform:uppercase;}
-    .auth-card h3{font-family:'Syne',sans-serif;font-size:23px;font-weight:700;margin:0 0 28px;color:var(--school-text6);}
+    .auth-card h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin:0 0 28px;color:var(--school-text6);text-transform:uppercase;}
+    .auth-card h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 28px;color:var(--school-text6);}
     .auth-card h4{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin:0 0 5px;color:var(--school-text6);text-transform:uppercase;}
     .auth-card p{font-family:'Syne',sans-serif;font-size:13.5px;font-weight:700;line-height:1;color:var(--school-bg);margin:0 0 22px;text-transform:uppercase;}
 
@@ -306,7 +306,7 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
         <h2>Classroom Management System</h2>
       </div>
       <div class="kicker">Welcome back</div>
-      <h2>Sign in to your account</h2>
+      <h3>Sign in to your account</h3>
 
       <?php if ($error): ?>
       <div class="alert"><i class="ti ti-alert-circle"></i> <?php echo htmlspecialchars($error); ?></div>
