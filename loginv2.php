@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <style>
     :root{
       /* school brand tokens — pulled from the site's own variables */
-      --school-bg:  var(--bg, #1e5f4e);   /* school green */
+      --school-bg:  var(--bg, #0E4A2C);   /* school green */
       --school-text: var(--text, #FFFFFF); /* white */
       --school-text6: var(--text6, #000000); /* black */
       --school-text7: var(--text7, #6B7280); /* grey */

@@ -3,8 +3,8 @@
 
 :root {
   /* ── Surfaces (dark green, matches the app screenshots) ── */
-  --bg:       #1e5f4e;   /* hover state one step lighter than bg3 #0B301A */
-  --bg2:      #0b3327;   /* page background fallback / gradient start */
+  --bg:       #0A3520;   /* hover state one step lighter than bg3 #0B301A */
+  --bg2:      #0E4A2C;   /* page background fallback / gradient start */
   --bg3:      #123f30;   /* navbar, cards, modals */
   --bg4:      #164134;   /* nested surfaces (table hover, inputs) */
   --bg5:      #f0f0f0;   /* hover state one step lighter than bg3 */
@@ -552,7 +552,7 @@ body {
 }
 
 .btn-primary {
-  background: var(--bg);
+  background: var(--bg2);
   color: var(--text);
   width: 100%;
   justify-content: center;
@@ -592,7 +592,7 @@ body {
 .btn-outline {
   border: 1px solid var(--border);
   color: var(--text);
-  background: var(--bg);
+  background: var(--bg2);
   transition: transform 0.15s; filter: .5s;
 }
 

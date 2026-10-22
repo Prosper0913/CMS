@@ -112,7 +112,7 @@ $active_nav = 'sections';
             <tr><td colspan="5"><div class="empty-state"><i class="ti ti-building-community"></i><p>No sections match these filters.</p></div></td></tr>
             <?php endif; ?>
             <?php foreach ($all_sections as $sec): ?>
-            <tr style="cursor:pointer;<?php echo (int)$sec['id'] === $active_sec_id ? 'background:var(--bg3);' : ''; ?>"
+            <tr style= "cursor:pointer;<?php echo (int)$sec['id'] === $active_sec_id ? 'background:color-mix(in srgb, var(--bg) 60%, transparent);' : ''; ?>"
                 onclick="location.href='sections.php?sec=<?php echo (int)$sec['id']; ?><?php echo $filter_course ? '&course='.urlencode($filter_course) : ''; ?><?php echo $filter_year ? '&year='.urlencode($filter_year) : ''; ?>'">
               <td style="font-weight:500;"><?php echo htmlspecialchars($sec['section_name']); ?></td>
               <td><?php echo htmlspecialchars($sec['teacher_name'] ?: '—'); ?></td>
