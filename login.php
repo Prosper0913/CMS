@@ -101,7 +101,7 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
 
   <style>
     :root{
-      --school-bg:  #0E4A2C;
+      --school-bg:  #1e5f4e;
       --school-text: #FFFFFF;
       --school-text6: #050505ec;
       --school-text7: #6B7280;
@@ -240,7 +240,7 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
     .mv-card p{margin:0;font-size:14.5px;color:var(--school-text7);}
 
     /* ---------- FOOTER ---------- */
-    .site-footer{background:#0A3520;color:rgba(255,255,255,.82);padding:52px 24px 28px;}
+    .site-footer{background:#1e5f4e;;color:rgba(255,255,255,.82);padding:52px 24px 28px;}
     .footer-grid{max-width:980px;margin:0 auto;display:grid;grid-template-columns:1.7fr 1fr 1fr;gap:36px;}
     .footer-brand{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
     .footer-brand img{width:75px;height:75px;border-radius:8px;}

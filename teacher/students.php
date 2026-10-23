@@ -391,7 +391,7 @@ $active_nav = "students";
       <div style="font-weight:600;font-size:15px;">Import Students from CSV/Excel</div>
       <div style="font-size:12.5px;color:var(--text7);margin-top:2px;">Bulk-enroll a whole class at once instead of adding students one at a time.</div>
     </div>
-    <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:var(--radius);background:var(--bg2);color:#fff;font-size:13px;font-weight:500;white-space:nowrap;">
+    <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:var(--radius);background:var(--bg);color:#fff;font-size:13px;font-weight:500;white-space:nowrap;">
       <i class="ti ti-arrow-right"></i> Import
     </span>
   </a>
