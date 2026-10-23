@@ -221,5 +221,6 @@ echo date("l, F j, Y");
 })();
 </script>
 <?php endif; ?>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

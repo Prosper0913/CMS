@@ -302,7 +302,7 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
         <img src="assets/images/TCM logo (2).png" alt="TCM Logo" width="76" height="76" style="display:block;margin:0 auto 16px;">
         <h4><?php echo htmlspecialchars($SCHOOL_NAME); ?></h4>
         <p>NISI DOMINUS FRUSTRA</p>
-        <hr class="thin-line" style="color: var(--school-bg);border:0;border-top:1px solid var(--border-on-light);margin:16px 0;">
+        <hr class="thin-line" style="color: var(--school-bg);border:0;border-top:1px solid var(--border-on-light);margin:12px 0;">
         <h2>Classroom Management System</h2>
       </div>
       <div class="kicker">Welcome back</div>

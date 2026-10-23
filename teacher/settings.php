@@ -28,7 +28,7 @@ function settings_email_error(string $e): string {
     return '';
 }
 
-$me_q = $conn->prepare("SELECT id, username, password, email, contact_number FROM users WHERE id = ? LIMIT 1");
+$me_q = $conn->prepare("SELECT id, username, display_name, password, email, contact_number FROM users WHERE id = ? LIMIT 1");
 $me_q->bind_param("i", $teacher_id);
 $me_q->execute();
 $me = $me_q->get_result()->fetch_assoc();
@@ -165,6 +165,19 @@ $event_labels = [
   <div class="two-col">
   <div>
 
+  <!-- ── PROFILE ── -->
+  <div class="card" style="margin-bottom:20px;">
+    <p class="card-title"><i class="ti ti-user-circle"></i> Profile</p>
+    <div style="display:grid;grid-template-columns:140px 1fr;gap:10px 14px;font-size:13px;">
+      <span style="color:var(--text7);">Username</span>
+      <span style="font-family:var(--font-mono);"><?php echo htmlspecialchars($me['username']); ?></span>
+      <span style="color:var(--text7);">Full name</span>
+      <span><?php echo htmlspecialchars(($me['display_name'] ?? '') !== '' ? $me['display_name'] : $me['username']); ?></span>
+      <span style="color:var(--text7);">Role</span>
+      <span>Teacher</span>
+    </div>
+  </div>
+
   <!-- ── CONTACT INFO ── -->
   <div class="card" style="margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-id-badge-2"></i> Contact Information</p>
@@ -279,5 +292,6 @@ $event_labels = [
 
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

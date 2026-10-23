@@ -1440,5 +1440,6 @@ function human_time_diff($timestamp) {
 ?>
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

@@ -199,12 +199,20 @@ $comp_colors = [
 <div class="page-wrap">
 
   <!-- ── WELCOME BANNER ── -->
+  <?php
+    $dn_q = $conn->prepare("SELECT display_name FROM users WHERE id = ? LIMIT 1");
+    $dn_q->bind_param("i", $teacher_id);
+    $dn_q->execute();
+    $dn_row = $dn_q->get_result()->fetch_assoc();
+    $teacher_name = trim($dn_row['display_name'] ?? '') !== '' ? $dn_row['display_name'] : $_SESSION['username'];
+  ?>
   <div class="welcome-banner">
     <div class="welcome-text">
-      <h1><?php echo htmlspecialchars($_SESSION['username']); ?></h1>
+      <h1><?php echo htmlspecialchars($teacher_name); ?></h1>
       <p><?php echo date('l, F d Y'); ?> &nbsp;·&nbsp; <?php echo (int)($t['total_subjects']??0); ?> active subject<?php echo ($t['total_subjects']??0)!=1?'s':''; ?> this semester</p>
     </div>
   </div>
+  <hr class="thin-line">
 
 
 
@@ -277,7 +285,7 @@ $comp_colors = [
   <!-- Already has at least a section or a subject: never fully remove the guide —
        just tuck it out of the way as a small, collapsed-by-default card so it
        doesn't compete with real data, but is one click away if they forget a step. -->
-  <details class="card getting-started-mini" style="margin-bottom:20px;border-left:3px solid var(--bg);">
+  <details class="card getting-started-mini" style="margin-bottom:20px;border-left:3px solid var(--bg);margin-top:25px;">
     <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;">
       <i class="ti ti-rocket"></i>
       <span class="card-title" style="margin:0;">Getting Started Guide</span>
@@ -580,6 +588,7 @@ function togglePerf(key) {
 
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>
 <!--PHPEOF

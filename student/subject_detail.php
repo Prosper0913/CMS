@@ -512,5 +512,6 @@ $pass = $fg >= 75;
 </div><!-- end page-wrap -->
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

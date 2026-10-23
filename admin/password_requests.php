@@ -267,5 +267,6 @@ $role_badge = ['student' => 'badge-green', 'teacher' => 'badge-blue', 'admin' =>
 
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

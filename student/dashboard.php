@@ -138,5 +138,6 @@ $type_colors = [
 
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

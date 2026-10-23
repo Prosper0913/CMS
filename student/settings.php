@@ -42,6 +42,18 @@ $s_q->bind_param("s", $sid);
 $s_q->execute();
 $student = $s_q->get_result()->fetch_assoc();
 
+// ── Profile card data: sections this student belongs to ───────
+$sec_q = $conn->prepare(
+    "SELECT sec.section_name, sec.course, sec.year_level
+     FROM section_students ss
+     JOIN sections sec ON sec.id = ss.section_id
+     WHERE ss.student_id = ?
+     ORDER BY sec.year_level ASC, sec.section_name ASC"
+);
+$sec_q->bind_param("s", $sid);
+$sec_q->execute();
+$my_sections = $sec_q->get_result()->fetch_all(MYSQLI_ASSOC);
+
 // ── Update contact info (email + contact number) ──────────────
 if (isset($_POST['update_profile'])) {
     if (!csrf_verify()) {
@@ -175,6 +187,36 @@ $event_labels = [
   <div class="two-col">
   <div>
 
+  <!-- ── PROFILE ── -->
+  <div class="card" style="margin-bottom:20px;">
+    <p class="card-title"><i class="ti ti-user-circle"></i> Profile</p>
+    <?php
+      $full = trim($student['last_name'] . ', ' . $student['first_name']
+            . (!empty($student['middle_initial']) ? ' ' . rtrim($student['middle_initial'], '.') . '.' : ''));
+    ?>
+    <div style="display:grid;grid-template-columns:140px 1fr;gap:10px 14px;font-size:13px;">
+      <span style="color:var(--text7);">Student ID</span>
+      <span style="font-family:var(--font-mono);"><?php echo htmlspecialchars($student['student_id']); ?></span>
+      <span style="color:var(--text7);">Full name</span>
+      <span><?php echo htmlspecialchars($full); ?></span>
+      <span style="color:var(--text7);">Course</span>
+      <span><?php echo htmlspecialchars($student['course'] ?: '—'); ?></span>
+      <span style="color:var(--text7);">Level</span>
+      <span>College</span>
+      <?php if (empty($my_sections)): ?>
+      <span style="color:var(--text7);">Section</span>
+      <span style="color:var(--text7);">Not assigned to a section yet</span>
+      <?php else: foreach ($my_sections as $i => $sec): ?>
+      <span style="color:var(--text7);"><?php echo $i === 0 ? 'Section / Year' : ''; ?></span>
+      <span>
+        <?php echo htmlspecialchars($sec['section_name']); ?>
+        <?php echo $sec['year_level'] ? ' · Year ' . (int)$sec['year_level'] : ''; ?>
+        <?php echo $sec['course'] ? ' · ' . htmlspecialchars($sec['course']) : ''; ?>
+      </span>
+      <?php endforeach; endif; ?>
+    </div>
+  </div>
+
   <!-- ── CONTACT INFO ── -->
   <div class="card" style="margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-id-badge-2"></i> Contact Information</p>
@@ -289,5 +331,6 @@ $event_labels = [
 
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

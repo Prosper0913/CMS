@@ -499,5 +499,6 @@ if (savedType) selectType(savedType);
 </script>
 </main>
 </div>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

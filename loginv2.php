@@ -734,5 +734,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 })();
 </script>
 <?php include __DIR__ . '/includes/cookie_notice.php'; ?>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

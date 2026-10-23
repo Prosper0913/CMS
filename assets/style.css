@@ -5233,3 +5233,89 @@ body.page-legal {
   .legal-topbar { padding: 14px 16px; }
   .legal-card { padding: 22px 20px; }
 }
+
+
+/* ============================================================
+   MOTION LAYER  (added last so it only layers on top of the
+   rules above — nothing above this line was changed)
+   Durations are deliberately short (120–300ms) so the site
+   feels responsive, not slow. Everything is switched off for
+   people who set "reduce motion" in their OS (see bottom).
+   ============================================================ */
+
+html { scroll-behavior: smooth; }
+
+/* ── Page fade-in on load ─────────────────────────────────── */
+@keyframes ui-fade-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-rise-in   { from { opacity: 0; transform: translateY(10px); }
+                          to   { opacity: 1; transform: none; } }
+@keyframes ui-pop-in    { from { opacity: 0; transform: translateY(8px) scale(.97); }
+                          to   { opacity: 1; transform: none; } }
+@keyframes ui-drop-in   { from { opacity: 0; transform: translateY(-6px); }
+                          to   { opacity: 1; transform: none; } }
+
+body { animation: ui-fade-in .25s ease-out backwards; }
+
+/* Content blocks rise in one after another. "backwards" fill (not
+   "forwards") means no leftover transform once finished, so fixed
+   modals / dropdowns inside these blocks keep working normally. */
+.page-body > * { animation: ui-rise-in .35s ease-out backwards; }
+.page-body > *:nth-child(2) { animation-delay: .04s; }
+.page-body > *:nth-child(3) { animation-delay: .08s; }
+.page-body > *:nth-child(4) { animation-delay: .12s; }
+.page-body > *:nth-child(5) { animation-delay: .16s; }
+.page-body > *:nth-child(6) { animation-delay: .20s; }
+.page-body > *:nth-child(n+7) { animation-delay: .24s; }
+
+/* ── Fade-out when leaving the page (class set by assets/ui.js) ── */
+html.ui-leaving body { opacity: 0; transition: opacity .15s ease-in; pointer-events: none; }
+
+/* ── Hover / press feedback ───────────────────────────────── */
+a { transition: color .15s ease, opacity .15s ease; }
+
+.card, .stat-card, .subject-card, .mini-card {
+  transition: border-color .2s ease, box-shadow .25s ease, transform .2s ease, background .2s ease;
+}
+.stat-card:hover, .subject-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0,0,0,.18);
+}
+
+.btn { transition: background .15s ease, color .15s ease, border-color .15s ease,
+                   box-shadow .2s ease, transform .12s ease, filter .15s ease, opacity .15s ease; }
+.btn:hover:not(:disabled)  { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.18); }
+.btn:active:not(:disabled) { transform: translateY(0) scale(.97); box-shadow: none; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+
+tbody tr { transition: background .15s ease; }          /* was .4s — felt laggy */
+
+.tab-btn, .nav-links > a, .dropdown-item, .nav-dropdown-btn {
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease;
+}
+.dropdown-item:hover { transform: translateX(2px); }
+
+.form-control { transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+
+/* ── Things that appear: alerts, dropdowns, modals ────────── */
+.alert { animation: ui-drop-in .3s ease-out backwards; }
+.alert.ui-dismiss { opacity: 0; transform: translateY(-6px); max-height: 0; margin: 0; padding-top: 0; padding-bottom: 0;
+                    overflow: hidden; transition: opacity .3s ease, transform .3s ease, max-height .3s ease .1s,
+                    margin .3s ease .1s, padding .3s ease .1s; }
+
+.nav-dropdown-menu.open { animation: ui-drop-in .18s ease-out; }
+
+.modal-overlay.open { animation: ui-fade-in .18s ease-out; }
+.modal-overlay.open .modal { animation: ui-pop-in .22s ease-out; }
+
+#cookie-notice.is-visible { animation: ui-rise-in .35s ease-out; }
+
+/* ── Respect "reduce motion" ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0s !important;
+    transition-duration: .01ms !important;
+  }
+  html.ui-leaving body { opacity: 1; }
+}

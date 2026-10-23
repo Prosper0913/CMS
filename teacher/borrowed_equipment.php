@@ -177,5 +177,6 @@ $status_badge = [
   </div>
 </div>
 
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>

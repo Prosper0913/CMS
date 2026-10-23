@@ -86,5 +86,6 @@ session_start();
 </div>
 
 <?php include __DIR__ . '/includes/cookie_notice.php'; ?>
+<script src="/classroomv2/assets/ui.js" defer></script>
 </body>
 </html>
