@@ -481,9 +481,36 @@ $type_cfg  = [
   <!-- PAGE HEADER -->
   <div class="page-header with-actions">
     <div>
-      <h1><i class="ti ti-fingerprint text-accent"></i> Biometric Attendance</h1>
+      <h1><i class="ti ti-fingerprint text-accent"></i> Biometric/RFID Attendance</h1>
       <p>Register devices, enroll student fingerprints, and monitor live attendance.</p>
     </div>
+      <!-- ── STEP-BY-STEP GUIDE ── -->
+  <div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,rgba(19, 95, 63, 0.24) 100%,transparent 80%);border-color:rgba(36, 90, 31, 0.2);">
+    <p class="card-title"><i class="ti ti-route"></i> Setup Guide</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+      <?php
+      $steps = [
+        ['1','Register Fingerprint Device','Click "Register Device" above, enter the DEVICE_KEY you flashed into the ESP32 sketch, and assign it to a subject. (Skip this if you\'re only using the RFID reader.)','ti-cpu'],
+        ['2','Verify Connection','The device must connect to your WiFi and call bio_config.php on boot. The LCD shows the subject code if config loaded OK.','ti-wifi'],
+        ['3','Or Plug In the RFID Reader','No setup needed — it\'s a USB card reader. Just plug it into this computer; Windows sees it as a keyboard.','ti-id-badge-2'],
+        ['4','Enroll Students','Fingerprint: use the "Enroll" panel below, select a device and student, then place a finger. RFID: use the "Enroll via RFID Card" panel and tap a card.','ti-fingerprint'],
+        ['5','Attendance is Automatic','Students place their finger or tap their card when entering class. The server matches and records attendance instantly. Grades update right away.','ti-checks'],
+      ];
+      foreach ($steps as [$n,$title,$desc,$icon]): ?>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="width:28px;height:28px;border-radius:8px;background:var(--accent-dim);border:1px solid var(--accent-glow);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;"><?php echo $n; ?></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
+            <i class="ti <?php echo $icon; ?>" style="font-size:13px;color:var(--accent);"></i>
+            <?php echo $title; ?>
+          </div>
+          <div style="font-size:12px;color:var(--text2);"><?php echo $desc; ?></div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+
     <button class="btn btn-primary" onclick="openModal('registerModal')">
       <i class="ti ti-plus"></i> Register Device
     </button>
@@ -521,33 +548,6 @@ $type_cfg  = [
     <div class="stat-chip p">
       <div class="stat-chip-val"><?php echo count($queue_rows); ?></div>
       <div class="stat-chip-lbl">In Queue</div>
-    </div>
-  </div>
-
-  <!-- ── STEP-BY-STEP GUIDE ── -->
-  <div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,rgba(19, 95, 63, 0.24) 0%,transparent 100%);border-color:rgba(36, 90, 31, 0.2);">
-    <p class="card-title"><i class="ti ti-route"></i> Setup Guide</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
-      <?php
-      $steps = [
-        ['1','Register Fingerprint Device','Click "Register Device" above, enter the DEVICE_KEY you flashed into the ESP32 sketch, and assign it to a subject. (Skip this if you\'re only using the RFID reader.)','ti-cpu'],
-        ['2','Verify Connection','The device must connect to your WiFi and call bio_config.php on boot. The LCD shows the subject code if config loaded OK.','ti-wifi'],
-        ['3','Or Plug In the RFID Reader','No setup needed — it\'s a USB card reader. Just plug it into this computer; Windows sees it as a keyboard.','ti-id-badge-2'],
-        ['4','Enroll Students','Fingerprint: use the "Enroll" panel below, select a device and student, then place a finger. RFID: use the "Enroll via RFID Card" panel and tap a card.','ti-fingerprint'],
-        ['5','Attendance is Automatic','Students place their finger or tap their card when entering class. The server matches and records attendance instantly. Grades update right away.','ti-checks'],
-      ];
-      foreach ($steps as [$n,$title,$desc,$icon]): ?>
-      <div style="display:flex;gap:12px;align-items:flex-start;">
-        <div style="width:28px;height:28px;border-radius:8px;background:var(--accent-dim);border:1px solid var(--accent-glow);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;"><?php echo $n; ?></div>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
-            <i class="ti <?php echo $icon; ?>" style="font-size:13px;color:var(--accent);"></i>
-            <?php echo $title; ?>
-          </div>
-          <div style="font-size:12px;color:var(--text2);"><?php echo $desc; ?></div>
-        </div>
-      </div>
-      <?php endforeach; ?>
     </div>
   </div>
 

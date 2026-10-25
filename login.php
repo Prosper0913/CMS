@@ -72,7 +72,8 @@ $SCHOOL_LAT      = "10.134692065956623";
 $SCHOOL_LNG      = "124.83862468701554";
 $SCHOOL_MAP_QUERY = urlencode($SCHOOL_LAT . ',' . $SCHOOL_LNG);
 $SCHOOL_EMAIL    = "collegeofmaasin1925@yahoo.com";
-$SCHOOL_PHONE    = "00000000000";
+$SCHOOL_PHONE    = "(053) 570 8671, 
+                    (053) 570 9317";
 $DEV_EMAIL       = "anthonyvdances@gmail.com";
 $DEV_PHONE       = "00000000000";
 $SCHOOL_MISSION  = "The College of Maasin, with the dynamic integration of instruction, research, "
@@ -161,11 +162,11 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
 
     /* ---------- AUTH CARD ---------- */
     .auth-card{width:100%;max-width:380px;background:var(--school-bg5);color:var(--school-text6);
-      border-radius:18px;padding:36px 32px;box-shadow:0 24px 60px rgba(0,0,0,.35);}
+      border-radius:18px;padding:25px 32px;box-shadow:0 24px 60px rgba(0,0,0,.35);}
 
     .auth-card .kicker{font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
       color:var(--school-text7);margin-bottom:8px;}
-    .auth-card h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin:0 0 28px;color:var(--school-text6);text-transform:uppercase;}
+    .auth-card h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin:0 0 15px;color:var(--school-text6);text-transform:uppercase;}
     .auth-card h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 28px;color:var(--school-text6);}
     .auth-card h4{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin:0 0 5px;color:var(--school-text6);text-transform:uppercase;}
     .auth-card p{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;line-height:1;color:var(--school-bg);margin:0 0 22px;text-transform:uppercase;}

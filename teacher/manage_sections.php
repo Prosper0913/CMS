@@ -428,7 +428,7 @@ $total_in_sections = $tis->get_result()->fetch_assoc()['c'];
   <?php endif; ?>
 
   <!-- ── STAT CHIPS ── -->
-  <div class="stat-chips">
+  <!-- <div class="stat-chips">
     <div class="stat-chip a">
       <div class="stat-chip-val"><?php echo $total_sections; ?></div>
       <div class="stat-chip-lbl">Total Sections</div>
@@ -437,19 +437,25 @@ $total_in_sections = $tis->get_result()->fetch_assoc()['c'];
       <div class="stat-chip-val"><?php echo $total_in_sections; ?></div>
       <div class="stat-chip-lbl">Students in Sections</div>
     </div>
-  </div>
-
+  </div> -->
+<!-- 
   <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
     <button type="button" class="btn btn-primary" onclick="openCreateModal()">
       <i class="ti ti-plus"></i> New Section
     </button>
   </div>
 
-  <hr class="thin-line" style="margin-bottom:20px;">
+  <hr class="thin-line" style="margin-bottom:20px;"> -->
 
   <!-- ── MY SECTIONS TABLE ── -->
   <div class="card" style="margin-bottom:24px;">
     <p class="card-title" style="margin-bottom:14px;"><i class="ti ti-building-community"></i> My Sections</p>
+
+      <div style="display:flex;gap:8px;margin:12px;flex-wrap:wrap;max-width:25%;  position: fixed;top: 20px;right: 20px;z-index: 1000;">
+    <button type="button" class="btn btn-primary" onclick="openCreateModal()">
+      <i class="ti ti-plus"></i> New Section
+    </button>
+  </div>
 
     <?php if (empty($my_sections)): ?>
       <div class="empty-state">

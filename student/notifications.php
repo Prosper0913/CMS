@@ -124,6 +124,7 @@ $type_icons = [
         </div>
       </div>
     </a>
+    <hr class="thin-line">
     <?php endforeach; ?>
   </div>
   <?php endif; ?>

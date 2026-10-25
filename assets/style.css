@@ -318,6 +318,7 @@ body {
   color: var(--text7);
   font-size: 13px;
   padding-top: 5px;
+  margin-bottom: 15px;
 }
 
 .two-col {
@@ -361,7 +362,7 @@ body {
 }
 
 .card-title {
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text6);
   text-transform: uppercase;
@@ -2940,7 +2941,7 @@ box-shadow:0px 0px 5px rgb(96, 97, 96);
 }
 
 /* ── PAGE HEADER ──────────────────────────────────────── */ .page-header {
-  display: flex;
+  /* display: flex; */
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
