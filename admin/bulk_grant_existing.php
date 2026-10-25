@@ -211,5 +211,6 @@ $pending_count = count(array_filter($pairs, fn($p) => !$p['already_granted']));
 </main>
 </div>
 <script src="/classroomv2/assets/ui.js" defer></script>
+<script src="/classroomv2/assets/pwa.js" defer></script>
 </body>
 </html>

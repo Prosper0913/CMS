@@ -74,6 +74,8 @@ $SCHOOL_MAP_QUERY = urlencode($SCHOOL_LAT . ',' . $SCHOOL_LNG);
 $SCHOOL_EMAIL    = "collegeofmaasin1925@yahoo.com";
 $SCHOOL_PHONE    = "(053) 570 8671, 
                     (053) 570 9317";
+// Link to the Windows desktop-app installer (e.g. a GitHub Release URL). Leave empty to hide the button.
+$DESKTOP_DOWNLOAD_URL = "";
 $DEV_EMAIL       = "anthonyvdances@gmail.com";
 $DEV_PHONE       = "00000000000";
 $SCHOOL_MISSION  = "The College of Maasin, with the dynamic integration of instruction, research, "
@@ -92,6 +94,9 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
 <html lang="en">
 <head>
   <link rel="icon" type="image/png" href="assets/images/TCM logo (2).png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1e5f4e">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Sign In — Classroom CMS</title>
@@ -287,6 +292,13 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
     }
     @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto;} .scroll-hint i{animation:none;} }
 
+    /* ── Install-app strip (shown only when installing is possible) ── */
+    .app-install{margin-top:16px;padding-top:14px;border-top:1px solid var(--border-on-light);text-align:center;font-size:12.5px;}
+    .app-install[hidden],.app-install [hidden]{display:none !important;}
+    .app-install .btn-ghost{display:inline-flex;align-items:center;gap:7px;cursor:pointer;margin:4px 3px;text-decoration:none;color:inherit;font-size:12.5px;}
+    .app-install .btn-ghost:hover{filter:brightness(1.1);}
+    .app-install p{margin:6px 0 0;color:var(--school-text6);line-height:1.5;}
+
     .school-title {
     font-family: var(--serif);
     font-size: 50px;
@@ -339,6 +351,22 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
         <div class="forgot-row"><a href="forgot_password.php">Forgot password?</a></div>
         <button type="submit" class="btn-login"><i class="ti ti-login"></i> Sign In</button>
       </form>
+
+      <!-- Install as an app: button appears automatically on Android/Chrome/Edge when
+           installing is possible; iPhone gets manual steps; Windows link shows only if
+           $DESKTOP_DOWNLOAD_URL is set above. -->
+      <div class="app-install" id="app-install" <?php echo $DESKTOP_DOWNLOAD_URL ? '' : 'hidden'; ?>>
+        <button type="button" class="btn-ghost" id="pwa-install-btn" hidden>
+          <i class="ti ti-device-mobile-down"></i> Install app on this device
+        </button>
+        <?php if ($DESKTOP_DOWNLOAD_URL): ?>
+        <a class="btn-ghost" href="<?php echo htmlspecialchars($DESKTOP_DOWNLOAD_URL); ?>">
+          <i class="ti ti-brand-windows"></i> Download for Windows
+        </a>
+        <p>Windows may show a "protected your PC" notice: click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
+        <?php endif; ?>
+        <p id="pwa-ios-hint" hidden>On iPhone: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</p>
+      </div>
     </div>
 
     <a href="#visit" class="scroll-hint"><span style="color: var(--school-text6);">Learn more about <?php echo htmlspecialchars($SCHOOL_NAME); ?></span><i class="ti ti-chevron-down" style="color: var(--school-text6);"></i></a>
@@ -545,6 +573,7 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
   });
 })();
 </script>
+<script src="assets/pwa.js" defer></script>
 <?php include __DIR__ . '/includes/cookie_notice.php'; ?>
 </body>
 </html>

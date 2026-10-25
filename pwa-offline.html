@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Offline — TCM Classroom</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0e2a24;
+       color:#e8f3ef;font-family:system-ui,Segoe UI,Arial,sans-serif;text-align:center;padding:24px;box-sizing:border-box}
+  .box{max-width:380px}
+  img{width:84px;height:84px}
+  h1{font-size:21px;margin:16px 0 8px}
+  p{font-size:14px;line-height:1.55;color:#a9c7bd;margin:6px 0}
+  button{margin-top:18px;padding:11px 24px;border:0;border-radius:8px;background:#34d399;color:#06281f;
+         font-weight:600;font-size:14px;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="box">
+    <img src="/classroomv2/assets/icons/icon-192.png" alt="">
+    <h1>You're offline</h1>
+    <p>TCM Classroom needs an internet connection to load your grades and attendance.</p>
+    <p>Check your Wi-Fi or mobile data, then try again.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+  <script>addEventListener('online', function(){ location.reload(); });</script>
+</body>
+</html>

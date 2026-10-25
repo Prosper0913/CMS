@@ -1,0 +1,17 @@
+{
+  "id": "/classroomv2/",
+  "name": "TCM Classroom Management System",
+  "short_name": "TCM Classroom",
+  "description": "Grades, attendance and class records for The College of Maasin.",
+  "start_url": "/classroomv2/login.php?source=app",
+  "scope": "/classroomv2/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#1e5f4e",
+  "icons": [
+    { "src": "/classroomv2/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/classroomv2/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/classroomv2/assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
