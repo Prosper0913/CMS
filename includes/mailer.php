@@ -155,3 +155,75 @@ function send_report_issue_email(
         return false;
     }
 }
+
+/**
+ * Send a message from the login page's "Contact the developer" box to the
+ * developer's inbox (partnership inquiry or general comment).
+ *
+ * Recipient: DEV_CONTACT_EMAIL from config/secrets.php if defined, otherwise the
+ * developer address below. The visitor's email (if given) is set as Reply-To so
+ * the developer can answer straight from their inbox.
+ *
+ * @param string $type   'partnership' | 'comment'
+ * @return bool true on success; on failure the reason goes to the PHP error log.
+ */
+function send_dev_contact_email(string $type, string $message, string $senderName, string $senderEmail): bool
+{
+    $secretsFile = __DIR__ . '/../config/secrets.php';
+    if (!file_exists($secretsFile)) {
+        error_log('[mailer] config/secrets.php is missing — copy config/secrets.example.php and fill in SMTP credentials.');
+        return false;
+    }
+    require_once $secretsFile;
+    if (!defined('SMTP_HOST') || !defined('SMTP_USER') || !defined('SMTP_PASS')) {
+        error_log('[mailer] config/secrets.php is missing one of SMTP_HOST / SMTP_USER / SMTP_PASS.');
+        return false;
+    }
+
+    $toEmail = defined('DEV_CONTACT_EMAIL') ? DEV_CONTACT_EMAIL : 'anthonyvdances@gmail.com';
+    $label   = $type === 'partnership' ? 'Partnership inquiry' : 'Comment';
+
+    $mail = new PHPMailer(true);
+    try {
+        $mail->isSMTP();
+        $mail->Host       = SMTP_HOST;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = SMTP_USER;
+        $mail->Password   = SMTP_PASS;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = SMTP_PORT ?? 587;
+        $mail->CharSet    = 'UTF-8';
+        $mail->Timeout    = 12;
+
+        $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Classroom CMS';
+        $mail->setFrom(SMTP_USER, $fromName);
+        $mail->addAddress($toEmail);
+        if ($senderEmail !== '') {
+            $mail->addReplyTo($senderEmail, $senderName !== '' ? $senderName : $senderEmail);
+        }
+
+        $mail->Subject = "[TCM Dev] {$label}";
+        $mail->isHTML(true);
+        $safeName  = htmlspecialchars($senderName !== '' ? $senderName : 'Anonymous', ENT_QUOTES);
+        $safeEmail = htmlspecialchars($senderEmail !== '' ? $senderEmail : 'not provided', ENT_QUOTES);
+        $safeLabel = htmlspecialchars($label, ENT_QUOTES);
+        $safeMsg   = nl2br(htmlspecialchars($message, ENT_QUOTES));
+        $mail->Body = "
+            <div style=\"font-family:Arial,sans-serif;max-width:560px;margin:0 auto;\">
+              <p><strong>Type:</strong> {$safeLabel}</p>
+              <p><strong>From:</strong> {$safeName} ({$safeEmail})</p>
+              <p><strong>Message:</strong></p>
+              <p style=\"background:#f1f5f3;padding:12px 14px;border-radius:8px;\">{$safeMsg}</p>
+            </div>";
+        $mail->AltBody = "Type: {$label}\nFrom: {$senderName} ({$senderEmail})\n\n{$message}";
+
+        $mail->send();
+        return true;
+    } catch (PHPMailerException $e) {
+        error_log('[mailer] send_dev_contact_email failed: ' . $mail->ErrorInfo);
+        return false;
+    } catch (Throwable $e) {
+        error_log('[mailer] send_dev_contact_email failed: ' . $e->getMessage());
+        return false;
+    }
+}

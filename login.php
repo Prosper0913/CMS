@@ -261,6 +261,18 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
     .footer-bottom{max-width:980px;margin:36px auto 0;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);
       font-size:12.5px;color:rgba(255,255,255,.5);display:flex;justify-content:center;flex-wrap:wrap;gap:10px;}
 
+    /* ---------- DEVELOPER CONTACT ---------- */
+    .dev-tag{display:inline-block;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;
+      color:rgba(255,255,255,.9);background:rgba(255,255,255,.14);border-radius:6px;padding:2px 7px;margin-right:6px;}
+    .dev-option{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;padding:13px 14px;margin-bottom:10px;
+      border:1px solid var(--border-on-light);border-radius:12px;background:var(--surface-tint);color:var(--school-text6);
+      font-family:'DM Sans',sans-serif;cursor:pointer;text-decoration:none;transition:border-color .15s,transform .15s,box-shadow .15s;}
+    .dev-option:hover{border-color:var(--school-bg);transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
+    .dev-option > i{font-size:22px;color:var(--school-bg);margin-top:1px;}
+    .dev-option strong{display:block;font-size:14px;margin-bottom:2px;}
+    .dev-option span{font-size:12.5px;color:var(--school-text7);line-height:1.4;}
+    .modal-box [hidden]{display:none !important;}
+
     /* ---------- REPORT-AN-ISSUE MODAL ---------- */
     .modal-overlay{position:fixed;inset:0;background:rgba(5,20,16,.55);display:none;align-items:center;
       justify-content:center;padding:20px;z-index:1000;}
@@ -451,7 +463,10 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
         <ul>
           <li><a href="forgot_password.php">Forgot password</a></li>
           <li><button type="button" class="linklike" id="openReportModal">Report an issue</button></li>
-          <li><a href="mailto:<?php echo htmlspecialchars($DEV_EMAIL); ?>"><?php echo htmlspecialchars($DEV_EMAIL); ?></a></li>
+          <li>
+            <span class="dev-tag">Dev email</span>
+            <button type="button" class="linklike" id="openDevModal" aria-haspopup="dialog"><?php echo htmlspecialchars($DEV_EMAIL); ?> <i class="ti ti-chevron-down" style="font-size:11px;"></i></button>
+          </li>
           <li><a href="tel:<?php echo htmlspecialchars($DEV_PHONE); ?>"><?php echo htmlspecialchars($DEV_PHONE); ?></a></li>
         </ul>
       </div>
@@ -460,6 +475,54 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
       <span><?php echo htmlspecialchars($SCHOOL_NAME); ?> Classroom Management System &middot; <?php echo date('Y'); ?></span>
     </div>
   </footer>
+
+  <!-- ============== CONTACT THE DEVELOPER MODAL ============== -->
+  <div class="modal-overlay" id="devOverlay" role="dialog" aria-modal="true" aria-labelledby="devTitle">
+    <div class="modal-box">
+      <h3 id="devTitle">Contact the developer</h3>
+      <p class="modal-sub" id="devSub">This is the developer's email. Choose how you'd like to reach out.</p>
+
+      <div class="modal-msg" id="devMsg"></div>
+
+      <div id="devMenu">
+        <a class="dev-option" href="mailto:<?php echo htmlspecialchars($DEV_EMAIL); ?>?subject=<?php echo rawurlencode('Message for the TCM Classroom developer'); ?>">
+          <i class="ti ti-mail"></i>
+          <div><strong>Contact dev</strong><span>Open your email app and write directly to <?php echo htmlspecialchars($DEV_EMAIL); ?>.</span></div>
+        </a>
+        <button type="button" class="dev-option" data-type="partnership">
+          <i class="ti ti-heart-handshake"></i>
+          <div><strong>Get in touch</strong><span>Have a project in mind? Tell the developer about it and let's talk about working together.</span></div>
+        </button>
+        <button type="button" class="dev-option" data-type="comment">
+          <i class="ti ti-message-2"></i>
+          <div><strong>Comments</strong><span>Share feedback, an idea, or a kind word about the system.</span></div>
+        </button>
+        <div class="modal-actions"><button type="button" class="btn-ghost" data-close-dev>Close</button></div>
+      </div>
+
+      <form id="devForm" hidden>
+        <?php echo csrf_field(); ?>
+        <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off">
+        <input type="hidden" name="type" id="devType" value="">
+        <div class="form-group">
+          <label>Your name (optional)</label>
+          <input type="text" name="name" maxlength="100" placeholder="Your name">
+        </div>
+        <div class="form-group">
+          <label id="devEmailLabel">Your email (optional)</label>
+          <input type="email" name="email" id="devEmail" placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label id="devMsgLabel">Message</label>
+          <textarea name="message" id="devMessage" required minlength="10" maxlength="2000"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost" id="devBack">Back</button>
+          <button type="submit" class="btn-primary" id="devSubmitBtn">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ============== REPORT AN ISSUE MODAL ============== -->
   <div class="modal-overlay" id="reportOverlay" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
@@ -527,6 +590,83 @@ $SCHOOL_VISION   = "The College of Maasin, as a dynamic learning institution, co
     pill.addEventListener('mouseenter', ()=>{
       document.querySelector('.auth-card').style.setProperty('--role-accent', 'var(--role-'+role+')');
     });
+  });
+})();
+
+(function(){
+  const overlay = document.getElementById('devOverlay');
+  const openBtn = document.getElementById('openDevModal');
+  if(!overlay||!openBtn) return;
+  const menu = document.getElementById('devMenu');
+  const form = document.getElementById('devForm');
+  const msg  = document.getElementById('devMsg');
+  const title = document.getElementById('devTitle');
+  const sub   = document.getElementById('devSub');
+  const typeInput = document.getElementById('devType');
+  const emailInput = document.getElementById('devEmail');
+  const emailLabel = document.getElementById('devEmailLabel');
+  const msgLabel = document.getElementById('devMsgLabel');
+  const msgBox = document.getElementById('devMessage');
+  const submitBtn = document.getElementById('devSubmitBtn');
+
+  const COPY = {
+    partnership: { title:'Get in touch', sub:"Have a project in mind? Tell the developer about it and how you'd like to work together.",
+                   emailLabel:'Your email (required, so the developer can reply)', msgLabel:'About your project',
+                   placeholder:'What do you have in mind? Goals, timeline, anything that helps.', sendLabel:'Send message', emailRequired:true },
+    comment:     { title:'Comments', sub:'Share feedback, an idea, or a kind word about the system.',
+                   emailLabel:'Your email (optional, only if you want a reply)', msgLabel:'Your comment',
+                   placeholder:'What do you think?', sendLabel:'Send comment', emailRequired:false }
+  };
+
+  function showMenu(){
+    form.hidden = true; menu.hidden = false;
+    title.textContent = 'Contact the developer';
+    sub.textContent = "This is the developer's email. Choose how you'd like to reach out.";
+    msg.className = 'modal-msg'; msg.textContent = '';
+  }
+  function showForm(type){
+    const c = COPY[type];
+    typeInput.value = type;
+    title.textContent = c.title; sub.textContent = c.sub;
+    emailLabel.textContent = c.emailLabel; msgLabel.textContent = c.msgLabel;
+    msgBox.placeholder = c.placeholder; emailInput.required = c.emailRequired;
+    submitBtn.textContent = c.sendLabel;
+    msg.className = 'modal-msg'; msg.textContent = '';
+    menu.hidden = true; form.hidden = false;
+    msgBox.focus();
+  }
+  function open(){ showMenu(); overlay.classList.add('is-open'); }
+  function close(){ overlay.classList.remove('is-open'); }
+
+  openBtn.addEventListener('click', open);
+  overlay.querySelectorAll('[data-close-dev]').forEach(b => b.addEventListener('click', close));
+  overlay.querySelectorAll('.dev-option[data-type]').forEach(b => b.addEventListener('click', () => showForm(b.dataset.type)));
+  document.getElementById('devBack').addEventListener('click', showMenu);
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) close(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && overlay.classList.contains('is-open')) close(); });
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    const label = submitBtn.textContent;
+    submitBtn.disabled = true; submitBtn.textContent = 'Sending...';
+    try {
+      const res = await fetch('api/dev_contact.php', { method:'POST', body:new FormData(form) });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        msg.className = 'modal-msg ok';
+        msg.textContent = data.message || 'Thanks, your message was sent.';
+        form.reset(); form.hidden = true;
+        setTimeout(close, 2200);
+      } else {
+        msg.className = 'modal-msg err';
+        msg.textContent = data.message || 'Something went wrong — please try again.';
+      }
+    } catch (err) {
+      msg.className = 'modal-msg err';
+      msg.textContent = 'Network error — please check your connection and try again.';
+    } finally {
+      submitBtn.disabled = false; submitBtn.textContent = label;
+    }
   });
 })();
 
