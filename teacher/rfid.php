@@ -195,11 +195,11 @@ $type_cfg  = [
       <div style="display:flex;gap:12px;align-items:flex-start;">
         <div style="width:28px;height:28px;border-radius:8px;background:var(--accent-dim);border:1px solid var(--accent-glow);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;"><?php echo $n; ?></div>
         <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
+          <div style="font-size:13px;font-weight:600;color:var(--bg);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
             <i class="ti <?php echo $icon; ?>" style="font-size:13px;color:var(--accent);"></i>
             <?php echo $title; ?>
           </div>
-          <div style="font-size:12px;color:var(--text2);"><?php echo $desc; ?></div>
+          <div style="font-size:12px;color:var(--bg4);"><?php echo $desc; ?></div>
         </div>
       </div>
       <?php endforeach; ?>

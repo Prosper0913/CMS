@@ -2042,7 +2042,7 @@ elseif ($active_tab === 'rfid'):
                 value="15" min="1" step="1" required>
             </div>
             <div class="form-group">
-              <label>Auto-Stop</label>
+              <label>Auto-Stop session after:</label>
               <select name="rfid_expire_hours" class="form-control">
                 <option value="1">1 hour</option>
                 <option value="2" selected>2 hours</option>
