@@ -10,7 +10,7 @@
       setTimeout(function () {
         el.classList.add('ui-dismiss');
         setTimeout(function () { el.remove(); }, 600);
-      }, 6000);
+      }, 500);
     });
   });
 })();
