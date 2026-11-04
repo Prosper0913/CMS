@@ -53,18 +53,17 @@ session_start();
       <li>Notifications about your own academic activity (e.g. a new grade posted, an absence streak)</li>
     </ul>
 
-    <h3>Biometric data (fingerprint attendance)</h3>
+    <h3>RFID card data (card attendance)</h3>
     <p>
-      If your teacher or school enables fingerprint-based attendance, a fingerprint scanner
-      captures your fingerprint and the System extracts a <strong>minutiae template</strong> —
-      a mathematical map of ridge points — rather than storing a picture of your fingerprint.
-      That template is what later scans are compared against to mark attendance.
+      If your teacher or school uses RFID attendance, your RFID card's unique identifier (UID)
+      is registered to your student record. When you tap your card on the reader, the System looks
+      up that identifier to mark you Present or Late. Only the card's identifier is stored — no
+      photo, fingerprint, or other personal data is read from the card.
     </p>
     <div class="legal-note">
-      <strong>Biometric data is sensitive personal information.</strong> It is collected only
-      for attendance verification, is never used for any other purpose, is never shared outside
-      the System, and is removed if you're removed from the class or request its deletion
-      through your school admin.
+      Your card identifier is used only for attendance, is never shared outside the System, and
+      can be removed or replaced by your teacher if you lose your card or leave the class, or
+      on request through your school admin.
     </div>
 
     <h3>Security &amp; activity logs</h3>
@@ -119,7 +118,7 @@ session_start();
       <li>Passwords are one-way hashed, never stored or displayed in plain text</li>
       <li>Forms are protected against cross-site request forgery (CSRF)</li>
       <li>Sensitive actions are recorded in a security audit log</li>
-      <li>Fingerprint data is stored as a non-reversible minutiae template, not a raw image</li>
+      <li>RFID attendance stores only a card identifier, never any other data from the card</li>
     </ul>
 
     <h2>7. Your Choices &amp; Rights</h2>

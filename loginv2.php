@@ -533,8 +533,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div><h3>Live grades</h3><p>Scores and averages update the moment they are recorded.</p></div>
           </div>
           <div class="feature-card">
-            <span class="fc-icon"><i class="ti ti-fingerprint"></i></span>
-            <div><h3>Biometric attendance</h3><p>A fingerprint scan marks attendance automatically.</p></div>
+            <span class="fc-icon"><i class="ti ti-id-badge-2"></i></span>
+            <div><h3>RFID attendance</h3><p>A card tap marks attendance automatically.</p></div>
           </div>
           <div class="feature-card">
             <span class="fc-icon"><i class="ti ti-file-export"></i></span>
@@ -565,7 +565,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <li><i class="ti ti-clipboard-check"></i> Create subjects and manipulate grade weights. </li>
             <li><i class="ti ti-clipboard-check"></i> Record grades and manage class lists.</li>
             <li><i class="ti ti-report"></i> Generate reports across every class.</li>
-            <li><i class="ti ti-fingerprint"></i> Take attendance automatically via biometric scan.</li>
+            <li><i class="ti ti-id-badge-2"></i> Take attendance automatically via RFID card tap.</li>
             <li><i class="ti ti-report"></i> Export class records anytime.</li>
             <li><i class="ti ti-speakerphone"></i> Post class announcements and notify students of new scores.</li>
             <li><i class="ti ti-building-community"></i> Request access to sections through admin approval.</li>
@@ -579,7 +579,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <li><i class="ti ti-users"></i> Manage accounts, students, and access requests.</li>
             <li><i class="ti ti-history"></i> Audit every sign-in by IP address and device.</li>
             <li><i class="ti ti-lock-open"></i> Approve password recovery with one-time reset links.</li>
-            <li><i class="ti ti-device-desktop"></i> Monitor biometric devices and system health.</li>
+            <li><i class="ti ti-device-desktop"></i> Monitor system activity and health.</li>
             <li><i class="ti ti-file-spreadsheet"></i> Import students in bulk from CSV or Excel.</li>
             <li><i class="ti ti-key"></i> Issue API keys for connected systems.</li>
           </ul>

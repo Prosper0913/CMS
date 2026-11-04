@@ -1,8 +1,8 @@
 <?php
 // ============================================================
-// api/rfid_enroll.php   (REVISED — no ESP32, no device_key)
+// api/rfid_enroll.php
 //
-// Called by JS in teacher/biometric.php's "Enroll via RFID Card"
+// Called by JS in teacher/rfid.php's "Enroll via RFID Card"
 // panel, directly from the teacher's own browser tab. The USB
 // reader is a plug-and-play HID keyboard-emulation device: when a
 // card is tapped it "types" the UID into a focused text input on

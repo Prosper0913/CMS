@@ -49,7 +49,7 @@ session_start();
       <li>Share your login credentials with anyone else, or use another person's account</li>
       <li>Attempt to access records, grades, or attendance that aren't your own (or, for teachers, that aren't for your own sections/subjects)</li>
       <li>Upload files or data you don't have the right to upload, or that contain malicious code</li>
-      <li>Attempt to bypass, probe, or disrupt the System's security, including biometric attendance hardware</li>
+      <li>Attempt to bypass, probe, or disrupt the System's security, including RFID attendance hardware</li>
       <li>Use the System for anything unlawful or outside its intended academic purpose</li>
     </ul>
 
@@ -76,12 +76,11 @@ session_start();
       of any discrepancy.
     </p>
 
-    <h2>6. Biometric Attendance</h2>
+    <h2>6. RFID Attendance</h2>
     <p>
-      Where enabled, fingerprint-based attendance is optional at your school's discretion and is
-      used solely to verify attendance, as described in our
-      <a href="/classroomv2/privacy.php">Privacy Policy</a>. Tampering with or attempting to spoof
-      biometric attendance devices is not permitted.
+      Where enabled, RFID card attendance is used solely to record attendance, as described in our
+      <a href="/classroomv2/privacy.php">Privacy Policy</a>. Each card belongs to one student. Tapping
+      another student's card, or tampering with RFID attendance hardware, is not permitted.
     </p>
 
     <h2>7. Availability &amp; Changes</h2>

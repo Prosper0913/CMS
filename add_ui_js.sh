@@ -32,7 +32,7 @@ student/subject_detail.php
 student/subjects.php
 teacher/add_subject.php
 teacher/all_subjects.php
-teacher/biometric.php
+teacher/rfid.php
 teacher/borrowed_equipment.php
 teacher/dashboard.php
 teacher/import_students.php
@@ -41,6 +41,5 @@ teacher/manage_teachers_UNUSED.php
 teacher/settings.php
 teacher/students.php
 teacher/subject_view.php
-teacher/subject_view_biometric.php
 terms.php
 LIST

@@ -40,7 +40,8 @@ $subject = $sub_stmt->get_result()->fetch_assoc();
 if (!$subject) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
 $active_tab = $_GET['tab'] ?? 'overview';
-$valid_tabs = ['overview','written','exams','performance','attendance','biometric','grades','announcements','settings'];
+if ($active_tab === 'biometric') $active_tab = 'rfid';   // old bookmarked links
+$valid_tabs = ['overview','written','exams','performance','attendance','rfid','grades','announcements','settings'];
 if (!in_array($active_tab, $valid_tabs)) $active_tab = 'overview';
 
 $success_msg = '';
@@ -57,9 +58,6 @@ $subject_locked = !$subject['is_active'];
 $LOCKED_MSG = "This subject is inactive — it's a read-only history record. Reactivate it in Settings to make changes.";
 
 
-//----------------------------
-/*$subject_id = (int)($_GET['id'] ?? 0); // if not already set
-include 'subject_view_biometric.php';*/
 
 // ── Shared: fetch enrolled students ─────────────────────────
 function getEnrollees($conn, $subject_id) {
@@ -114,14 +112,13 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv' && ($active_tab === 'gra
     exit;
 }
 
-// ── AJAX: biometric live roster (must be before HTML output) ─
-if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
+// ── AJAX: RFID live roster (must be before HTML output) ─
+if (isset($_GET['rfid_ajax']) && $_GET['rfid_ajax'] === 'live') {
     header('Content-Type: application/json');
     $ajax_date = $_GET['date'] ?? date('Y-m-d');
     $aq = $conn->prepare(
         "SELECT s.student_id, s.last_name, s.first_name,
                 a.status AS att_status, a.time_in, a.source,
-                (ft.id IS NOT NULL) AS has_template,
                 (rc.id IS NOT NULL) AS has_card
          FROM subject_enrollments se
          JOIN students s USING(student_id)
@@ -129,7 +126,6 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
                ON  a.subject_id = se.subject_id
                AND a.student_id = se.student_id
                AND a.date = ?
-         LEFT JOIN fingerprint_templates ft ON ft.student_id = s.student_id
          LEFT JOIN rfid_cards rc ON rc.student_id = s.student_id
          WHERE se.subject_id = ?
          ORDER BY s.last_name ASC, s.first_name ASC"
@@ -139,10 +135,8 @@ if (isset($_GET['bio_ajax']) && $_GET['bio_ajax'] === 'live') {
     $ajax_rows = $aq->get_result()->fetch_all(MYSQLI_ASSOC);
 
     $asq = $conn->prepare(
-        "SELECT bs.id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at,
-                bd.label AS device_label
+        "SELECT bs.id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at
          FROM bio_sessions bs
-         JOIN bio_devices bd ON bd.id = bs.device_id
          WHERE bs.subject_id = ? AND bs.status = 'active'
          ORDER BY bs.started_at DESC LIMIT 1"
     );
@@ -518,18 +512,13 @@ if (isset($_POST['delete_attendance_day']) && $subject_locked) {
     }
 }
 
-// ── START biometric session ───────────────────────────────────
-// dev_id = 0 is a valid choice: "No device — RFID / manual only".
-// A session is fundamentally scoped to a subject, not a device — a
-// fingerprint ESP32 and the USB RFID reader (if one is tapped on
-// this page) can both feed attendance into the same open session,
-// and a subject with no fingerprint device at all can still run
-// attendance purely over RFID.
-if (isset($_POST['start_bio_session']) && $subject_locked) {
+// ── START RFID attendance session ─────────────────────────────
+// A session is scoped to a subject: it is the open window during which
+// RFID card taps (api/rfid_scan.php) are accepted for this subject.
+if (isset($_POST['start_rfid_session']) && $subject_locked) {
     $error_msg = $LOCKED_MSG;
-} elseif (isset($_POST['start_bio_session'])) {
-    $dev_id = (int)$_POST['bio_device_id'];
-    $hours  = (int)($_POST['bio_expire_hours'] ?? 2);
+} elseif (isset($_POST['start_rfid_session'])) {
+    $hours  = (int)($_POST['rfid_expire_hours'] ?? 2);
 
     $late_raw = trim($_POST['late_after_minutes'] ?? '');
     $late_minutes = (ctype_digit($late_raw) && (int)$late_raw > 0) ? (int)$late_raw : null;
@@ -537,9 +526,7 @@ if (isset($_POST['start_bio_session']) && $subject_locked) {
     if ($late_minutes === null) {
         $error_msg = "Please enter how many minutes after the session starts a scan counts as Late (a whole number greater than 0).";
     } else {
-        // End any other active session for THIS SUBJECT first (not
-        // just this device) — a subject only ever has one open
-        // attendance window at a time, however it's being fed.
+        // A subject only ever has one open attendance window at a time.
         $es = $conn->prepare(
             "UPDATE bio_sessions SET status='ended', ended_at=NOW()
              WHERE subject_id=? AND status='active'"
@@ -548,31 +535,28 @@ if (isset($_POST['start_bio_session']) && $subject_locked) {
 
         $expire = $hours > 0 ? date('Y-m-d H:i:s', strtotime("+{$hours} hours")) : null;
 
-        $dev_param = $dev_id > 0 ? $dev_id : null;
         $ins = $conn->prepare(
             "INSERT INTO bio_sessions
-                (device_id, subject_id, started_by, auto_expire_at, late_after_minutes, status)
-             VALUES (?,?,?,?,?,'active')"
+                (subject_id, started_by, auto_expire_at, late_after_minutes, status)
+             VALUES (?,?,?,?,'active')"
         );
-        $ins->bind_param('iiisi', $dev_param, $subject_id, $teacher_id, $expire, $late_minutes);
+        $ins->bind_param('iisi', $subject_id, $teacher_id, $expire, $late_minutes);
         $ins->execute();
 
-        $success_msg = $dev_id > 0
-            ? "Biometric session started. Device is now live for this subject."
-            : "Attendance session started (RFID / manual only — no fingerprint device selected).";
+        $success_msg = "Attendance session started. Students can now tap their RFID cards.";
     }
 }
-// ── STOP biometric session ────────────────────────────────────
-if (isset($_POST['stop_bio_session']) && $subject_locked) {
+// ── STOP RFID attendance session ──────────────────────────────
+if (isset($_POST['stop_rfid_session']) && $subject_locked) {
     $error_msg = $LOCKED_MSG;
-} elseif (isset($_POST['stop_bio_session'])) {
+} elseif (isset($_POST['stop_rfid_session'])) {
     $sess_id = (int)$_POST['session_id'];
     $st = $conn->prepare(
         "UPDATE bio_sessions SET status='ended', ended_at=NOW()
          WHERE id=? AND subject_id=?"
     );
     $st->bind_param('ii', $sess_id, $subject_id); $st->execute();
-    $success_msg = "Biometric session ended.";
+    $success_msg = "Attendance session ended.";
 }
 if (isset($_POST['recompute']) && $subject_locked) {
     $error_msg = $LOCKED_MSG;
@@ -891,25 +875,16 @@ $page_title        = $subject['subject_code'] . ' — ' . $subject['section'];
 $active_nav        = 'subject_view';
 $active_subject_id = $subject_id;
 
-// ── Biometric: devices + active session ───────────────────────
-// bio_devices is fingerprint-ESP32-only (RFID has no "device" row —
-// it's a USB peripheral on whichever computer the teacher is using).
-$bio_devices_res = $conn->query("SELECT id, label, last_seen FROM bio_devices ORDER BY label ASC");
-$bio_devices = $bio_devices_res ? $bio_devices_res->fetch_all(MYSQLI_ASSOC) : [];
-
+// ── RFID: active session ──────────────────────────────────────
 // Auto-expire overdue sessions
 $conn->query(
     "UPDATE bio_sessions SET status='ended', ended_at=NOW()
      WHERE status='active' AND auto_expire_at IS NOT NULL AND auto_expire_at < NOW()"
 );
 
-// LEFT JOIN: an RFID-only session has device_id = NULL, so it must
-// still show up here (an INNER JOIN would silently hide it).
 $bsq = $conn->prepare(
-    "SELECT bs.id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at,
-            COALESCE(bd.label, 'RFID / Manual (no device)') AS device_label
+    "SELECT bs.id, bs.late_after_minutes, bs.auto_expire_at, bs.started_at
      FROM bio_sessions bs
-     LEFT JOIN bio_devices bd ON bd.id = bs.device_id
      WHERE bs.subject_id = ? AND bs.status = 'active'
      ORDER BY bs.started_at DESC LIMIT 1"
 );
@@ -917,7 +892,7 @@ $bsq->bind_param('i', $subject_id);
 $bsq->execute();
 $active_bio_session = $bsq->get_result()->fetch_assoc();
 
-// Today's biometric scans for this subject
+// Today's RFID scans for this subject
 $bscans_q = $conn->prepare(
     "SELECT bl.student_id, bl.scanned_at, bl.status,
             s.first_name, s.last_name
@@ -1034,7 +1009,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
     ['exams',       'ti-file-certificate',  'Major Exams',    null],
     ['performance', 'ti-star',              'Performance',    null],
     ['attendance',  'ti-calendar-check',    'Attendance',     null],
-    ['biometric',   'ti-fingerprint',       'Biometric/RFID',      null],
+    ['rfid',        'ti-id-badge-2',        'RFID Attendance',     null],
     ['grades',      'ti-chart-bar',         'Grades',         null],
     ['announcements','ti-speakerphone',     'Announcements',  null],
     ['settings',    'ti-settings',          'Settings',       null],
@@ -1911,8 +1886,8 @@ elseif ($active_tab === 'attendance'):
                         <?php echo $ar['status'] === 'Absent' ? 'disabled' : ''; ?>>
                     </td>-->
                     <td style="font-size:11px;color:var(--text7);">
-                      <?php if ($ar['source'] === 'Biometric'): ?>
-                        <span class="text-accent"><i class="ti ti-fingerprint" style="font-size:12px;"></i> Bio</span>
+                      <?php if ($ar['source'] === 'RFID'): ?>
+                        <span class="text-accent"><i class="ti ti-id-badge-2" style="font-size:12px;"></i> RFID</span>
                       <?php elseif ($ar['source']): ?>
                         <?php echo htmlspecialchars($ar['source']); ?>
                       <?php else: ?>
@@ -1950,15 +1925,14 @@ elseif ($active_tab === 'attendance'):
 
 <?php
 // ══════════════════════════════════════════════════════
-//  TAB: BIOMETRIC
+//  TAB: RFID ATTENDANCE
 // ══════════════════════════════════════════════════════
-elseif ($active_tab === 'biometric'):
+elseif ($active_tab === 'rfid'):
     // Seed initial roster for JS (PHP-rendered = zero flicker)
     $bio_today  = date('Y-m-d');
     $bio_init_q = $conn->prepare(
         "SELECT s.student_id, s.last_name, s.first_name,
                 a.status AS att_status, a.time_in, a.source,
-                (ft.id IS NOT NULL) AS has_template,
                 (rc.id IS NOT NULL) AS has_card
          FROM subject_enrollments se
          JOIN students s USING(student_id)
@@ -1966,7 +1940,6 @@ elseif ($active_tab === 'biometric'):
                ON  a.subject_id = se.subject_id
                AND a.student_id = se.student_id
                AND a.date = ?
-         LEFT JOIN fingerprint_templates ft ON ft.student_id = s.student_id
          LEFT JOIN rfid_cards rc ON rc.student_id = s.student_id
          WHERE se.subject_id = ?
          ORDER BY s.last_name ASC, s.first_name ASC"
@@ -1981,7 +1954,7 @@ elseif ($active_tab === 'biometric'):
     $bio_absent  = $bio_total - $bio_present - $bio_late;
 ?>
 
-<!-- Bio stat chips 
+<!-- Stat chips 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
   <?php foreach ([
     ['Present', $bio_present, 'var(--green)',  'var(--bg4)',  'rgba(52,211,153,.25)',  'bioStatPresent'],
@@ -2004,7 +1977,7 @@ elseif ($active_tab === 'biometric'):
 
 <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start;">
 
-  <!-- LEFT: Session control + device status -->
+  <!-- LEFT: Session control + reader -->
   <div>
     <div class="card" style="<?php echo $active_bio_session
         ? 'border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03);' : ''; ?>">
@@ -2025,8 +1998,8 @@ elseif ($active_tab === 'biometric'):
       <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);
                   border-radius:var(--radius);padding:14px;margin-bottom:14px;">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px;">
-          <i class="ti ti-cpu text-green"></i>
-          <?php echo htmlspecialchars($active_bio_session['device_label']); ?>
+          <i class="ti ti-id-badge-2 text-green"></i>
+          RFID attendance session
         </div>
         <div style="font-size:12px;color:var(--text2);display:flex;flex-direction:column;gap:4px;">
           <div style="display:flex;justify-content:space-between;">
@@ -2047,9 +2020,9 @@ elseif ($active_tab === 'biometric'):
       </div>
       <form method="POST">
         <input type="hidden" name="session_id" value="<?php echo $active_bio_session['id']; ?>">
-        <button type="submit" name="stop_bio_session"
+        <button type="submit" name="stop_rfid_session"
           class="btn btn-danger btn-sm" style="width:100%;justify-content:center;"
-          onclick="return confirm('End this biometric session?')">
+          onclick="return confirm('End this attendance session?')">
           <i class="ti ti-player-stop"></i> End Session
         </button>
       </form>
@@ -2062,23 +2035,6 @@ elseif ($active_tab === 'biometric'):
           <i class="ti ti-clock"></i> No active session
         </p>
         <form method="POST">
-          <div class="form-group">
-            <label>Fingerprint Device (optional)</label>
-            <select name="bio_device_id" class="form-control">
-              <option value="0">No device — RFID / manual only</option>
-              <?php foreach ($bio_devices as $bd):
-                $online = $bd['last_seen'] && (time() - strtotime($bd['last_seen']) < 120);
-              ?>
-              <option value="<?php echo $bd['id']; ?>">
-                <?php echo ($online ? '🟢 ' : '⚫ ') . htmlspecialchars($bd['label']); ?>
-              </option>
-              <?php endforeach; ?>
-            </select>
-            <p style="font-size:11px;color:var(--text6);margin-top:4px;">
-              Leave this on "No device" to run attendance with just the USB RFID card
-              reader below — no fingerprint sensor needed.
-            </p>
-          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="form-group">
               <label>Late After (minutes)</label>
@@ -2087,7 +2043,7 @@ elseif ($active_tab === 'biometric'):
             </div>
             <div class="form-group">
               <label>Auto-Stop</label>
-              <select name="bio_expire_hours" class="form-control">
+              <select name="rfid_expire_hours" class="form-control">
                 <option value="1">1 hour</option>
                 <option value="2" selected>2 hours</option>
                 <option value="3">3 hours</option>
@@ -2095,7 +2051,7 @@ elseif ($active_tab === 'biometric'):
               </select>
             </div>
           </div>
-          <button type="submit" name="start_bio_session"
+          <button type="submit" name="start_rfid_session"
             class="btn btn-primary btn-sm"
             style="width:100%;justify-content:center;background:var(--green);margin-top:4px;">
             <i class="ti ti-player-play"></i> Start Session
@@ -2105,45 +2061,22 @@ elseif ($active_tab === 'biometric'):
       <?php endif; ?>
     </div>
 
-    <?php if (!empty($bio_devices)): ?>
     <div class="card">
-      <p class="card-title"><i class="ti ti-cpu"></i> Devices</p>
-            <hr class="thin-line">
-      <?php foreach ($bio_devices as $bd):
-        $online = $bd['last_seen'] && (time() - strtotime($bd['last_seen']) < 120);
-        $ls     = !$bd['last_seen'] ? 'Never'
-                  : (time() - strtotime($bd['last_seen']) < 60 ? 'Just now'
-                     : round((time() - strtotime($bd['last_seen'])) / 60) . 'm ago');
-      ?>
-      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;
-                  border-bottom:1px solid var(--border);">
-        <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;
-          background:<?php echo $online ? 'var(--green)' : 'var(--text7)'; ?>;
-          <?php echo $online ? 'animation:pulse 1.5s infinite;' : ''; ?>"></div>
-        <i class="ti ti-fingerprint" style="font-size:13px;color:var(--text3);"></i>
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:500;"><?php echo htmlspecialchars($bd['label']); ?></div>
-        </div>
-        <span style="font-size:11px;color:<?php echo $online ? 'var(--green)' : 'var(--text3)'; ?>;">
-          <?php echo $online ? 'Online' : $ls; ?>
-        </span>
-      </div>
-      <?php endforeach; ?>
-      <div style="margin-top:12px;text-align:center;">
-        <a href="/classroomv2/teacher/biometric.php" class="btn btn-outline btn-sm" style="font-size:11px;">
-          <i class="ti ti-settings"></i> Manage Devices &amp; Enrollment
+      <p class="card-title"><i class="ti ti-id-badge-2"></i> Card Enrollment</p>
+      <p style="font-size:11px;color:var(--text6);margin-bottom:10px;">
+        Students need a registered card before they can tap in.
+      </p>
+      <div style="text-align:center;">
+        <a href="/classroomv2/teacher/rfid.php" class="btn btn-outline btn-sm" style="font-size:11px;">
+          <i class="ti ti-settings"></i> Enroll RFID Cards
         </a>
       </div>
     </div>
-    <?php endif; ?>
 
-    <!-- RFID card reader — a plug-and-play USB HID device, not a
-         network device. It only works while a session is active, and
-         it rides along on whatever session is open for this subject
-         (fingerprint-started or device-less), since both methods feed
-         the same attendance window. Tapping a card "types" its UID
-         into the input below (the reader emulates a keyboard), so the
-         input just needs to stay focused while this tab is open. -->
+    <!-- RFID card reader — a plug-and-play USB HID device. It only works
+         while a session is active. Tapping a card "types" its UID into
+         the input below (the reader emulates a keyboard), so the input
+         just needs to stay focused while this tab is open. -->
     <?php if ($active_bio_session): ?>
     <div class="card" id="rfidCard">
       <p class="card-title"><i class="ti ti-id-badge-2"></i> RFID Card Reader</p>
@@ -2202,7 +2135,7 @@ elseif ($active_tab === 'biometric'):
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Student</th><th>ID Method</th>
+            <th>#</th><th>Student</th><th>RFID Card</th>
             <th>Status</th>
             <!-- <th>Time In</th> -->
             <th>Source</th>
@@ -2213,7 +2146,7 @@ elseif ($active_tab === 'biometric'):
     </div>
   </div>
 
-</div><!-- end biometric grid -->
+</div><!-- end RFID grid -->
 
 <script>
 (function () {
@@ -2240,21 +2173,15 @@ elseif ($active_tab === 'biometric'):
   }
   function sourceBadge(src) {
     if (!src) return '';
-    if (src === 'Biometric')
-      return badge('<i class="ti ti-fingerprint" style="font-size:9px;"></i> Bio','#5b8dee','rgba(91,141,238,.12)');
     if (src === 'RFID')
       return badge('<i class="ti ti-id-badge-2" style="font-size:9px;"></i> RFID','#a78bfa','rgba(167,139,250,.12)');
     return badge('Manual','#dcd6d6','#eb14348e');
   }
-  // Shows BOTH enrollment methods for a student — a student can have a
-  // fingerprint, an RFID card, both, or neither; this isn't an
-  // either/or like the attendance source is.
-  function idMethodBadges(hasTemplate, hasCard) {
-    if (!hasTemplate && !hasCard) return badge('✗ None','#dcd6d6','#eb14348e');
-    let out = '';
-    if (hasTemplate) out += badge('<i class="ti ti-fingerprint" style="font-size:9px;"></i> FP','#34d399','rgba(52,211,153,.12)');
-    if (hasCard)     out += ' ' + badge('<i class="ti ti-id-badge-2" style="font-size:9px;"></i> RFID','#34d399','rgba(52,211,153,.12)');
-    return out;
+  // Whether the student has a registered RFID card.
+  function cardBadge(hasCard) {
+    return hasCard
+      ? badge('<i class="ti ti-id-badge-2" style="font-size:9px;"></i> Card','#34d399','rgba(52,211,153,.12)')
+      : badge('✗ No card','#dcd6d6','#eb14348e');
   }
 
   function renderRoster(students) {
@@ -2273,7 +2200,7 @@ elseif ($active_tab === 'biometric'):
           <div style="font-weight:500;">${s.last_name}, ${s.first_name}</div>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--text7);">${s.student_id}</div>
         </td>
-        <td>${idMethodBadges(s.has_template, s.has_card)}</td>
+        <td>${cardBadge(s.has_card)}</td>
         <td>${statusBadge(s.att_status)}</td>
 
         <!-- <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">
@@ -2294,7 +2221,7 @@ elseif ($active_tab === 'biometric'):
   }
 
   function pollLive() {
-    fetch(`?id=${SUBJECT_ID}&tab=biometric&bio_ajax=live&date=${TODAY}`)
+    fetch(`?id=${SUBJECT_ID}&tab=rfid&rfid_ajax=live&date=${TODAY}`)
       .then(r => r.json())
       .then(d => {
         lastData = d;

@@ -1,21 +1,15 @@
 <?php
 // ============================================================
-// api/rfid_scan.php   (REVISED — no ESP32, no device_key)
+// api/rfid_scan.php
 //
-// Called by JS in teacher/subject_view.php's biometric tab,
+// Called by JS in teacher/subject_view.php's RFID Attendance tab,
 // directly from the teacher's own browser. The USB reader types
 // the tapped card's UID into a focused input followed by Enter;
 // the page's JS catches that and fetch()'s this endpoint with the
 // subject the teacher is currently viewing. Auth is the teacher's
-// PHP session (same as every other action on that page) — there is
-// no device_key, because there is no separate networked device.
+// PHP session (same as every other action on that page).
 //
-// This endpoint does NOT care whether the active attendance session
-// for the subject was started with a fingerprint device attached or
-// with none at all ("RFID / manual only") — it looks the session up
-// by subject_id, so RFID can either ride alongside an active
-// fingerprint session as a fallback input, or be the only input in
-// use for that subject.
+// The active attendance session is looked up by subject_id.
 //
 // POST /classroom/api/rfid_scan.php
 // Body (JSON or form):
@@ -53,7 +47,7 @@ set_exception_handler(function (Throwable $e) {
 // Deliberately NOT using includes/auth.php's requireRole() here: on an
 // expired/invalid session that redirects (header Location: login.php)
 // instead of returning JSON. This endpoint is hit via fetch() from a
-// biometric tab that's often left open for an entire class period, so
+// attendance tab that's often left open for an entire class period, so
 // once the session lapses, requireRole()'s redirect would send the
 // browser off to fetch the login page's HTML — r.json() then throws
 // trying to parse it, which the page's .catch() reports as a generic
@@ -106,17 +100,15 @@ if (!$ov_row['is_active']) {
     die(json_encode(['status' => 'error', 'message' => 'This subject is now inactive. Attendance session ended.']));
 }
 
-// ── Auto-expire sessions (same housekeeping as bio_config.php / bio_record.php) ─
+// ── Auto-expire overdue sessions ─
 $conn->query(
     "UPDATE bio_sessions SET status='ended', ended_at=NOW()
      WHERE status='active' AND auto_expire_at IS NOT NULL AND auto_expire_at < NOW()"
 );
 
 // ── Find the active session for THIS SUBJECT ───────────────────
-// Keyed by subject_id, not device_id — a fingerprint-started session
-// and an RFID tap are just two inputs into the same open window.
 $sq = $conn->prepare(
-    "SELECT id AS session_id, started_at, late_after_minutes, device_id
+    "SELECT id AS session_id, started_at, late_after_minutes
      FROM bio_sessions
      WHERE subject_id=? AND status='active'
      ORDER BY started_at DESC LIMIT 1"
@@ -125,17 +117,15 @@ $sq->bind_param('i', $subject_id);
 $sq->execute();
 $session = $sq->get_result()->fetch_assoc();
 if (!$session) {
-    die(json_encode(['status' => 'error', 'message' => 'No active session. Start one on this subject\'s Biometric tab first.']));
+    die(json_encode(['status' => 'error', 'message' => 'No active session. Start one on this subject\'s RFID Attendance tab first.']));
 }
 $session_id         = (int)$session['session_id'];
 $session_started_at = $session['started_at'];
 $late_after_minutes  = (int)$session['late_after_minutes'];
-$device_id           = $session['device_id'] !== null ? (int)$session['device_id'] : null;
+$device_id           = null;   // RFID uses the teacher's own reader; no device row
 
 // ── Look up the card ────────────────────────────────────────────
-// This is the RFID "match" step — a direct UID lookup instead of
-// fingerprint minutiae comparison. An unknown/unregistered card is
-// reported exactly like a fingerprint NO_MATCH.
+// Direct UID lookup. An unknown/unregistered card is reported as NO_MATCH.
 $cq = $conn->prepare("SELECT student_id FROM rfid_cards WHERE card_uid=? LIMIT 1");
 $cq->bind_param('s', $card_uid);
 $cq->execute();
@@ -185,7 +175,7 @@ if ($ck->num_rows > 0) {
 }
 
 // ── Determine Present / Late ────────────────────────────────────
-// Same approach as bio_record.php: let MySQL compare the scan
+// Let MySQL compare the scan
 // datetime against session_start + late_after_minutes, so the
 // browser's own clock can't disagree with the threshold the teacher
 // actually configured for this session.
@@ -223,10 +213,7 @@ echo json_encode([
     'action' => $att_status,
 ]);
 
-// ── Helper (identical shape to bio_record.php's, so biometric_log
-//     stays a single shared table for both attendance methods).
-//     $device_id may be NULL for an RFID-only session — the column
-//     already allows that. ─────────────────────────────────────
+// ── Helper: writes the scan to biometric_log (the RFID scan log table) ──
 function writelog($conn, $device_id, $session_id, $student_id, $subject_id,
                    $scanned_at, $ip, $status, $message) {
     // A failed log write must never block recording attendance.
