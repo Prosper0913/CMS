@@ -38,6 +38,17 @@ $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 header('Content-Type: application/json');
 
+// Any uncaught error (PHP 8.1+ makes mysqli throw on SQL errors) would
+// otherwise come back as an HTML 500 page, which the browser's r.json()
+// can't parse -> the generic "Network error — scan not recorded". Always
+// answer in JSON instead so the real reason reaches the screen.
+set_exception_handler(function (Throwable $e) {
+    error_log('rfid_scan.php: ' . $e->getMessage());
+    if (!headers_sent()) { http_response_code(500); header('Content-Type: application/json'); }
+    echo json_encode(['status' => 'error', 'message' => 'Server error: ' . $e->getMessage()]);
+    exit;
+});
+
 // ── Auth (AJAX-safe) ─────────────────────────────────────────────
 // Deliberately NOT using includes/auth.php's requireRole() here: on an
 // expired/invalid session that redirects (header Location: login.php)
@@ -218,14 +229,19 @@ echo json_encode([
 //     already allows that. ─────────────────────────────────────
 function writelog($conn, $device_id, $session_id, $student_id, $subject_id,
                    $scanned_at, $ip, $status, $message) {
-    $ll = $conn->prepare(
-        "INSERT INTO biometric_log
-            (device_id, session_id, student_id, subject_id, scanned_at, ip_address, status, message)
-         VALUES (?,?,?,?,?,?,?,?)"
-    );
-    $ll->bind_param('iisissss',
-        $device_id, $session_id, $student_id, $subject_id,
-        $scanned_at, $ip, $status, $message
-    );
-    $ll->execute();
+    // A failed log write must never block recording attendance.
+    try {
+        $ll = $conn->prepare(
+            "INSERT INTO biometric_log
+                (device_id, session_id, student_id, subject_id, scanned_at, ip_address, status, message)
+             VALUES (?,?,?,?,?,?,?,?)"
+        );
+        $ll->bind_param('iisissss',
+            $device_id, $session_id, $student_id, $subject_id,
+            $scanned_at, $ip, $status, $message
+        );
+        $ll->execute();
+    } catch (Throwable $e) {
+        error_log('rfid_scan.php writelog: ' . $e->getMessage());
+    }
 }
