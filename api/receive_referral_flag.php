@@ -10,7 +10,10 @@
  $DB_USER = 'root';
  $DB_PASS = '';
 
- $SYNC_RECEIVE_KEY = '30fceb36b4cc5c5422ab192d5bead0de7dd88596c37a372c0e14abc1551ad0e8';
+ // Shared secret — loaded from config/secrets.php (gitignored), never hardcoded.
+ $__secrets = __DIR__ . '/../config/secrets.php';
+ if (is_file($__secrets)) require_once $__secrets;
+ $SYNC_RECEIVE_KEY = defined('REFERRAL_RECEIVE_KEY') ? REFERRAL_RECEIVE_KEY : '';
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
  $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);

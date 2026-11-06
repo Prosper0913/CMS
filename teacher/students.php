@@ -195,6 +195,22 @@ if (isset($_POST['add_student'])) {
 // Settings page now. Teachers can still add (create-or-attach) and remove
 // students from their own sections/subjects.
 
+// studentHasAnyLinkage() is normally provided by config/db.php, but that
+// file isn't in the repo and the server's copy doesn't define it — which
+// made every delete end in "Call to undefined function" (HTTP 500).
+// Defined here (guarded) so it works either way.
+if (!function_exists('studentHasAnyLinkage')) {
+    function studentHasAnyLinkage($conn, $student_id) {
+        $q = $conn->prepare(
+            "SELECT (SELECT COUNT(*) FROM subject_enrollments WHERE student_id=?)
+                  + (SELECT COUNT(*) FROM section_students   WHERE student_id=?) AS n"
+        );
+        $q->bind_param('ss', $student_id, $student_id);
+        $q->execute();
+        return (int)$q->get_result()->fetch_assoc()['n'] > 0;
+    }
+}
+
 // ── DELETE (scoped) — removes this teacher's own links only; the
 // underlying account is only fully deleted if, after that, no other
 // teacher has any link to this student left. ──
@@ -238,6 +254,8 @@ if (isset($_GET['delete'])) {
 
             $fully_orphaned = !studentHasAnyLinkage($conn, $del_id);
             if ($fully_orphaned) {
+                $d5b = $conn->prepare("DELETE FROM rfid_cards WHERE student_id=?");
+                $d5b->bind_param("s", $del_id); $d5b->execute();
                 $d6 = $conn->prepare("DELETE FROM users WHERE student_id=?");
                 $d6->bind_param("s", $del_id); $d6->execute();
                 $d7 = $conn->prepare("DELETE FROM students WHERE student_id=?");
@@ -254,7 +272,7 @@ if (isset($_GET['delete'])) {
                 header("Location: students.php?msg=removed");
             }
             exit;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $conn->rollback();
             $error_msg = "Could not remove: " . $e->getMessage();
         }

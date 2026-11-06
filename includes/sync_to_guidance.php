@@ -36,9 +36,14 @@
 const GUIDANCE_API_BASE = 'http://localhost/guidance-system';
 
 // Shared secret — must match $SYNC_RECEIVE_KEY in
-// guidance/_receive_common.php. Same value as the Tooltrack
-// sync for simplicity (one secret for all integrations).
-const GUIDANCE_SYNC_KEY = '71e9aa8ae68de3a3b03523526d864ebd6bcfb0253dd3f3532c2c59155fff2353';
+// guidance/_receive_common.php.
+// Loaded from config/secrets.php (gitignored) — never hardcode keys here.
+// If the constant is missing, fall back to '' so the app keeps working and
+// the sync simply fails with an HTTP 401 (logged) instead of crashing.
+$__secrets = __DIR__ . '/../config/secrets.php';
+if (is_file($__secrets)) require_once $__secrets;
+unset($__secrets);
+if (!defined('GUIDANCE_SYNC_KEY')) define('GUIDANCE_SYNC_KEY', '');
 
 // ── Internal: HTTP POST a JSON payload to Guidance ───────────
 // Returns ['ok'=>bool, 'http'=>int, 'body'=>string, 'json'=>array|null].

@@ -120,9 +120,11 @@ $by_day = array_fill_keys($day_order, []);
 $range_start = 7*60 + 30;   // 7:30 AM in minutes-since-midnight
 $range_end   = 17*60 + 30;  // 5:30 PM
 
-$all_subjects_rows = [];
+$all_subjects_rows = [];       // ACTIVE subjects — shown on the timetable
+$inactive_rows     = [];       // INACTIVE subjects — shown as a history table
 $subjects->data_seek(0);
 while ($sub = $subjects->fetch_assoc()) {
+    if (!$sub['is_active']) { $inactive_rows[] = $sub; continue; }
     $all_subjects_rows[] = $sub;
     if (!empty($sub['schedule_start_time']) && !empty($sub['schedule_end_time'])) {
         $sm = (int)date('H', strtotime($sub['schedule_start_time'])) * 60 + (int)date('i', strtotime($sub['schedule_start_time']));
@@ -136,6 +138,37 @@ while ($sub = $subjects->fetch_assoc()) {
         }
     }
 }
+// Inactive subjects are history records, not part of the weekly timetable.
+// Group them by school year (newest first) then semester, because several
+// inactive subjects can share the same days/times across different terms.
+$sem_rank = ['1st' => 1, '2nd' => 2, 'Summer' => 3];
+$history = [];   // [school_year][semester] => rows
+foreach ($inactive_rows as $r) {
+    $sy = trim($r['school_year'] ?? '') !== '' ? $r['school_year'] : 'No school year';
+    $sm = trim($r['semester'] ?? '')    !== '' ? $r['semester']    : 'No semester';
+    $history[$sy][$sm][] = $r;
+}
+uksort($history, function ($a, $b) {   // newest school year first; "No school year" last
+    if ($a === 'No school year') return 1;
+    if ($b === 'No school year') return -1;
+    return strnatcmp($b, $a);
+});
+foreach ($history as $sy => &$sems) {
+    uksort($sems, fn($a, $b) => ($sem_rank[$b] ?? 0) <=> ($sem_rank[$a] ?? 0));  // 2nd before 1st
+    foreach ($sems as &$list) {
+        usort($list, fn($a, $b) => strcasecmp($a['subject_name'], $b['subject_name']));
+    }
+    unset($list);
+}
+unset($sems);
+
+function fmt_schedule_text($sub) {
+    if (empty($sub['schedule_days']) || empty($sub['schedule_start_time']) || empty($sub['schedule_end_time'])) return '—';
+    $days = implode(', ', array_filter(explode(',', $sub['schedule_days'])));
+    return $days . ' · ' . date('g:i A', strtotime($sub['schedule_start_time']))
+         . '–' . date('g:i A', strtotime($sub['schedule_end_time']));
+}
+
 $total_range = max(1, $range_end - $range_start);
 $px_per_min  = 1.2;
 $grid_height = round($total_range * $px_per_min);
@@ -279,6 +312,7 @@ function qs($overrides = []) {
     </a>
   </div>
 
+  <?php if ($all_subjects_rows): ?>
   <div class="timetable-wrap">
     <div class="timetable-times" style="height:<?php echo $grid_height; ?>px;">
       <?php
@@ -315,6 +349,7 @@ function qs($overrides = []) {
       <?php endforeach; ?>
     </div>
   </div>
+  <?php endif; ?>
 
   <?php
   // Subjects with no schedule set yet still need to be reachable
@@ -332,6 +367,62 @@ function qs($overrides = []) {
     </a>
     <?php endforeach; ?>
   </div>
+  <?php endif; ?>
+
+  <?php if ($history): ?>
+  <!-- ── INACTIVE SUBJECTS — history, grouped by school year & semester ── -->
+  <div class="section-label" style="margin-top:28px;">
+    <span><i class="ti ti-archive"></i> Inactive subjects (history) &mdash; <?php echo count($inactive_rows); ?></span>
+  </div>
+  <?php foreach ($history as $sy => $sems): foreach ($sems as $sm => $rows): ?>
+  <div class="card" style="margin-bottom:16px;">
+    <p class="card-title">
+      <i class="ti ti-calendar-event"></i>
+      S.Y. <?php echo htmlspecialchars($sy); ?> &middot; <?php echo htmlspecialchars($sm); ?><?php echo in_array($sm, ['1st','2nd'], true) ? ' Semester' : ''; ?>
+      <span class="card-title-right" style="font-size:11px;font-weight:400;color:var(--text3);">
+        <?php echo count($rows); ?> subject<?php echo count($rows)!=1?'s':''; ?>
+      </span>
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Subject</th>
+            <th>Section</th>
+            <th>Type</th>
+            <th>Schedule</th>
+            <th style="text-align:right;">Students</th>
+            <th style="text-align:right;">Avg</th>
+            <th style="text-align:right;">Pass / Fail</th>
+            <th>Closed</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($rows as $r): $cfg = $type_cfg[$r['subject_type']] ?? $type_cfg['General Education']; ?>
+          <tr>
+            <td class="td-mono"><?php echo htmlspecialchars($r['subject_code']); ?></td>
+            <td style="font-weight:500;"><?php echo htmlspecialchars($r['subject_name']); ?></td>
+            <td><?php echo htmlspecialchars($r['section']); ?></td>
+            <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:<?php echo $cfg['bg']; ?>;color:<?php echo $cfg['color']; ?>;"><?php echo $cfg['label']; ?></span></td>
+            <td style="font-size:12px;color:var(--text7);white-space:nowrap;"><?php echo htmlspecialchars(fmt_schedule_text($r)); ?></td>
+            <td style="text-align:right;"><?php echo (int)$r['enrollee_count']; ?></td>
+            <td style="text-align:right;"><?php echo $r['class_avg'] !== null ? $r['class_avg'].'%' : '—'; ?></td>
+            <td style="text-align:right;white-space:nowrap;"><?php echo (int)$r['passing']; ?> / <?php echo (int)$r['failing']; ?></td>
+            <td style="font-size:12px;color:var(--text7);white-space:nowrap;"><?php echo !empty($r['deactivated_at']) ? date('M d, Y', strtotime($r['deactivated_at'])) : '—'; ?></td>
+            <td style="text-align:right;">
+              <a href="/classroomv2/teacher/subject_view.php?id=<?php echo (int)$r['id']; ?>" class="btn btn-outline btn-sm">
+                <i class="ti ti-eye"></i> View
+              </a>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <?php endforeach; endforeach; ?>
   <?php endif; ?>
 
   <?php endif; ?>

@@ -32,7 +32,13 @@ const TOOLTRACK_API_BASE = 'http://localhost/tooltrack';
 // Shared secret — must match $TOOLTRACK_RECEIVE_KEY in
 // tooltrack/_receive_common.php. Same value as CMS_API_KEY in
 // sync_fpst_masterlist.php so there's only one secret to manage.
-const TOOLTRACK_RECEIVE_KEY = 'a888034173f952595606d57bf49804937dda9faea3d60c89426a7d0c4a239eda';
+// Loaded from config/secrets.php (gitignored) — never hardcode keys here.
+// If the constant is missing, fall back to '' so the app keeps working and
+// the sync simply fails with an HTTP 401 (logged) instead of crashing.
+$__secrets = __DIR__ . '/../config/secrets.php';
+if (is_file($__secrets)) require_once $__secrets;
+unset($__secrets);
+if (!defined('TOOLTRACK_RECEIVE_KEY')) define('TOOLTRACK_RECEIVE_KEY', '');
 
 // Course filter — only sections whose course matches this
 // (case-insensitive) are synced. Set to '' to sync ALL sections

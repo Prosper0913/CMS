@@ -27,7 +27,13 @@ const OCES_API_BASE = 'http://localhost/capstone';
 
 // Shared secret — must match $SYNC_RECEIVE_KEY in
 // oces/_receive_common.php.
-const OCES_SYNC_KEY = '1ff3aa6089f6e0897082946894b6f66f7e09b7c9a08651a8bc2c8f36fdf9a28e';
+// Loaded from config/secrets.php (gitignored) — never hardcode keys here.
+// If the constant is missing, fall back to '' so the app keeps working and
+// the sync simply fails with an HTTP 401 (logged) instead of crashing.
+$__secrets = __DIR__ . '/../config/secrets.php';
+if (is_file($__secrets)) require_once $__secrets;
+unset($__secrets);
+if (!defined('OCES_SYNC_KEY')) define('OCES_SYNC_KEY', '');
 
 // Subject filter — only students enrolled in at least one of these
 // subjects (by subject_name, case-insensitive) sync to OCES.
