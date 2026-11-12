@@ -117,8 +117,8 @@ $type_cfg = [
 $day_order = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 $day_full  = ['Mon'=>'Monday','Tue'=>'Tuesday','Wed'=>'Wednesday','Thu'=>'Thursday','Fri'=>'Friday','Sat'=>'Saturday','Sun'=>'Sunday'];
 $by_day = array_fill_keys($day_order, []);
-$range_start = 7*60 + 30;   // 7:30 AM in minutes-since-midnight
-$range_end   = 17*60 + 30;  // 5:30 PM
+$range_start = 7*60;    // 7:00 AM in minutes-since-midnight
+$range_end   = 21*60;   // 5:00 PM
 
 $all_subjects_rows = [];       // ACTIVE subjects — shown on the timetable
 $inactive_rows     = [];       // INACTIVE subjects — shown as a history table
@@ -169,9 +169,29 @@ function fmt_schedule_text($sub) {
          . '–' . date('g:i A', strtotime($sub['schedule_end_time']));
 }
 
-$total_range = max(1, $range_end - $range_start);
-$px_per_min  = 1.2;
-$grid_height = round($total_range * $px_per_min);
+// Snap the grid to whole hours so every row is a clean hour cell.
+$range_start = (int)(floor($range_start / 60) * 60);
+$range_end   = (int)(ceil($range_end / 60) * 60);
+if ($range_end <= $range_start) $range_end = $range_start + 60;
+$hour_h      = 64;                                   // px per hour row
+$hours_count = (int)(($range_end - $range_start) / 60);
+$px_per_min  = $hour_h / 60;
+$grid_height = $hours_count * $hour_h;
+$day_short   = ['Mon'=>'MON','Tue'=>'TUE','Wed'=>'WED','Thu'=>'THU','Fri'=>'FRI','Sat'=>'SAT','Sun'=>'SUN'];
+$today_key   = date('D');
+// Term label under the title: the school year / semester most of the
+// active subjects belong to.
+$term_counts = [];
+foreach ($all_subjects_rows as $r) {
+    $lab = trim(($r['school_year'] ?? '') . '|' . ($r['semester'] ?? ''));
+    $term_counts[$lab] = ($term_counts[$lab] ?? 0) + 1;
+}
+arsort($term_counts);
+$term_label = '';
+if ($term_counts) {
+    [$ty, $tm] = array_pad(explode('|', array_key_first($term_counts), 2), 2, '');
+    $term_label = trim(($ty !== '' ? 'S.Y. ' . $ty : '') . ($tm !== '' ? ' · ' . $tm . (in_array($tm, ['1st','2nd'], true) ? ' Semester' : '') : ''));
+}
 
 // helper to keep other filters when a filter link is clicked
 function qs($overrides = []) {
@@ -193,6 +213,41 @@ function qs($overrides = []) {
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="/classroomv2/assets/style.css">
+  <style>
+  /* ── WEEKLY SCHEDULE SHEET (teacher/all_subjects.php) ─────────────
+     Printed-planner look: centered title, day header row, hourly rows,
+     every cell outlined. Subjects sit on the grid as coloured blocks. */
+  .wk-sheet{background:#f6faf8;border:1px solid rgba(30,95,78,.25);border-radius:14px;padding:26px 24px 22px;margin-bottom:24px;color:#1b3b32}
+  .wk-title{text-align:center;font-family:var(--font-head);font-weight:800;font-size:26px;letter-spacing:.14em;color:#1e5f4e;margin:0}
+  .wk-sub{text-align:center;font-size:13px;color:#5d7a71;margin:6px 0 4px;letter-spacing:.04em}
+  .wk-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:14px;margin:10px 0 20px;font-size:11.5px;color:#4d6a61}
+  .wk-legend span{display:inline-flex;align-items:center;gap:6px}
+  .wk-legend i{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.12)}
+  .wk-scroll{overflow-x:auto;padding-bottom:4px}
+  .wk-board{min-width:820px;display:grid;grid-template-columns:72px repeat(7,minmax(104px,1fr))}
+  .wk-head{height:38px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;letter-spacing:.12em;color:#1e5f4e}
+  .wk-head.is-today{color:#fff;background:#1e5f4e;border-radius:8px 8px 0 0}
+  .wk-timecol{display:flex;flex-direction:column}
+  .wk-time{height:var(--hh);display:flex;align-items:flex-start;justify-content:flex-end;padding:5px 10px 0 0;font-size:11.5px;color:#4d6a61;border-top:1px solid #8aa59b;box-sizing:border-box}
+  .wk-time:last-child{border-bottom:1px solid #8aa59b}
+  .wk-col{position:relative;border-left:1px solid #8aa59b}
+  .wk-col:last-child{border-right:1px solid #8aa59b}
+  .wk-col.is-today{background:rgba(30,95,78,.06)}
+  .wk-cell{height:var(--hh);border-top:1px solid #8aa59b;box-sizing:border-box}
+  .wk-cell:last-child{border-bottom:1px solid #8aa59b}
+  .wk-block{position:absolute;left:3px;right:3px;box-sizing:border-box;border-radius:7px;padding:5px 7px;overflow:hidden;text-decoration:none;color:#14302a;border:1px solid;border-left-width:4px;box-shadow:0 1px 3px rgba(0,0,0,.12);transition:transform .12s ease,box-shadow .12s ease;z-index:2}
+  .wk-block:hover{transform:scale(1.025);box-shadow:0 6px 16px rgba(0,0,0,.22);z-index:6}
+  .wk-block .b-time{font-size:10.5px;font-weight:600;opacity:.75;white-space:nowrap}
+  .wk-block .b-code{font-size:12px;font-weight:800;line-height:1.2;margin-top:1px}
+  .wk-block .b-name{font-size:11.5px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .wk-block .b-meta{font-size:10.5px;opacity:.75;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wk-ge {background:#dce8ff;border-color:#5b8dee}
+  .wk-pe {background:#d3f4e5;border-color:#2bb585}
+  .wk-maj{background:#fdecc0;border-color:#d9a21b}
+  .wk-empty{grid-column:1/-1;text-align:center;color:#5d7a71;padding:28px 0;font-size:13px}
+  @media (max-width:640px){.wk-sheet{padding:18px 12px}.wk-title{font-size:20px}}
+  @media print{.wk-sheet{border:none;background:#fff}}
+  </style>
 </head>
 <body class="page-teacher-all_subjects">
 <div class="app-shell">
@@ -313,40 +368,59 @@ function qs($overrides = []) {
   </div>
 
   <?php if ($all_subjects_rows): ?>
-  <div class="timetable-wrap">
-    <div class="timetable-times" style="height:<?php echo $grid_height; ?>px;">
-      <?php
-      // Hour labels down the left edge, matching the grid's scale
-      for ($m = $range_start; $m <= $range_end; $m += 60):
-        $top = round(($m - $range_start) * $px_per_min);
-      ?>
-      <div class="timetable-time-label" style="top:<?php echo $top; ?>px;"><?php echo date('g:i A', strtotime('1970-01-01 ' . floor($m/60) . ':' . ($m%60))); ?></div>
-      <?php endfor; ?>
+  <!-- ── WEEKLY SCHEDULE (active subjects) ── -->
+  <div class="wk-sheet" style="--hh:<?php echo $hour_h; ?>px;">
+    <h2 class="wk-title">WEEKLY SCHEDULE</h2>
+    <?php if ($term_label !== ''): ?><div class="wk-sub"><?php echo htmlspecialchars($term_label); ?></div><?php endif; ?>
+    <div class="wk-legend">
+      <span><i style="background:#dce8ff;border-color:#5b8dee"></i> General Education</span>
+      <span><i style="background:#d3f4e5;border-color:#2bb585"></i> Professional Education</span>
+      <span><i style="background:#fdecc0;border-color:#d9a21b"></i> Major Subject</span>
     </div>
 
-    <div class="timetable-grid">
-      <?php foreach ($day_order as $d): ?>
-      <div class="timetable-day-col">
-        <div class="timetable-day-label"><?php echo $day_full[$d]; ?></div>
-        <div class="timetable-day-body" style="height:<?php echo $grid_height; ?>px;background-size:100% <?php echo round(60*$px_per_min); ?>px;">
+    <div class="wk-scroll">
+      <div class="wk-board">
+        <!-- header row -->
+        <div class="wk-head"></div>
+        <?php foreach ($day_order as $d): ?>
+        <div class="wk-head <?php echo $d === $today_key ? 'is-today' : ''; ?>"><?php echo $day_short[$d]; ?></div>
+        <?php endforeach; ?>
+
+        <!-- time labels -->
+        <div class="wk-timecol">
+          <?php for ($h = 0; $h < $hours_count; $h++):
+            $mm = $range_start + $h * 60;
+          ?>
+          <div class="wk-time"><?php echo date('g:i A', strtotime('1970-01-01 ' . floor($mm/60) . ':00')); ?></div>
+          <?php endfor; ?>
+        </div>
+
+        <!-- one column per day -->
+        <?php foreach ($day_order as $d): ?>
+        <div class="wk-col <?php echo $d === $today_key ? 'is-today' : ''; ?>">
+          <?php for ($h = 0; $h < $hours_count; $h++): ?><div class="wk-cell"></div><?php endfor; ?>
+
           <?php foreach ($by_day[$d] as $sub):
-            $cfg = $type_cfg[$sub['subject_type']] ?? $type_cfg['General Education'];
+            $cls = ['General Education'=>'wk-ge','Professional Education'=>'wk-pe','Major Subject'=>'wk-maj'][$sub['subject_type']] ?? 'wk-ge';
             $sm  = (int)date('H', strtotime($sub['schedule_start_time'])) * 60 + (int)date('i', strtotime($sub['schedule_start_time']));
             $em  = (int)date('H', strtotime($sub['schedule_end_time']))   * 60 + (int)date('i', strtotime($sub['schedule_end_time']));
             $top    = round(($sm - $range_start) * $px_per_min);
-            $height = max(28, round(($em - $sm) * $px_per_min));
+            $height = max(30, round(($em - $sm) * $px_per_min) - 2);
+            $tstr = date('g:i A', strtotime($sub['schedule_start_time'])) . '–' . date('g:i A', strtotime($sub['schedule_end_time']));
           ?>
-          <a href="/classroomv2/teacher/subject_view.php?id=<?php echo $sub['id']; ?>"
-             class="timetable-block <?php echo $sub['is_active'] ? '' : 'is-inactive'; ?>"
-             style="top:<?php echo $top; ?>px;height:<?php echo $height; ?>px;border-left-color:<?php echo $cfg['color']; ?>;">
-            <div class="tt-time"><?php echo date('g:i A', strtotime($sub['schedule_start_time'])); ?>&ndash;<?php echo date('g:i A', strtotime($sub['schedule_end_time'])); ?></div>
-            <div class="tt-name"><?php echo htmlspecialchars($sub['subject_code']); ?> &middot; <?php echo htmlspecialchars($sub['subject_name']); ?></div>
-            <div class="tt-meta"><?php echo htmlspecialchars($sub['section']); ?> &middot; <?php echo (int)$sub['enrollee_count']; ?> students</div>
+          <a href="/classroomv2/teacher/subject_view.php?id=<?php echo (int)$sub['id']; ?>"
+             class="wk-block <?php echo $cls; ?>"
+             style="top:<?php echo $top + 1; ?>px;height:<?php echo $height; ?>px;"
+             title="<?php echo htmlspecialchars($sub['subject_code'].' · '.$sub['subject_name'].' · '.$sub['section'].' · '.$tstr); ?>">
+            <div class="b-time"><?php echo $tstr; ?></div>
+            <div class="b-code"><?php echo htmlspecialchars($sub['subject_code']); ?></div>
+            <div class="b-name"><?php echo htmlspecialchars($sub['subject_name']); ?></div>
+            <div class="b-meta"><?php echo htmlspecialchars($sub['section']); ?> &middot; <?php echo (int)$sub['enrollee_count']; ?> students</div>
           </a>
           <?php endforeach; ?>
         </div>
+        <?php endforeach; ?>
       </div>
-      <?php endforeach; ?>
     </div>
   </div>
   <?php endif; ?>

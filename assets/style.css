@@ -1911,7 +1911,8 @@ tbody td {
 }
 
 .type-option input:checked + .type-label {
-  background:rgba(232, 232, 235, 0.685);
+  /* background:rgba(232, 232, 235, 0.123); */
+  transform: translatey(-5px);
 }
 
 .type-label .tl-name {
@@ -5050,8 +5051,9 @@ color:var(--text7);
   position: absolute;
   left: 3px;
   right: 3px;
-   background: color-mix(in srgb, var(--bg) 80%, transparent);
-  border-left: 3px solid var(--accent);
+   /* background: color-mix(in srgb, var(--bg) 80%, transparent); */
+  background: var(--bg6);
+  border: 3px solid var(--bg8);
   border-radius: 4px;
   padding: 4px 6px;
   overflow: hidden;

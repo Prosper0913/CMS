@@ -107,7 +107,7 @@ $la_all_stmt = $conn->prepare(
             MAX(se.created_at) AS latest_created
      FROM score_entries se
      JOIN subjects sub ON sub.id = se.subject_id
-     WHERE sub.teacher_id = ?
+     WHERE sub.teacher_id = ? AND sub.is_active = 1
      GROUP BY se.subject_id, se.component, se.entry_name, se.total_items,
               se.date_given, sub.subject_code, sub.subject_name, sub.section
      ORDER BY latest_created DESC"
@@ -124,6 +124,11 @@ foreach ($la_rows as $row) {
         $latest_by_subject[$row['subject_id']] = $row;
     }
 }
+
+// Only show the 5 subjects with the most recent activity (array is already
+// newest-first, and array_slice with preserve_keys keeps the subject ids).
+$perf_total_subjects = count($latest_by_subject);
+$latest_by_subject   = array_slice($latest_by_subject, 0, 5, true);
 
 // Step 2: for each subject's latest activity, rank every student's score
 // and split into up to 3 top performers and up to 3 lowest performers
@@ -419,7 +424,11 @@ $comp_colors = [
         Top &amp; Lowest Performers
         <?php if (!empty($subject_perf)): ?>
           <span class="tlp-sub-count">
-            <?php echo count($subject_perf); ?> subject<?php echo count($subject_perf)!=1?'s':''; ?>
+            <?php if ($perf_total_subjects > count($subject_perf)): ?>
+              Latest <?php echo count($subject_perf); ?> of <?php echo $perf_total_subjects; ?> subjects
+            <?php else: ?>
+              <?php echo count($subject_perf); ?> subject<?php echo count($subject_perf)!=1?'s':''; ?>
+            <?php endif; ?>
           </span>
         <?php endif; ?>
       </p>

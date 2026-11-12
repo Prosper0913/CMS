@@ -339,9 +339,9 @@ $type_cfg = [
         <div class="type-selector">
           <?php
           $type_options = [
-            'General Education'      => ['color'=>'#6c8dda','e'=>30,'w'=>30,'p'=>40,'desc'=>'30 / 30 / 40'],
-            'Professional Education' => ['color'=>'#ff2407','e'=>25,'w'=>25,'p'=>50,'desc'=>'25 / 25 / 50'],
-            'Major Subject'          => ['color'=>'#00ff1a','e'=>40,'w'=>20,'p'=>40,'desc'=>'40 / 20 / 40'],
+            'General Education'      => ['color'=>'#1e5f4e','e'=>30,'w'=>30,'p'=>40,'desc'=>'30 / 30 / 40'],
+            'Professional Education' => ['color'=>'#1e5f4e','e'=>25,'w'=>25,'p'=>50,'desc'=>'25 / 25 / 50'],
+            'Major Subject'          => ['color'=>'#1e5f4e','e'=>40,'w'=>20,'p'=>40,'desc'=>'40 / 20 / 40'],
           ];
           foreach($type_options as $type=>$cfg):
             $sel = ($_POST['subject_type']??'')===$type;
