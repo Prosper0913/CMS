@@ -117,6 +117,8 @@ auth_page_start('Enter code', 'Account recovery', 'Check your email');
     <?php echo csrf_field(); ?>
     <input type="hidden" name="identifier" value="<?php echo htmlspecialchars($identifier); ?>">
 
+    <div class="otp-required">
+      <span class="otp-tag"><i class="ti ti-alert-triangle"></i> Code required</span>
     <div class="form-group">
       <label>6-digit code</label>
       <div class="input-wrap">
@@ -126,6 +128,7 @@ auth_page_start('Enter code', 'Account recovery', 'Check your email');
                placeholder="000000" autofocus
                style="letter-spacing:4px;font-weight:600;">
       </div>
+    </div>
     </div>
     <div class="form-group">
       <label>New password</label>

@@ -211,11 +211,7 @@ $event_labels = [
     <p class="card-title"><i class="ti ti-id-badge-2"></i> Contact Information</p>
     <form method="POST">
       <?php echo csrf_field(); ?>
-      <div class="form-group">
-        <label>Gmail / Email</label>
-        <input type="email" name="email" class="form-control" placeholder="you@gmail.com" required
-          value="<?php echo htmlspecialchars($student['email'] ?? ''); ?>">
-      </div>
+      <?php contact_email_field((string)($student['email'] ?? ''), contact_is_verified($conn, (int)(int)($me['id'] ?? 0))); ?>
       <div class="form-group">
         <label>Contact Number</label>
         <input type="tel" name="contact_number" class="form-control" maxlength="20" placeholder="e.g. 09171234567"

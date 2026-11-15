@@ -66,6 +66,12 @@ function auth_page_start(string $title, string $kicker, string $heading): void {
     .back-link{display:block;text-align:center;margin-top:20px;font-size:13px;color:var(--school-text7);text-decoration:none;}
     .back-link:hover{color:var(--school-bg);text-decoration:underline;}
     .hint{font-size:11.5px;color:var(--school-text7);margin-top:6px;}
+    .otp-required{border:2px solid #dc2626;border-radius:12px;padding:14px;background:rgba(220,38,38,.06);animation:otpPulse 2s ease-in-out infinite;}
+    .otp-required .input-wrap{border-color:#dc2626;}
+    .otp-tag{display:inline-flex;align-items:center;gap:6px;background:#dc2626;color:#fff;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;margin-bottom:10px;}
+    .locked-field input[readonly]{cursor:not-allowed;}
+    @keyframes otpPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.35)}50%{box-shadow:0 0 0 7px rgba(220,38,38,0)}}
+    @media (prefers-reduced-motion: reduce){.otp-required{animation:none;}}
   </style>
 </head>
 <body>

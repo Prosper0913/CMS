@@ -178,21 +178,30 @@ auth_page_start('Set up your account', 'Welcome, ' . $display, $pending ? 'Confi
     <button type="submit" class="btn-main"><i class="ti ti-send"></i> Send verification code</button>
   </form>
 <?php else: ?>
-  <p class="lead">
-    Enter the 6-digit code we sent to <strong><?php echo htmlspecialchars($pending['email']); ?></strong>.
-    It expires in 10 minutes. Check your spam folder if you don't see it.
-  </p>
-  <form method="POST" autocomplete="off">
-    <?php echo csrf_field(); ?>
-    <input type="hidden" name="action" value="verify">
-    <div class="form-group">
-      <label>6-digit code</label>
-      <div class="input-wrap"><i class="ti ti-shield-lock"></i>
-        <input type="text" name="code" required maxlength="6" minlength="6" inputmode="numeric" pattern="\d{6}"
-               autocomplete="one-time-code" placeholder="000000" autofocus style="letter-spacing:4px;font-weight:600;"></div>
-    </div>
-    <button type="submit" class="btn-main"><i class="ti ti-check"></i> Confirm &amp; continue</button>
-  </form>
+  <div class="form-group locked-field">
+    <label><i class="ti ti-lock"></i> Gmail (locked while you verify)</label>
+    <div class="input-wrap"><i class="ti ti-mail"></i>
+      <input type="email" value="<?php echo htmlspecialchars($pending['email']); ?>" readonly tabindex="-1"></div>
+  </div>
+  <div class="otp-required">
+    <span class="otp-tag"><i class="ti ti-alert-triangle"></i> Code required</span>
+    <p class="lead" style="margin-bottom:14px;">
+      Your account is <strong>not set up yet</strong>. Enter the 6-digit code we sent to
+      <strong><?php echo htmlspecialchars($pending['email']); ?></strong> to continue. It expires in 10 minutes.
+      Check your spam folder if you don't see it.
+    </p>
+    <form method="POST" autocomplete="off">
+      <?php echo csrf_field(); ?>
+      <input type="hidden" name="action" value="verify">
+      <div class="form-group">
+        <label>6-digit code</label>
+        <div class="input-wrap"><i class="ti ti-shield-lock"></i>
+          <input type="text" name="code" required maxlength="6" minlength="6" inputmode="numeric" pattern="\d{6}"
+                 autocomplete="one-time-code" placeholder="000000" autofocus style="letter-spacing:4px;font-weight:600;"></div>
+      </div>
+      <button type="submit" class="btn-main" style="width:100%;margin-top:14px;"><i class="ti ti-check"></i> Confirm &amp; continue</button>
+    </form>
+  </div>
   <form method="POST" style="margin-top:12px;">
     <?php echo csrf_field(); ?>
     <input type="hidden" name="action" value="resend">
