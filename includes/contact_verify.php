@@ -163,6 +163,8 @@ function contact_otp_css(): void {
   .locked-email-wrap input[readonly]{background:rgba(127,127,127,.12);cursor:not-allowed;flex:1;min-width:200px;}
   .verified-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#15803d;font-weight:600;}
   .btn-changeEmail{  background: transparent;border: solid 1px var(--bg2);color: var(--text7);}
+  .btn-changeEmail:hover {color: var(--red);
+}
 </style>
 <?php
 }
