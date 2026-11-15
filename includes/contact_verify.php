@@ -162,6 +162,7 @@ function contact_otp_css(): void {
   .locked-email-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   .locked-email-wrap input[readonly]{background:rgba(127,127,127,.12);cursor:not-allowed;flex:1;min-width:200px;}
   .verified-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#15803d;font-weight:600;}
+  .btn-changeEmail{  background: transparent;border: solid 1px var(--bg2);color: var(--text7);}
 </style>
 <?php
 }
@@ -182,7 +183,7 @@ function contact_email_field(string $email, bool $verified): void {
           <input type="email" name="email" id="contactEmailInput" class="form-control" placeholder="you@gmail.com" required
                  maxlength="120" value="<?php echo htmlspecialchars($email); ?>" <?php echo $has ? 'readonly' : ''; ?>>
           <?php if ($has): ?>
-            <button type="button" class="btn btn-ghost btn-sm" id="contactEmailUnlock"
+            <button type="button" class="btn btn-changeEmail btn-sm" id="contactEmailUnlock"
                     onclick="var i=document.getElementById('contactEmailInput');i.removeAttribute('readonly');i.focus();i.select();this.remove();document.getElementById('contactEmailHint').style.display='block';">
               <i class="ti ti-pencil"></i> Change email
             </button>
