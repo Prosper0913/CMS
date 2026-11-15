@@ -15,7 +15,6 @@
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
-require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 $teacher_id  = $_SESSION['user_id'];
@@ -148,8 +147,6 @@ if (isset($_POST['add_to_section'])) {
                 $ins->bind_param('is', $sec_id, $sid);
                 $ins->execute();
                 backfillSubjectEnrollmentsForSection($conn, $sec_id, $sid);
-                auto_enroll_student_in_fpst_subjects($conn, $sec_id, $sid);
-                push_all_fpst_subjects_for_section($conn, $sec_id);
                 header("Location: manage_sections.php?sec={$sec_id}&msg=student_added");
                 exit;
             }

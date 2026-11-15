@@ -81,6 +81,7 @@ $pending = $_SESSION['first_login'] ?? null;   // ['hash' => ..., 'email' => ...
 $action  = $_POST['action'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  try {
     if ($action === 'restart') {
         unset($_SESSION['first_login']);
         $pending = null;
@@ -133,6 +134,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+  } catch (Throwable $e) {
+    error_log('[first_login] ' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+    $error = "We couldn't process that right now. Please try again in a moment; if it keeps happening, tell your administrator.";
+  }
 }
 
 $display = $user['display_name'] ?: $user['username'];

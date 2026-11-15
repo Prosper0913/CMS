@@ -30,8 +30,6 @@
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
-require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
-require_once __DIR__ . '/../includes/sync_to_guidance.php';
 
 $teacher_id  = $_SESSION['user_id'];
 $success_msg = '';
@@ -107,8 +105,6 @@ if (isset($_POST['add_student'])) {
                 $ins->bind_param("is", $section_id, $student_id);
                 $ins->execute();
                 $backfilled = backfillSubjectEnrollmentsForSection($conn, $section_id, $student_id);
-                auto_enroll_student_in_fpst_subjects($conn, $section_id, $student_id);
-                push_all_fpst_subjects_for_section($conn, $section_id);
                 $success_msg = "Added <strong>" . htmlspecialchars($found['last_name'] . ', ' . $found['first_name'])
                     . "</strong> (existing student) to this section."
                     . ($backfilled > 0 ? " Also enrolled in {$backfilled} existing subject(s) for this section." : "");
@@ -171,10 +167,6 @@ if (isset($_POST['add_student'])) {
                         $conn->commit();
 
                         backfillSubjectEnrollmentsForSection($conn, $section_id, $student_id);
-                        // Same side-effects admin/students.php used to trigger on create.
-                        auto_enroll_student_in_fpst_subjects($conn, $section_id, $student_id);
-                        push_all_fpst_subjects_for_section($conn, $section_id);
-                        push_student_to_guidance($conn, $student_id);
 
                         $success_msg = "Student <strong>" . htmlspecialchars($last_name . ', ' . $first_name)
                             . "</strong> created and added to this section. "
@@ -265,8 +257,6 @@ if (isset($_GET['delete'])) {
             $conn->commit();
 
             if ($fully_orphaned) {
-                push_student_deletion_to_tooltrack($del_id);
-                push_student_deletion_to_guidance($del_id);
                 header("Location: students.php?msg=deleted");
             } else {
                 header("Location: students.php?msg=removed");

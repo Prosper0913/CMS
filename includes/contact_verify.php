@@ -61,7 +61,7 @@ function contact_apply(mysqli $conn, array $u, string $email, ?string $contact):
  *   pending = ['email','contact','dest'] while a code is awaited;
  *   applied = ['email','contact'] right after a successful save.
  */
-function contact_handle_post(mysqli $conn, array $u): array {
+function _contact_handle_post_inner(mysqli $conn, array $u): array {
     $key = 'pending_contact_' . (int)$u['id'];
     $out = ['success' => '', 'error' => '', 'pending' => $_SESSION[$key] ?? null, 'applied' => null];
     $purposeLine = 'confirm the email / contact details on your Classroom CMS account';
@@ -124,6 +124,25 @@ function contact_handle_post(mysqli $conn, array $u): array {
         }
     }
     return $out;
+}
+
+/**
+ * Public entry point. Any unexpected failure (for example a database that has not
+ * had migrations/security_hardening.sql applied yet) is logged and shown as a
+ * normal error message instead of a blank 500 page.
+ */
+function contact_handle_post(mysqli $conn, array $u): array {
+    try {
+        return _contact_handle_post_inner($conn, $u);
+    } catch (Throwable $e) {
+        error_log('[contact_verify] ' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+        return [
+            'success' => '',
+            'error'   => "We couldn't process that right now. Please try again in a moment; if it keeps happening, tell your administrator.",
+            'pending' => $_SESSION['pending_contact_' . (int)$u['id']] ?? null,
+            'applied' => null,
+        ];
+    }
 }
 
 /** The "enter your code" card shown above the contact form while a change is pending. */

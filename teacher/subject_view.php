@@ -12,12 +12,6 @@
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
-// Push-based sync to tooltrack (no-op for non-FPST subjects, never throws).
-// See includes/sync_to_tooltrack.php for the full design.
-require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
-require_once __DIR__ . '/../includes/sync_to_guidance.php';
-// Push-based sync to OCES (NSTP 1/2 students only).
-require_once __DIR__ . '/../includes/sync_to_oces.php';
 
 $teacher_id = $_SESSION['user_id'];
 
@@ -676,21 +670,6 @@ if (isset($_POST['enroll_section']) && $subject_locked) {
         $added++;
     }
     $success_msg = "Enrolled <strong>{$added}</strong> student(s) from section.";
-    // ── Push to tooltrack: we have sec_id directly, so push this
-    // specific section+subject pair. Non-FPST sections are a no-op
-    // inside push_section_subject_to_tooltrack. Failures never break
-    // the enrollment.
-    push_section_subject_to_tooltrack($conn, $sec_id, $subject_id);
-    // Push to Guidance: every student just enrolled
-    $sq3 = $conn->prepare("SELECT student_id FROM section_students WHERE section_id = ?");
-    $sq3->bind_param('i', $sec_id);
-    $sq3->execute();
-    $srows3 = $sq3->get_result();
-    while ($sr3 = $srows3->fetch_assoc()) {
-        push_student_to_guidance($conn, $sr3['student_id']);
-        // ── Push to OCES: same student, only syncs if NSTP 1/2 enrolled
-        push_student_to_oces($conn, $sr3['student_id']);
-    }
 }
 
 // ── ENROLL single student ────────────────────────────────────
@@ -721,20 +700,6 @@ if (isset($_POST['enroll_single']) && $subject_locked) {
             $e2->bind_param('is', $subject_id, $sid);
             $e2->execute();
             $success_msg = "Student enrolled.";
-            // ── Push to tooltrack: we don't have a section_id here (the
-            // enrollment row was created without one), but the subject
-            // has a `section` text field we can resolve to a section_id.
-            // push_subject_to_tooltrack() handles that lookup and filters
-            // to FPST. Note: students enrolled via enroll_single won't
-            // appear in the pushed roster unless they ALSO have a
-            // section_id on their subject_enrollments row — but pushing
-            // is still useful so any OTHER students in this section+subject
-            // get re-synced. Failures never break the enrollment.
-            push_subject_to_tooltrack($conn, $subject_id);
-            // Push to Guidance: push student's full state
-            push_student_to_guidance($conn, $sid);
-            // ── Push to OCES: same student (only syncs if NSTP 1/2)
-            push_student_to_oces($conn, $sid);
         }
     }
 }
@@ -750,17 +715,6 @@ if (isset($_POST['unenroll_student']) && $subject_locked) {
     $del->bind_param('is', $subject_id, $sid);
     $del->execute();
     $success_msg = "Student removed from subject. Their scores and grades are preserved.";
-    // ── Push to tooltrack: re-push the (now smaller) roster for this
-    // subject. The removed student won't be in the payload, so tooltrack's
-    // receive endpoint will soft-deactivate their borrower_enrollments row
-    // for this section+subject. The borrower row itself is preserved (the
-    // student may still be in other subjects, or may still have tools out).
-    // Non-FPST subjects are a no-op. Failures never break the unenroll.
-    push_subject_to_tooltrack($conn, $subject_id);
-    // Push to Guidance: re-push student state (enrollment removed)
-    push_student_to_guidance($conn, $sid);
-    // ── Push to OCES: re-push state (if no more NSTP, OCES deactivates)
-    push_student_to_oces($conn, $sid);
 }
 
 // ══════════════════════════════════════════════════════════════

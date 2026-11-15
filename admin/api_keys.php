@@ -2,8 +2,8 @@
 // ============================================================
 //  admin/api_keys.php
 //  Generate and manage API keys for ANY external system that
-//  integrates with this CMS (the FPST Inventory System is just
-//  the first one). Each key is scoped to ONE course via
+//  integrates with this CMS. No systems are pre-registered: every
+//  integration starts by generating a key here. Each key is scoped to ONE course via
 //  allowed_course — that's what api/_api_common.php checks on
 //  every request, so a key can never see/touch a course outside
 //  what it was issued for. Onboarding a new integration is just:
@@ -27,7 +27,7 @@ if (isset($_POST['generate_key'])) {
     $client_name    = trim($_POST['client_name'] ?? '');
     $allowed_course = trim($_POST['allowed_course'] ?? '');
     if ($client_name === '') {
-        $flash_error = "Please enter a name for the client system (e.g. \"FPST Inventory System\").";
+        $flash_error = "Please enter a name for the client system (e.g. \"Library System\").";
     } else {
         $plaintext = bin2hex(random_bytes(32)); // 64 hex chars
         $prefix    = substr($plaintext, 0, 8);
@@ -139,11 +139,11 @@ $active_nav = 'api_keys';
         <form method="POST">
           <div class="form-group">
             <label>Client / System Name</label>
-            <input type="text" name="client_name" class="form-control" placeholder="e.g. FPST Inventory System" required>
+            <input type="text" name="client_name" class="form-control" placeholder="e.g. Library System" required>
           </div>
           <div class="form-group">
             <label>Allowed Course</label>
-            <input type="text" name="allowed_course" class="form-control" placeholder="e.g. FPST — leave blank for unrestricted">
+            <input type="text" name="allowed_course" class="form-control" placeholder="e.g. BSIT — leave blank for unrestricted">
             <p style="font-size:11px;color:var(--text7);margin-top:4px;">
               This key can only read/write data for sections tagged with this course. Leave blank only for a fully-trusted internal key.
             </p>

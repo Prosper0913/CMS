@@ -21,8 +21,6 @@
 require_once '../includes/auth.php';
 requireRole('teacher');
 require_once '../config/db.php';
-require_once __DIR__ . '/../includes/sync_to_tooltrack.php';
-require_once __DIR__ . '/../includes/sync_to_guidance.php';
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
@@ -367,12 +365,6 @@ if (isset($_POST['import_csv'])) {
                                     $ins3->bind_param("is", $section_id, $student_id);
                                     $ins3->execute();
                                     backfillSubjectEnrollmentsForSection($conn, $section_id, $student_id);
-                                    if (function_exists('auto_enroll_student_in_fpst_subjects')) {
-                                        auto_enroll_student_in_fpst_subjects($conn, $section_id, $student_id);
-                                    }
-                                    if (function_exists('push_all_fpst_subjects_for_section')) {
-                                        push_all_fpst_subjects_for_section($conn, $section_id);
-                                    }
                                     $results['attached'][] = "$label: attached existing student (" . htmlspecialchars($found['last_name'] . ', ' . $found['first_name']) . "){$section_note}.";
                                 } else {
                                     $results['skipped'][] = "$label: student already exists and no section was given — nothing to do.";
@@ -423,15 +415,6 @@ if (isset($_POST['import_csv'])) {
 
                             if ($section_id) {
                                 backfillSubjectEnrollmentsForSection($conn, $section_id, $student_id);
-                                if (function_exists('auto_enroll_student_in_fpst_subjects')) {
-                                    auto_enroll_student_in_fpst_subjects($conn, $section_id, $student_id);
-                                }
-                                if (function_exists('push_all_fpst_subjects_for_section')) {
-                                    push_all_fpst_subjects_for_section($conn, $section_id);
-                                }
-                            }
-                            if (function_exists('push_student_to_guidance')) {
-                                push_student_to_guidance($conn, $student_id);
                             }
 
                             $results['created'][] = "$label: created as <code>" . htmlspecialchars($username)

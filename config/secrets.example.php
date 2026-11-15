@@ -15,14 +15,6 @@ define('SMTP_USER', 'your-email@gmail.com');
 define('SMTP_PASS', 'xxxx xxxx xxxx xxxx');
 define('SMTP_FROM_NAME', 'Classroom CMS');
 
-// ── Integration keys (shared secrets with the other systems) ─────
-// Generate each one with:   openssl rand -hex 32
-// Each must match the value configured on the receiving system.
-define('GUIDANCE_SYNC_KEY',    'put-a-64-char-hex-key-here');  // sent to Guidance (X-Sync-Key)
-define('OCES_SYNC_KEY',        'put-a-64-char-hex-key-here');  // sent to OCES (X-Sync-Key)
-define('TOOLTRACK_RECEIVE_KEY','put-a-64-char-hex-key-here');  // sent to Tooltrack (X-Tooltrack-Key)
-define('REFERRAL_RECEIVE_KEY', 'put-a-64-char-hex-key-here');  // Guidance -> CMS api/receive_referral_flag.php
-
 // Emergency valve: set to false ONLY if the school email (SMTP) is down and
 // people cannot receive codes. First-login setup and contact changes then
 // skip the emailed code. Leave true normally.
