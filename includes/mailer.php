@@ -19,7 +19,7 @@ use PHPMailer\PHPMailer\Exception as PHPMailerException;
  *              PHP error log (never shown to the person, so an attacker
  *              can't use send failures to probe which addresses exist).
  */
-function send_otp_email(string $toEmail, string $toName, string $code, int $expiryMinutes): bool
+function send_otp_email(string $toEmail, string $toName, string $code, int $expiryMinutes, string $purposeLine = 'reset your Classroom CMS password'): bool
 {
     $secretsFile = __DIR__ . '/../config/secrets.php';
     if (!file_exists($secretsFile)) {
@@ -51,16 +51,17 @@ function send_otp_email(string $toEmail, string $toName, string $code, int $expi
         $mail->Subject = "Your Classroom CMS verification code";
         $mail->isHTML(true);
         $safeName = htmlspecialchars($toName !== '' ? $toName : 'there', ENT_QUOTES);
+        $safePurpose = htmlspecialchars($purposeLine, ENT_QUOTES);
         $mail->Body = "
             <div style=\"font-family:Arial,sans-serif;max-width:420px;margin:0 auto;\">
               <p>Hi {$safeName},</p>
-              <p>Use this code to reset your Classroom CMS password:</p>
+              <p>Use this code to {$safePurpose}:</p>
               <p style=\"font-size:32px;font-weight:bold;letter-spacing:6px;
                          background:#f1f5f3;padding:14px 10px;text-align:center;
                          border-radius:8px;color:#1e5f4e;\">{$code}</p>
               <p>This code expires in {$expiryMinutes} minutes and can only be used once.</p>
               <p style=\"color:#777;font-size:12px;\">If you didn't request this, you can safely ignore this
-              email — your password will not be changed.</p>
+              email — nothing will be changed on your account.</p>
             </div>";
         $mail->AltBody = "Your Classroom CMS verification code is: {$code}\n"
             . "It expires in {$expiryMinutes} minutes and can only be used once.\n"

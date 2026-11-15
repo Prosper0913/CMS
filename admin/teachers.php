@@ -39,8 +39,8 @@ if (isset($_POST['add_teacher'])) {
         } else {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $ins = $conn->prepare(
-                "INSERT INTO users (username, password, role, display_name)
-                 VALUES (?, ?, 'teacher', ?)"
+                "INSERT INTO users (username, password, role, display_name, must_change_password)
+                 VALUES (?, ?, 'teacher', ?, 1)"
             );
             $ins->bind_param('sss', $username, $hashed, $display_name);
             if ($ins->execute()) {
@@ -98,7 +98,7 @@ if (isset($_POST['reset_password'])) {
         $error_msg = 'Password must be at least 6 characters.';
     } else {
         $hashed = password_hash($newpass, PASSWORD_DEFAULT);
-        $upd = $conn->prepare("UPDATE users SET password = ? WHERE id = ? AND role = 'teacher'");
+        $upd = $conn->prepare("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ? AND role = 'teacher'");
         $upd->bind_param('si', $hashed, $tid);
         $upd->execute();
         $success_msg = "Password reset successfully.";
@@ -294,7 +294,7 @@ $active_nav = 'teachers';
                     onclick="openReset(<?php echo (int)$t['id']; ?>, '<?php echo htmlspecialchars(addslashes($t['username'])); ?>')">
                     <i class="ti ti-key"></i>
                   </button>
-                  <a href="teachers.php?delete=<?php echo (int)$t['id']; ?>" class="btn btn-sm btn-delete"
+                  <a href="teachers.php?delete=<?php echo (int)$t['id']; ?>&<?php echo csrf_query(); ?>" class="btn btn-sm btn-delete"
                     onclick="return confirm('Delete teacher <?php echo htmlspecialchars(addslashes($t['username'])); ?>? Their students and sections will remain but become unassigned.')">
                     <i class="ti ti-trash"></i>
                   </a>

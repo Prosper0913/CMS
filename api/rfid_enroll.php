@@ -26,6 +26,8 @@ require_once '../config/db.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/csrf.php';
+csrf_enforce();   // POST must carry the session CSRF token (X-CSRF-Token header)
 
 function fail($msg, $httpCode = 400) {
     http_response_code($httpCode);

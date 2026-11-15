@@ -22,3 +22,8 @@ define('GUIDANCE_SYNC_KEY',    'put-a-64-char-hex-key-here');  // sent to Guidan
 define('OCES_SYNC_KEY',        'put-a-64-char-hex-key-here');  // sent to OCES (X-Sync-Key)
 define('TOOLTRACK_RECEIVE_KEY','put-a-64-char-hex-key-here');  // sent to Tooltrack (X-Tooltrack-Key)
 define('REFERRAL_RECEIVE_KEY', 'put-a-64-char-hex-key-here');  // Guidance -> CMS api/receive_referral_flag.php
+
+// Emergency valve: set to false ONLY if the school email (SMTP) is down and
+// people cannot receive codes. First-login setup and contact changes then
+// skip the emailed code. Leave true normally.
+// define('REQUIRE_EMAIL_VERIFICATION', true);

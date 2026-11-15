@@ -406,7 +406,7 @@ if (isset($_POST['import_csv'])) {
                             $ins->execute();
                             if ($ins->affected_rows < 1) throw new Exception("insert into students affected 0 rows");
 
-                            $ins2 = $conn->prepare("INSERT INTO users (username,password,role,student_id) VALUES (?,?,'student',?)");
+                            $ins2 = $conn->prepare("INSERT INTO users (username,password,role,student_id,must_change_password) VALUES (?,?,'student',?,1)");
                             $ins2->bind_param("sss", $username, $hashed, $student_id);
                             $ins2->execute();
                             if ($ins2->affected_rows < 1) throw new Exception("insert into users affected 0 rows");

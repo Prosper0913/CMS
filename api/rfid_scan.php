@@ -31,6 +31,8 @@ require_once '../config/db.php';
 $conn->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/csrf.php';
+csrf_enforce();   // POST must carry the session CSRF token (X-CSRF-Token header)
 
 // Any uncaught error (PHP 8.1+ makes mysqli throw on SQL errors) would
 // otherwise come back as an HTML 500 page, which the browser's r.json()

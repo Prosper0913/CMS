@@ -54,34 +54,21 @@ $sec_q->bind_param("s", $sid);
 $sec_q->execute();
 $my_sections = $sec_q->get_result()->fetch_all(MYSQLI_ASSOC);
 
-// ── Update contact info (email + contact number) ──────────────
-if (isset($_POST['update_profile'])) {
-    if (!csrf_verify()) {
-        $error_msg = "Your session expired. Please refresh the page and try again.";
-    } else {
-        $email   = trim($_POST['email'] ?? '');
-        $contact = trim($_POST['contact_number'] ?? '');
-
-        if (($eerr = settings_email_error($email)) !== '') {
-            $error_msg = $eerr;
-        } elseif (($cerr = settings_contact_error($contact)) !== '') {
-            $error_msg = $cerr;
-        } else {
-            $email_db   = $email !== '' ? $email : null;
-            $contact_db = $contact !== '' ? $contact : null;
-            $upd = $conn->prepare("UPDATE students SET email = ?, contact_number = ? WHERE student_id = ?");
-            $upd->bind_param("sss", $email_db, $contact_db, $sid);
-            $upd->execute();
-
-            audit_log($conn, 'profile_update', 'success', [
-                'user_id' => $me['id'] ?? null, 'username' => $me['username'] ?? $sid, 'role' => 'student',
-                'reason'  => 'updated email/contact number',
-            ]);
-            $success_msg = "Contact information updated.";
-            $student['email'] = $email_db;
-            $student['contact_number'] = $contact_db;
-        }
+// ── Update contact info (email code verification) ───────────────
+require_once '../includes/contact_verify.php';
+$contact_pending = null;
+if (isset($_POST['update_profile']) || isset($_POST['verify_contact']) || isset($_POST['resend_contact']) || isset($_POST['cancel_contact'])) {
+    $cu = ['id' => $me['id'] ?? 0, 'username' => $me['username'] ?? $sid, 'role' => 'student', 'display_name' => '', 'student_id' => $sid, 'email' => $student['email'] ?? '', 'contact_number' => $student['contact_number'] ?? ''];
+    $cres = contact_handle_post($conn, $cu);
+    if ($cres['success'] !== '') $success_msg = $cres['success'];
+    if ($cres['error']   !== '') $error_msg   = $cres['error'];
+    $contact_pending = $cres['pending'];
+    if ($cres['applied']) {
+        $student['email'] = $cres['applied']['email'];
+        $student['contact_number'] = $cres['applied']['contact'];
     }
+} elseif (!empty($_SESSION['pending_contact_' . (int)($me['id'] ?? 0)])) {
+    $contact_pending = $_SESSION['pending_contact_' . (int)($me['id'] ?? 0)];
 }
 
 // ── Change password ────────────────────────────────────────────
@@ -217,6 +204,8 @@ $event_labels = [
     </div>
   </div>
 
+  <?php contact_verify_card($contact_pending); ?>
+
   <!-- ── CONTACT INFO ── -->
   <div class="card" style="margin-bottom:20px;">
     <p class="card-title"><i class="ti ti-id-badge-2"></i> Contact Information</p>
@@ -224,7 +213,7 @@ $event_labels = [
       <?php echo csrf_field(); ?>
       <div class="form-group">
         <label>Gmail / Email</label>
-        <input type="email" name="email" class="form-control" placeholder="you@gmail.com"
+        <input type="email" name="email" class="form-control" placeholder="you@gmail.com" required
           value="<?php echo htmlspecialchars($student['email'] ?? ''); ?>">
       </div>
       <div class="form-group">

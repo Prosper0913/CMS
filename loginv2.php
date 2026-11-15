@@ -1,7 +1,11 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params(['lifetime'=>0,'path'     => '/','secure'=>!empty($_SERVER['HTTPS']) || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')==='https','httponly'=>true,'samesite'=>'Lax']);
+    session_start();
+}
 require_once 'config/db.php';
 require_once 'includes/audit.php';
+require_once 'includes/login_throttle.php';
 
 if (isset($_SESSION['role'])) {
     header("Location: " . match ($_SESSION['role']) {
@@ -20,18 +24,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username===''||$password==='') {
         $error = "Please enter both your Student ID / username and password.";
     } else {
-        $stmt = $conn->prepare("SELECT id,username,password,role,student_id FROM users WHERE username=?");
+        $ip = audit_client_ip();
+        $blocked = login_throttle_check($conn, audit_trunc($username, 100) ?? $username, $ip);
+        if ($blocked !== null) {
+            audit_log($conn, 'login', 'failure', ['username' => $username, 'reason' => 'throttled']);
+            $error = $blocked;
+        } else {
+        $stmt = $conn->prepare("SELECT * FROM users WHERE username=?");
         $stmt->bind_param("s",$username);
         $stmt->execute();
         $user = $stmt->get_result()->fetch_assoc();
         if ($user && password_verify($password,$user['password'])) {
+            session_regenerate_id(true);
             $_SESSION['user_id']   = $user['id'];
             $_SESSION['username']  = $user['username'];
             $_SESSION['role']      = $user['role'];
             $_SESSION['student_id']= $user['student_id'];
+            $_SESSION['must_change_password'] = (int)($user['must_change_password'] ?? 0);
             audit_log($conn, 'login', 'success', [
                 'user_id' => $user['id'], 'username' => $user['username'], 'role' => $user['role'],
             ]);
+            if (!empty($_SESSION['must_change_password'])) {
+                header("Location: /classroomv2/first_login.php");
+                exit;
+            }
             header("Location: " . match ($user['role']) {
                 'teacher' => '/classroomv2/teacher/dashboard.php',
                 'admin'   => '/classroomv2/admin/dashboard.php',
@@ -47,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $error = "Invalid Student ID / username or password.";
         }
+        } // end throttle else
     }
 }
 ?>

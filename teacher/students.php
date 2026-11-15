@@ -160,7 +160,7 @@ if (isset($_POST['add_student'])) {
                         );
                         $ins->execute();
 
-                        $ins2 = $conn->prepare("INSERT INTO users (username,password,role,student_id) VALUES (?,?,'student',?)");
+                        $ins2 = $conn->prepare("INSERT INTO users (username,password,role,student_id,must_change_password) VALUES (?,?,'student',?,1)");
                         $ins2->bind_param("sss", $username, $hashed, $student_id);
                         $ins2->execute();
 
@@ -570,7 +570,7 @@ $active_nav = "students";
               </td>
               <td>
                 <div class="td-actions" style="display:flex;gap:6px;">
-                  <a href="students.php?delete=<?php echo urlencode($s['student_id']); ?>"
+                  <a href="students.php?delete=<?php echo urlencode($s['student_id']); ?>&<?php echo csrf_query(); ?>"
                      class="btn btn-sm btn-delete"
                      onclick="return confirm('Remove <?php echo htmlspecialchars(addslashes($s['first_name'])); ?> from your classes? If no other teacher has them, their account is deleted entirely.')">
                     <i class="ti ti-trash"></i>

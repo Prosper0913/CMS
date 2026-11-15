@@ -1506,6 +1506,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
 
       <!-- Hidden form used solely to bulk-delete this activity -->
       <form method="POST" id="delq_form_<?php echo $gkey; ?>" style="display:none;">
+        <?php echo csrf_field(); ?>
         <input type="hidden" name="del_component"  value="<?php echo htmlspecialchars($current_component); ?>">
         <input type="hidden" name="del_entry_name" value="<?php echo htmlspecialchars($ename); ?>">
         <input type="hidden" name="delete_quiz" value="1">
@@ -1564,7 +1565,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
                       onclick="focusRowEdit('<?php echo $gkey; ?>', '<?php echo $r['id']; ?>')">
                       <i class="ti ti-edit"></i>
                     </button>
-                    <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=<?php echo $active_tab; ?>&del_score=<?php echo $r['id']; ?>"
+                    <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=<?php echo $active_tab; ?>&del_score=<?php echo $r['id']; ?>&<?php echo csrf_query(); ?>"
                        class="btn btn-sm btn-ghost" title="Delete"
                        onclick="return confirm('Delete this score? The grade will be recalculated.')">
                       <i class="ti ti-trash"></i>
@@ -1810,6 +1811,7 @@ elseif ($active_tab === 'attendance'):
 
         <!-- Hidden form used solely to bulk-delete this day -->
         <form method="POST" id="deld_form_<?php echo $dkey; ?>" style="display:none;">
+        <?php echo csrf_field(); ?>
           <input type="hidden" name="dad_date" value="<?php echo htmlspecialchars($d); ?>">
           <input type="hidden" name="delete_attendance_day" value="1">
         </form>
@@ -1899,7 +1901,7 @@ elseif ($active_tab === 'attendance'):
                         onclick="focusAttRowEdit('<?php echo $dkey; ?>', '<?php echo $rk; ?>')">
                         <i class="ti ti-edit"></i>
                       </button>
-                      <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=attendance&att_date=<?php echo $d; ?>&del_attendance=<?php echo urlencode($ar['student_id']); ?>&del_att_date=<?php echo $d; ?>"
+                      <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=attendance&att_date=<?php echo $d; ?>&del_attendance=<?php echo urlencode($ar['student_id']); ?>&del_att_date=<?php echo $d; ?>&<?php echo csrf_query(); ?>"
                          class="btn btn-sm btn-ghost" title="Delete"
                          onclick="return confirm('Delete this attendance record? The grade will be recalculated.')">
                         <i class="ti ti-trash"></i>
@@ -2499,7 +2501,7 @@ elseif ($active_tab === 'announcements'):
             <div style="font-weight:600;font-size:14px;"><?php echo htmlspecialchars($ann['title']); ?></div>
             <div style="font-size:12px;color:var(--text7);margin-top:2px;"><?php echo date('M d, Y g:i A', strtotime($ann['created_at'])); ?></div>
           </div>
-          <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=announcements&del_announcement=<?php echo $ann['id']; ?>"
+          <a href="subject_view.php?id=<?php echo $subject_id; ?>&tab=announcements&del_announcement=<?php echo $ann['id']; ?>&<?php echo csrf_query(); ?>"
              class="btn btn-sm btn-delete"
              onclick="return confirm('Delete this announcement? Students will still keep the notification they already received.');">
             <i class="ti ti-trash"></i>

@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $hashed = password_hash($pw1, PASSWORD_DEFAULT);
                 $conn->begin_transaction();
                 try {
-                    $u1 = $conn->prepare("UPDATE users SET password=? WHERE id=?");
+                    $u1 = $conn->prepare("UPDATE users SET password=?, must_change_password=0 WHERE id=?");
                     $u1->bind_param('si', $hashed, $user['id']);
                     $u1->execute();
 
