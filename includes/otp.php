@@ -99,6 +99,12 @@ function otp_request_and_send(mysqli $conn, string $identifier, string $purpose,
 
     $name = $user['display_name'] ?: $user['username'];
     $sent = send_otp_email($user['email'], $name, $code, (int)(OTP_EXPIRY_SECONDS / 60));
+    if (!$sent) {
+        $rid = (int)$ins->insert_id;
+        $rm = $conn->prepare("DELETE FROM otp_codes WHERE id = ?");
+        $rm->bind_param('i', $rid);
+        $rm->execute();
+    }
 
     audit_log($conn, 'otp_request', $sent ? 'success' : 'failure', [
         'user_id' => $user['id'], 'username' => $user['username'], 'role' => $user['role'],
@@ -229,8 +235,20 @@ function otp_send_to_destination(mysqli $conn, array $user, string $destination,
     $ins->execute();
 
     $name = ($user['display_name'] ?? '') ?: ($user['username'] ?? '');
+    // Release the PHP session lock while the (possibly slow) SMTP call runs. Otherwise every
+    // other tab/request of this user queues behind this one and the whole site looks frozen.
+    $hadSession = session_status() === PHP_SESSION_ACTIVE;
+    if ($hadSession) session_write_close();
     $sent = send_otp_email($destination, (string)$name, $code, (int)(OTP_EXPIRY_SECONDS / 60), $purposeLine);
+    if ($hadSession) @session_start();   // reload $_SESSION for the caller
 
+    if (!$sent) {
+        // An email that never left must not use up the cooldown / hourly allowance.
+        $rid = (int)$ins->insert_id;
+        $rm = $conn->prepare("DELETE FROM otp_codes WHERE id = ?");
+        $rm->bind_param('i', $rid);
+        $rm->execute();
+    }
     audit_log($conn, 'otp_request', $sent ? 'success' : 'failure', [
         'user_id' => $uid, 'username' => $user['username'] ?? null, 'role' => $user['role'] ?? null,
         'reason'  => $sent ? $purpose : $purpose . ':send_failed',

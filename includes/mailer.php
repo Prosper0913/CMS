@@ -39,13 +39,15 @@ function send_otp_email(string $toEmail, string $toName, string $code, int $expi
         $mail->SMTPAuth   = true;
         $mail->Username   = SMTP_USER;
         $mail->Password   = SMTP_PASS;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = SMTP_PORT ?? 587;
+        // SMTP_SECURE: 'tls' (STARTTLS, default; ports 587 / 2525) or 'ssl' (implicit TLS, port 465).
+        $mail->SMTPSecure = (defined('SMTP_SECURE') && SMTP_SECURE === 'ssl')
+            ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = defined('SMTP_PORT') ? SMTP_PORT : 587;
         $mail->CharSet    = 'UTF-8';
-        $mail->Timeout    = 12; // don't hang the request if SMTP is unreachable
+        $mail->Timeout    = 8;  // don't hang the request if SMTP is unreachable
 
         $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Classroom CMS';
-        $mail->setFrom(SMTP_USER, $fromName);
+        $mail->setFrom(defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : SMTP_USER, $fromName);
         $mail->addAddress($toEmail, $toName);
 
         $mail->Subject = "Your Classroom CMS verification code";
@@ -120,10 +122,10 @@ function send_report_issue_email(
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = SMTP_PORT ?? 587;
         $mail->CharSet    = 'UTF-8';
-        $mail->Timeout    = 12;
+        $mail->Timeout    = 8; 
 
         $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Classroom CMS';
-        $mail->setFrom(SMTP_USER, $fromName);
+        $mail->setFrom(defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : SMTP_USER, $fromName);
         $mail->addAddress($toEmail);
         if ($reporterEmail !== '') {
             $mail->addReplyTo($reporterEmail, $reporterName !== '' ? $reporterName : $reporterEmail);
@@ -194,10 +196,10 @@ function send_dev_contact_email(string $type, string $message, string $senderNam
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = SMTP_PORT ?? 587;
         $mail->CharSet    = 'UTF-8';
-        $mail->Timeout    = 12;
+        $mail->Timeout    = 8; 
 
         $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Classroom CMS';
-        $mail->setFrom(SMTP_USER, $fromName);
+        $mail->setFrom(defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : SMTP_USER, $fromName);
         $mail->addAddress($toEmail);
         if ($senderEmail !== '') {
             $mail->addReplyTo($senderEmail, $senderName !== '' ? $senderName : $senderEmail);
