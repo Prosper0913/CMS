@@ -2,11 +2,17 @@
 // ============================================================
 //  student/_nav.php  —  Shared student sidebar
 //  Include this and set $active_nav beforehand:
-//  'dashboard' | 'subjects' | 'notifications'
+//  'dashboard' | 'subjects' | 'messages' | 'notifications'
 //  Expects $conn and $sid to already be set by the including page.
 // ============================================================
 $active_nav = $active_nav ?? '';
 $unread_count = getUnreadNotificationCount($conn, $sid);
+$unread_msgs = 0;
+try {
+    $__q = $conn->prepare("SELECT COUNT(*) AS c FROM student_messages WHERE student_id = ? AND read_at IS NULL");
+    $__q->bind_param('s', $sid); $__q->execute();
+    $unread_msgs = (int)($__q->get_result()->fetch_assoc()['c'] ?? 0);
+} catch (Throwable $e) { /* table not created yet: no badge */ }
 function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ? ' active' : ''); }
 ?>
 <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('is-open'); document.querySelector('.sidebar-overlay').classList.toggle('is-open');" aria-label="Toggle menu">
@@ -21,6 +27,10 @@ function _nav_class($key, $active) { return 'sidebar-link' . ($key === $active ?
   <nav class="sidebar-links">
     <a href="/classroomv2/student/dashboard.php" class="<?php echo _nav_class('dashboard', $active_nav); ?>"><i class="ti ti-home"></i><span>Home</span></a>
     <a href="/classroomv2/student/subjects.php" class="<?php echo _nav_class('subjects', $active_nav); ?>"><i class="ti ti-books"></i><span>My Subjects</span></a>
+    <a href="/classroomv2/student/messages.php" class="<?php echo _nav_class('messages', $active_nav); ?>">
+      <i class="ti ti-message-circle"></i><span>Messages</span>
+      <?php if ($unread_msgs > 0): ?><span class="badge-count"><?php echo $unread_msgs > 9 ? '9+' : $unread_msgs; ?></span><?php endif; ?>
+    </a>
     <a href="/classroomv2/student/notifications.php" class="<?php echo _nav_class('notifications', $active_nav); ?>">
       <i class="ti ti-bell"></i><span>Notifications</span>
       <?php if ($unread_count > 0): ?><span class="badge-count"><?php echo $unread_count > 9 ? '9+' : $unread_count; ?></span><?php endif; ?>

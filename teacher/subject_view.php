@@ -35,7 +35,7 @@ if (!$subject) { header("Location: /classroomv2/teacher/dashboard.php"); exit; }
 
 $active_tab = $_GET['tab'] ?? 'overview';
 if ($active_tab === 'biometric') $active_tab = 'rfid';   // old bookmarked links
-$valid_tabs = ['overview','written','exams','performance','attendance','rfid','grades','announcements','settings'];
+$valid_tabs = ['overview','written','exams','performance','attendance','rfid','grades','announcements','messages','settings'];
 if (!in_array($active_tab, $valid_tabs)) $active_tab = 'overview';
 
 $success_msg = '';
@@ -384,6 +384,51 @@ if (isset($_POST['save_attendance']) && $subject_locked) {
         }
     }
     $success_msg = "Attendance saved for <strong>{$att_date}</strong>.";
+}
+
+// ── POST direct message to ONE student (max 500 words) ────────
+const STUDENT_MSG_MAX_WORDS = 500;
+if (isset($_POST['send_student_message']) && $subject_locked) {
+    $error_msg = $LOCKED_MSG;
+} elseif (isset($_POST['send_student_message'])) {
+    $msg_sid  = trim($_POST['msg_student_id'] ?? '');
+    $msg_body = trim(str_replace("\r\n", "\n", (string)($_POST['msg_body'] ?? '')));
+    $msg_words = preg_match_all('/\S+/u', $msg_body);
+    $en = $conn->prepare("SELECT 1 FROM subject_enrollments WHERE subject_id = ? AND student_id = ? LIMIT 1");
+    $en->bind_param('is', $subject_id, $msg_sid);
+    $en->execute();
+    if ($msg_sid === '' || !$en->get_result()->fetch_row()) {
+        $error_msg = "Please choose a student who is enrolled in this subject.";
+    } elseif ($msg_body === '') {
+        $error_msg = "Please write a message first.";
+    } elseif ($msg_words > STUDENT_MSG_MAX_WORDS || mb_strlen($msg_body) > 6000) {
+        $error_msg = "Your message is too long ({$msg_words} words). The limit is " . STUDENT_MSG_MAX_WORDS . " words.";
+    } else {
+        try {
+            $mi = $conn->prepare("INSERT INTO student_messages (subject_id, teacher_id, student_id, body, word_count) VALUES (?,?,?,?,?)");
+            $mi->bind_param('iissi', $subject_id, $teacher_id, $msg_sid, $msg_body, $msg_words);
+            $mi->execute();
+            $new_msg_id = (int)$conn->insert_id;
+
+            $tn = $conn->prepare("SELECT COALESCE(NULLIF(display_name,''), username) AS n FROM users WHERE id = ?");
+            $tn->bind_param('i', $teacher_id);
+            $tn->execute();
+            $tname = $tn->get_result()->fetch_assoc()['n'] ?? 'Your teacher';
+            $excerpt = mb_strlen($msg_body) > 140 ? mb_substr($msg_body, 0, 140) . '…' : $msg_body;
+
+            createNotification(
+                $conn, $msg_sid, 'announcement',
+                "Message from {$tname} ({$subject['subject_code']})",
+                $excerpt,
+                "/classroomv2/student/messages.php?id={$new_msg_id}",
+                $subject_id
+            );
+            $success_msg = "Message sent.";
+        } catch (Throwable $e) {
+            error_log('[student_messages] ' . $e->getMessage());
+            $error_msg = "Couldn't send the message right now. Please try again, and tell the administrator if it keeps happening.";
+        }
+    }
 }
 
 // ── POST announcement ─────────────────────────────────────────
@@ -966,6 +1011,7 @@ $bio_scans_today = $bscans_q->get_result()->fetch_all(MYSQLI_ASSOC);
     ['rfid',        'ti-id-badge-2',        'RFID Attendance',     null],
     ['grades',      'ti-chart-bar',         'Grades',         null],
     ['announcements','ti-speakerphone',     'Announcements',  null],
+    ['messages',    'ti-message-circle',    'Messages',       null],
     ['settings',    'ti-settings',          'Settings',       null],
   ];
   foreach ($tabs as [$tab_id, $icon, $label, $count]):
@@ -2467,6 +2513,95 @@ elseif ($active_tab === 'announcements'):
   </div>
 
 </div>
+
+<?php
+// ══════════════════════════════════════════════════════
+//  TAB: MESSAGES  (teacher → one student, max 500 words)
+// ══════════════════════════════════════════════════════
+elseif ($active_tab === 'messages'):
+    $msg_students = getEnrollees($conn, $subject_id)->fetch_all(MYSQLI_ASSOC);
+    $sent_list = [];
+    try {
+        $sl = $conn->prepare(
+            "SELECT m.id, m.body, m.created_at, m.read_at, s.last_name, s.first_name
+             FROM student_messages m JOIN students s ON s.student_id = m.student_id
+             WHERE m.subject_id = ? AND m.teacher_id = ?
+             ORDER BY m.created_at DESC LIMIT 30"
+        );
+        $sl->bind_param('ii', $subject_id, $teacher_id);
+        $sl->execute();
+        $sent_list = $sl->get_result()->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[student_messages] ' . $e->getMessage());
+    }
+    $keep_sid  = $_POST['msg_student_id'] ?? '';
+    $keep_body = ($error_msg !== '' && isset($_POST['send_student_message'])) ? ($_POST['msg_body'] ?? '') : '';
+?>
+<div class="settings-wrap">
+<div style="display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;">
+  <div class="card" style="margin-bottom:20px;">
+    <p class="card-title"><i class="ti ti-message-circle"></i> Message a Student</p>
+    <p style="font-size:12px;color:var(--text7);margin-bottom:14px;">
+      A private message to one student in this subject (up to <?php echo STUDENT_MSG_MAX_WORDS; ?> words). They get a notification and can read it under Messages.
+    </p>
+    <form method="POST" id="studentMsgForm">
+      <div class="form-group">
+        <label>Student</label>
+        <select name="msg_student_id" class="form-control" required>
+          <option value="">— choose a student —</option>
+          <?php foreach ($msg_students as $ms): ?>
+            <option value="<?php echo htmlspecialchars($ms['student_id']); ?>" <?php echo $keep_sid === $ms['student_id'] ? 'selected' : ''; ?>>
+              <?php echo htmlspecialchars($ms['last_name'] . ', ' . $ms['first_name']); ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label>Message</label>
+        <textarea name="msg_body" id="msgBody" class="form-control" rows="8" required
+                  placeholder="Write your message…"><?php echo htmlspecialchars($keep_body); ?></textarea>
+        <div id="msgCounter" style="font-size:12px;margin-top:4px;color:var(--text7);">0 / <?php echo STUDENT_MSG_MAX_WORDS; ?> words</div>
+      </div>
+      <button type="submit" name="send_student_message" value="1" id="msgSend" class="btn btn-primary" style="margin-top:14px;">
+        <i class="ti ti-send"></i> Send Message
+      </button>
+    </form>
+  </div>
+
+  <div class="card">
+    <p class="card-title"><i class="ti ti-list"></i> Recent Messages You Sent</p>
+    <?php if (empty($sent_list)): ?>
+      <p style="font-size:13px;color:var(--text7);">No messages sent for this subject yet.</p>
+    <?php else: foreach ($sent_list as $m): ?>
+      <div style="padding:12px 0;border-top:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <strong style="font-size:13.5px;">To: <?php echo htmlspecialchars($m['last_name'] . ', ' . $m['first_name']); ?></strong>
+          <span style="font-size:12px;color:var(--text7);">
+            <?php echo date('M d, Y g:i A', strtotime($m['created_at'])); ?> ·
+            <?php echo $m['read_at'] ? 'Read' : 'Not read yet'; ?>
+          </span>
+        </div>
+        <p style="font-size:13.5px;margin-top:6px;white-space:pre-wrap;"><?php echo htmlspecialchars($m['body']); ?></p>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+</div>
+</div>
+<script>
+(function(){
+  var MAX = <?php echo STUDENT_MSG_MAX_WORDS; ?>;
+  var ta = document.getElementById('msgBody'), c = document.getElementById('msgCounter'), b = document.getElementById('msgSend');
+  function upd(){
+    var m = ta.value.trim().match(/\S+/g), n = m ? m.length : 0;
+    c.textContent = n + ' / ' + MAX + ' words';
+    var over = n > MAX;
+    c.style.color = over ? '#dc2626' : '';
+    c.style.fontWeight = over ? '700' : '';
+    b.disabled = over;
+  }
+  ta.addEventListener('input', upd); upd();
+})();
+</script>
 
 <?php
 // ══════════════════════════════════════════════════════
