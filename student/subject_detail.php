@@ -91,10 +91,12 @@ $att_rows = $aq->get_result()->fetch_all(MYSQLI_ASSOC);
 $att_total   = count($att_rows);
 $att_present = 0;
 $att_late    = 0;
+$att_excused = 0;
 $att_absent  = 0;
 foreach ($att_rows as $ar) {
     if ($ar['status'] === 'Present')     $att_present++;
     elseif ($ar['status'] === 'Late')    $att_late++;
+    elseif ($ar['status'] === 'Excused') $att_excused++;
     else                                  $att_absent++;
 }
 
@@ -305,6 +307,10 @@ $pass = $fg >= 75;
         <div class="att-chip-lbl">Late</div>
       </div>
       <div class="att-chip">
+        <div class="att-chip-val" style="color:var(--accent);"><?php echo $att_excused; ?></div>
+        <div class="att-chip-lbl">Excused</div>
+      </div>
+      <div class="att-chip">
         <div class="att-chip-val text-red"><?php echo $att_absent; ?></div>
         <div class="att-chip-lbl">Absent</div>
       </div>
@@ -314,7 +320,7 @@ $pass = $fg >= 75;
       </div>
     </div>
     <?php if ($att_total > 0):
-      $rate = ($att_present + $att_late * 0.5) / $att_total * 100;
+      $rate = attendance_rate_pct($att_total, $att_absent, $att_late);
     ?>
     <div style="display:flex;align-items:center;gap:12px;">
       <div style="flex:1;height:8px;background:var(--bg3);border-radius:99px;overflow:hidden;">
@@ -439,6 +445,10 @@ $pass = $fg >= 75;
         <div class="att-chip-lbl">Late</div>
       </div>
       <div class="att-chip">
+        <div class="att-chip-val" style="color:var(--accent);"><?php echo $att_excused; ?></div>
+        <div class="att-chip-lbl">Excused</div>
+      </div>
+      <div class="att-chip">
         <div class="att-chip-val text-red"><?php echo $att_absent; ?></div>
         <div class="att-chip-lbl">Absent</div>
       </div>
@@ -450,7 +460,7 @@ $pass = $fg >= 75;
 
     <!-- Rate bar -->
     <?php
-      $rate = ($att_present + $att_late * 0.5) / $att_total * 100;
+      $rate = attendance_rate_pct($att_total, $att_absent, $att_late);
     ?>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <span>Attendance Rate</span>
@@ -468,6 +478,7 @@ $pass = $fg >= 75;
         $status_class = match($ar['status']) {
           'Present' => 'status-present',
           'Late'    => 'status-late',
+          'Excused' => 'status-excused',
           default   => 'status-absent',
         };
       ?>

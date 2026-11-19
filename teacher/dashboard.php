@@ -34,10 +34,10 @@ $subjects_stmt = $conn->prepare(
          WHERE subject_id = s.id AND final_grade > 0)                     AS class_avg,
         (SELECT COUNT(*)
          FROM subject_grades
-         WHERE subject_id = s.id AND final_grade >= 75)                   AS passing,
+         WHERE subject_id = s.id AND final_grade >= " . PASSING_GRADE . ")                   AS passing,
         (SELECT COUNT(*)
          FROM subject_grades
-         WHERE subject_id = s.id AND final_grade > 0 AND final_grade < 75) AS failing,
+         WHERE subject_id = s.id AND final_grade > 0 AND final_grade < " . PASSING_GRADE . ") AS failing,
         (SELECT COUNT(DISTINCT date)
          FROM attendance
          WHERE subject_id = s.id)                                         AS class_days
@@ -55,8 +55,8 @@ $totals_stmt = $conn->prepare(
         COUNT(DISTINCT s.id)            AS total_subjects,
         COUNT(DISTINCT e.student_id)    AS total_students,
         ROUND(AVG(g.final_grade),1)     AS overall_avg,
-        SUM(g.final_grade >= 75)        AS total_passing,
-        SUM(g.final_grade > 0 AND g.final_grade < 75) AS total_failing
+        SUM(g.final_grade >= " . PASSING_GRADE . ")        AS total_passing,
+        SUM(g.final_grade > 0 AND g.final_grade < " . PASSING_GRADE . ") AS total_failing
      FROM subjects s
      LEFT JOIN subject_enrollments e ON e.subject_id = s.id
      LEFT JOIN subject_grades g      ON g.subject_id = s.id
@@ -74,7 +74,7 @@ $at_risk = $conn->prepare(
      FROM subject_grades g
      JOIN students st   ON st.student_id  = g.student_id
      JOIN subjects sub  ON sub.id         = g.subject_id
-     WHERE sub.teacher_id = ? AND g.final_grade > 0 AND g.final_grade < 75
+     WHERE sub.teacher_id = ? AND g.final_grade > 0 AND g.final_grade < " . PASSING_GRADE . "
      ORDER BY g.final_grade ASC
      LIMIT 8"
 );

@@ -99,7 +99,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv' && ($active_tab === 'gra
         fputcsv($out, [
             $r['student_id'], $r['last_name'], $r['first_name'],
             round($r['ea'],2), round($r['wa'],2), round($r['pa'],2), round($r['ar'],2),
-            round($r['fg'],2), $r['lg'], $r['fg'] >= 75 ? 'Passed' : 'Failed'
+            round($r['fg'],2), $r['lg'], $r['fg'] >= PASSING_GRADE ? 'Passed' : 'Failed'
         ]);
     }
     fclose($out);
@@ -209,7 +209,7 @@ if (isset($_POST['add_score']) && $subject_locked) {
              // separate notification from the "new output" one above so
              // a struggling student sees it distinctly, not buried in a
              // generic "posted" message.
-             if ($total_all > 0 && ($score / $total_all * 100) < 50) {
+             if ($total_all > 0 && ($score / $total_all * 100) < PASSING_GRADE) {
                  createNotification(
                      $conn, $sid, 'low_score',
                      "Low score on {$entry_name}",
@@ -364,8 +364,9 @@ if (isset($_POST['save_attendance']) && $subject_locked) {
     $att_date = $_POST['att_date'];
     $statuses = $_POST['att_status'] ?? [];
     foreach ($statuses as $sid => $status) {
+        if (!in_array($status, ['Present', 'Late', 'Excused', 'Absent'], true)) continue;
         $sid     = $conn->real_escape_string($sid);
-        $time_in = ($status === 'Absent') ? null : ($_POST['time_in'][$sid] ?? null);
+        $time_in = in_array($status, ['Absent','Excused'], true) ? null : ($_POST['time_in'][$sid] ?? null);
         $remarks = $conn->real_escape_string($_POST['att_remarks'][$sid] ?? '');
         $src     = 'Manual';
         $a = $conn->prepare(
@@ -479,7 +480,7 @@ if (isset($_POST['bulk_edit_attendance']) && $subject_locked) {
     $bea_date     = $_POST['bea_date'] ?? '';
     $bea_statuses = $_POST['bea_status']  ?? [];
     $bea_times    = $_POST['bea_time_in'] ?? [];
-    $valid_statuses = ['Present', 'Late', 'Absent'];
+    $valid_statuses = ['Present', 'Late', 'Excused', 'Absent'];
 
     if ($bea_date === '') {
         $error_msg = "Invalid day for bulk attendance edit.";
@@ -487,7 +488,7 @@ if (isset($_POST['bulk_edit_attendance']) && $subject_locked) {
         $updated_count = 0;
         foreach ($bea_statuses as $sid => $status) {
             if (!in_array($status, $valid_statuses)) continue;
-            $time_in = ($status === 'Absent') ? null : (($bea_times[$sid] ?? '') !== '' ? $bea_times[$sid] : null);
+            $time_in = in_array($status, ['Absent','Excused'], true) ? null : (($bea_times[$sid] ?? '') !== '' ? $bea_times[$sid] : null);
 
             $u = $conn->prepare(
                 "UPDATE attendance SET status = ?, time_in = ?, source = 'Manual'
@@ -773,8 +774,8 @@ $stats = $conn->prepare(
     "SELECT
         ROUND(AVG(final_grade),1)                         AS avg,
         ROUND(MAX(final_grade),1)                         AS highest,
-        SUM(final_grade >= 75)                            AS passing,
-        SUM(final_grade > 0 AND final_grade < 75)         AS failing,
+        SUM(final_grade >= " . PASSING_GRADE . ")                 AS passing,
+        SUM(final_grade > 0 AND final_grade < " . PASSING_GRADE . ") AS failing,
         COUNT(*)                                          AS total
      FROM subject_grades WHERE subject_id = ?"
 );
@@ -1073,7 +1074,7 @@ if ($active_tab === 'overview'):
     while ($r = $cd->fetch_assoc()) {
         $chart_labels[] = $enr_map[$r['student_id']] ?? $r['student_id'];
         $chart_values[] = round((float)$r['final_grade'], 1);
-        $chart_colors[] = (float)$r['final_grade'] >= 75 ? 'rgba(52,211,153,.7)' : 'rgba(248,113,113,.7)';
+        $chart_colors[] = (float)$r['final_grade'] >= PASSING_GRADE ? 'rgba(52,211,153,.7)' : 'rgba(248,113,113,.7)';
     }
 
     // ── At-risk students (this subject only) ─────────────────────
@@ -1082,7 +1083,7 @@ $sv_risk_stmt = $conn->prepare(
             g.final_grade, g.letter_grade
      FROM subject_grades g
      JOIN students st ON st.student_id = g.student_id
-     WHERE g.subject_id = ? AND g.final_grade > 0 AND g.final_grade < 75
+     WHERE g.subject_id = ? AND g.final_grade > 0 AND g.final_grade < " . PASSING_GRADE . "
      ORDER BY g.final_grade ASC
      LIMIT 8"
 );
@@ -1281,7 +1282,7 @@ $sv_comp_colors = [
         </div>
         <div class="recent-score">
           <?php echo $r['score'].'/'.$r['total_items']; ?>
-          <span style="color:<?php echo $sv_pct>=75?'var(--green)':'var(--red)'; ?>;">
+          <span style="color:<?php echo $sv_pct>=PASSING_GRADE?'var(--green)':'var(--red)'; ?>;">
             (<?php echo $sv_pct; ?>%)
           </span>
         </div>
@@ -1470,7 +1471,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
               <span>Total items: <strong class="text-muted"><?php echo $total; ?></strong></span>
               <span>Students: <strong class="text-muted"><?php echo count($rows); ?></strong></span>
               <span>Class avg:
-                <strong style="color:<?php echo $avg_pct >= 75 ? 'var(--green)' : 'var(--red)'; ?>">
+                <strong style="color:<?php echo $avg_pct >= PASSING_GRADE ? 'var(--green)' : 'var(--red)'; ?>">
                   <?php echo number_format($avg_pct, 1); ?>%
                 </strong>
               </span>
@@ -1529,7 +1530,7 @@ elseif (in_array($active_tab, ['written','exams','performance'])):
               <tbody>
                 <?php foreach ($rows as $r):
                     $pct = $r['total_items'] > 0 ? $r['score'] / $r['total_items'] * 100 : 0;
-                    $pc  = $pct >= 75 ? 'var(--green)' : ($pct >= 60 ? 'var(--yellow)' : 'var(--red)');
+                    $pc  = $pct >= 75 ? 'var(--green)' : ($pct >= PASSING_GRADE ? 'var(--yellow)' : 'var(--red)');
                 ?>
                 <tr>
                   <td>
@@ -1601,7 +1602,7 @@ elseif ($active_tab === 'attendance'):
     while ($r = $aer->fetch_assoc()) $att_existing[$r['student_id']] = $r;
 
     // Attendance summary counts for the selected date
-    $att_summary = ['Present' => 0, 'Late' => 0, 'Absent' => 0];
+    $att_summary = ['Present' => 0, 'Late' => 0, 'Excused' => 0, 'Absent' => 0];
     foreach ($att_existing as $row) {
         if (isset($att_summary[$row['status']])) $att_summary[$row['status']]++;
     }
@@ -1631,10 +1632,11 @@ elseif ($active_tab === 'attendance'):
 ?>
 
 <!-- Stat chips 
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;">
   <?php foreach ([
     ['Present', $att_summary['Present'],    'var(--green)',  'var(--bg4)',  'rgba(52,211,153,.25)'],
     ['Late',    $att_summary['Late'],        'var(--yellow)', 'var(--bg4)','rgba(251,191,36,.25)'],
+    ['Excused', $att_summary['Excused'],     'var(--accent)', 'var(--bg4)','rgba(96,165,250,.25)'],
     ['Absent',  $att_summary['Absent'],      'var(--red)',    'var(--bg4)',   'rgba(248,113,113,.25)'],
     ['Total',   $enrollee_count,             'var(--accent)', 'var(--bg4)','var(--accent-glow)'],
   ] as [$lbl, $val, $col, $bg, $bdr]): ?>
@@ -1709,7 +1711,7 @@ elseif ($active_tab === 'attendance'):
               <?php echo htmlspecialchars($s['last_name'] . ', ' . $s['first_name']); ?>
             </span>
             <div class="att-radio-group">
-              <?php foreach (['Present','Late','Absent'] as $opt): ?>
+              <?php foreach (['Present','Late','Excused','Absent'] as $opt): ?>
               <input type="radio"
                 name="att_status[<?php echo htmlspecialchars($sid); ?>]"
                 id="att_<?php echo htmlspecialchars($sid) . '_' . $opt; ?>"
@@ -1725,7 +1727,7 @@ elseif ($active_tab === 'attendance'):
               id="timein_<?php echo htmlspecialchars($sid); ?>"
               class="form-control" style="width:110px;padding:5px 8px;font-size:12px;"
               value="<?php echo htmlspecialchars($timein); ?>"
-              <?php echo $status === 'Absent' ? 'disabled' : ''; ?>>-->
+              <?php echo in_array($status, ['Absent','Excused'], true) ? 'disabled' : ''; ?>>-->
           </div>
           <?php endwhile; ?>
         </div>
@@ -1753,7 +1755,7 @@ elseif ($active_tab === 'attendance'):
 
       <?php foreach ($att_dates as $d):
           $day_rows = $att_grouped[$d] ?? [];
-          $day_counts = ['Present' => 0, 'Late' => 0, 'Absent' => 0];
+          $day_counts = ['Present' => 0, 'Late' => 0, 'Excused' => 0, 'Absent' => 0];
           foreach ($day_rows as $dr) {
               if (isset($day_counts[$dr['status']])) $day_counts[$dr['status']]++;
           }
@@ -1776,6 +1778,7 @@ elseif ($active_tab === 'attendance'):
               <div style="display:flex;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap;">
                 <span class="text-green"><?php echo $day_counts['Present']; ?> Present</span>
                 <span class="text-muted"><?php echo $day_counts['Late']; ?> Late</span>
+                <span style="color:var(--accent);"><?php echo $day_counts['Excused']; ?> Excused</span>
                 <span class="text-red"><?php echo $day_counts['Absent']; ?> Absent</span>
               </div>
             </div>
@@ -1836,12 +1839,14 @@ elseif ($active_tab === 'attendance'):
                       $st_color = match($ar['status'] ?? '') {
                         'Present' => 'var(--green)',
                         'Late'    => 'var(--yellow)',
+                        'Excused' => 'var(--accent)',
                         'Absent'  => 'var(--red)',
                         default   => 'var(--text3)',
                       };
                       $st_bg = match($ar['status'] ?? '') {
                         'Present' => 'var(--green-dim)',
                         'Late'    => 'var(--yellow-dim)',
+                        'Excused' => 'var(--accent-glow)',
                         'Absent'  => 'var(--red-dim)',
                         default   => 'var(--bg3)',
                       };
@@ -1862,7 +1867,7 @@ elseif ($active_tab === 'attendance'):
                         </span>
                       </span>
                       <span class="att-edit-input" style="display:none;" id="att_radios_<?php echo $rk; ?>">
-                        <?php foreach (['Present','Late','Absent'] as $opt): ?>
+                        <?php foreach (['Present','Late','Excused','Absent'] as $opt): ?>
                         <label style="font-size:12px;margin-right:25px;">
                           <input type="radio"
                             name="bea_status[<?php echo htmlspecialchars($ar['student_id']); ?>]"
@@ -1885,7 +1890,7 @@ elseif ($active_tab === 'attendance'):
                         name="bea_time_in[<?php echo htmlspecialchars($ar['student_id']); ?>]"
                         style="display:none;width:100px;padding:4px 6px;font-size:11px;"
                         value="<?php echo htmlspecialchars(substr($ar['time_in'] ?? '', 0, 5)); ?>"
-                        <?php echo $ar['status'] === 'Absent' ? 'disabled' : ''; ?>>
+                        <?php echo in_array($ar['status'], ['Absent','Excused'], true) ? 'disabled' : ''; ?>>
                     </td>-->
                     <td style="font-size:11px;color:var(--text7);">
                       <?php if ($ar['source'] === 'RFID'): ?>
@@ -2170,6 +2175,7 @@ elseif ($active_tab === 'rfid'):
   function statusBadge(s) {
     if (s === 'Present') return badge('Present','#34d399','rgba(52,211,153,.12)');
     if (s === 'Late')    return badge('Late','#fbbf24','rgba(251,191,36,.12)');
+    if (s === 'Excused') return badge('Excused','#60a5fa','rgba(96,165,250,.12)');
     if (s === 'Absent')  return badge('Absent','#f87171','rgba(248,113,113,.12)');
     return badge('—','#979090','#1e5f4e');
   }
@@ -2392,11 +2398,11 @@ elseif ($active_tab === 'grades'):
         <?php endif; ?>
         <?php $rank = 1; while ($r = $grades_res->fetch_assoc()):
             $fg   = (float)$r['final_grade'];
-            $pass = $fg >= 75;
+            $pass = $fg >= PASSING_GRADE;
             $letter_color = match(true) {
                 $fg >= 85 => 'badge-green',
                 $fg >= 75 => 'badge-blue',
-                $fg >= 70 => 'badge-yellow',
+                $fg >= PASSING_GRADE => 'badge-yellow',
                 $fg > 0   => 'badge-red',
                 default   => '',
             };
@@ -2420,14 +2426,14 @@ elseif ($active_tab === 'grades'):
               <div class="score-bar-track">
                 <div class="score-bar-fill" style="width:<?php echo min($v,100); ?>%;"></div>
               </div>
-              <span style="font-size:12px;min-width:40px;text-align:right;color:<?php echo $v >= 75 ? 'var(--green)' : ($v > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
+              <span style="font-size:12px;min-width:40px;text-align:right;color:<?php echo $v >= PASSING_GRADE ? 'var(--green)' : ($v > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
                 <?php echo $v > 0 ? number_format($v,1) . '%' : '—'; ?>
               </span>
             </div>
           </td>
           <?php endforeach; ?>
           <td>
-            <span style="font-family:var(--font-head);font-size:13px;font-weight:700;color:<?php echo $fg >= 75 ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
+            <span style="font-family:var(--font-head);font-size:13px;font-weight:700;color:<?php echo $fg >= PASSING_GRADE ? 'var(--green)' : ($fg > 0 ? 'var(--red)' : 'var(--text7)'); ?>;">
               <?php echo $fg > 0 ? number_format($fg,2) . '%' : '—'; ?>
             </span>
           </td>
@@ -2935,7 +2941,7 @@ function calcPct(inp, sid) {
   if (total > 0) {
     const pct = score / total * 100;
     el.textContent = pct.toFixed(1) + '%';
-    el.style.color = pct >= 75 ? 'var(--green)' : 'var(--red)';
+    el.style.color = pct >= <?php echo PASSING_GRADE; ?> ? 'var(--green)' : 'var(--red)';
   }
 }
 
@@ -3022,7 +3028,7 @@ document.addEventListener('change', e => {
   const sid = match[1];
   const ti = document.getElementById('timein_' + sid);
   if (!ti) return;
-  ti.disabled = e.target.value === 'Absent';
+  ti.disabled = (e.target.value === 'Absent' || e.target.value === 'Excused');
   if (ti.disabled) ti.value = '';
 });
 

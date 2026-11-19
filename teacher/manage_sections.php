@@ -333,7 +333,7 @@ if ($active_section && $view === 'analytics') {
         $gq->execute();
         $grades  = array_column($gq->get_result()->fetch_all(MYSQLI_ASSOC), 'final_grade');
         $avg     = $grades ? array_sum($grades) / count($grades) : null;
-        $passing = $grades ? count(array_filter($grades, fn($g) => $g >= 75)) : 0;
+        $passing = $grades ? count(array_filter($grades, fn($g) => $g >= PASSING_GRADE)) : 0;
 
         $aq = $conn->prepare("SELECT status, COUNT(*) AS c FROM attendance WHERE subject_id = ? GROUP BY status");
         $aq->bind_param('i', $sub_id);
@@ -343,7 +343,7 @@ if ($active_section && $view === 'analytics') {
         $att_present = 0;
         foreach ($att_counts as $row) {
             $att_total += (int)$row['c'];
-            if (in_array($row['status'], ['Present', 'Late'], true)) $att_present += (int)$row['c'];
+            if (in_array($row['status'], ['Present', 'Late', 'Excused'], true)) $att_present += (int)$row['c'];
         }
         $att_rate = $att_total > 0 ? ($att_present / $att_total) * 100 : null;
 

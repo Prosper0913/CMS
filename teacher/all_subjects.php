@@ -62,10 +62,10 @@ $sql = "SELECT s.*,
              WHERE subject_id = s.id AND final_grade > 0)                     AS class_avg,
             (SELECT COUNT(*)
              FROM subject_grades
-             WHERE subject_id = s.id AND final_grade >= 75)                   AS passing,
+             WHERE subject_id = s.id AND final_grade >= " . PASSING_GRADE . ")                   AS passing,
             (SELECT COUNT(*)
              FROM subject_grades
-             WHERE subject_id = s.id AND final_grade > 0 AND final_grade < 75) AS failing,
+             WHERE subject_id = s.id AND final_grade > 0 AND final_grade < " . PASSING_GRADE . ") AS failing,
             (SELECT COUNT(DISTINCT date)
              FROM attendance
              WHERE subject_id = s.id)                                         AS class_days
@@ -93,8 +93,8 @@ $totals_sql = "SELECT
         COUNT(DISTINCT s.id)            AS total_subjects,
         COUNT(DISTINCT e.student_id)    AS total_students,
         ROUND(AVG(g.final_grade),1)     AS overall_avg,
-        SUM(g.final_grade >= 75)        AS total_passing,
-        SUM(g.final_grade > 0 AND g.final_grade < 75) AS total_failing
+        SUM(g.final_grade >= " . PASSING_GRADE . ")        AS total_passing,
+        SUM(g.final_grade > 0 AND g.final_grade < " . PASSING_GRADE . ") AS total_failing
      FROM subjects s
      LEFT JOIN subject_enrollments e ON e.subject_id = s.id
      LEFT JOIN subject_grades g      ON g.subject_id = s.id
