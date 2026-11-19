@@ -9,3 +9,6 @@ ToDoList.md
 *.md
 **/secrets.h
 !**/secrets.example.h
+
+*.bak
+*.zip
